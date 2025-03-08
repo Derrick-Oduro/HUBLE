@@ -1,14 +1,16 @@
-import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import tw from "../lib/tailwind";
+import { Tabs } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
+import tw from "../lib/\/tailwind"
 
-export default function Layout() {
+export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: tw`bg-white border-t border-gray-200`,
+        tabBarStyle: tw`bg-gray-800 border-t border-gray-700`,
         tabBarLabelStyle: tw`text-xs`,
+        tabBarActiveTintColor: "#8B5CF6", // Violet color for active tab
+        tabBarInactiveTintColor: "#9CA3AF", // Gray color for inactive tabs
       }}
     >
       {/* 🏠 Habits (Landing Page) */}
@@ -16,9 +18,7 @@ export default function Layout() {
         name="index"
         options={{
           title: "Habits",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="checkmark-circle-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="checkmark-circle-outline" size={size} color={color} />,
         }}
       />
 
@@ -27,9 +27,7 @@ export default function Layout() {
         name="dailies"
         options={{
           title: "Dailies",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" size={size} color={color} />,
         }}
       />
 
@@ -38,9 +36,7 @@ export default function Layout() {
         name="routines"
         options={{
           title: "Routines",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="repeat-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="repeat-outline" size={size} color={color} />,
         }}
       />
 
@@ -49,9 +45,7 @@ export default function Layout() {
         name="timer"
         options={{
           title: "Timer",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
         }}
       />
 
@@ -60,11 +54,10 @@ export default function Layout() {
         name="more"
         options={{
           title: "More",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="ellipsis-horizontal" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="ellipsis-horizontal" size={size} color={color} />,
         }}
       />
     </Tabs>
-  );
+  )
 }
+
