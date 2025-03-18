@@ -6,18 +6,46 @@ import { Ionicons } from "@expo/vector-icons"
 import tw from "../lib/tailwind"
 
 interface HabitItemProps {
-  id: number
+  id?: number | string
   title: string
   color: string
   subtext?: string
-  onEdit: (id: number) => void
-  onDelete: (id: number) => void
-  onComplete: (id: number) => void
-  onFail: (id: number) => void
+  onEdit?: (id: number | string) => void
+  onDelete?: (id: number | string) => void
+  onComplete?: (id: number | string) => void
+  onFail?: (id: number | string) => void
 }
 
-export default function HabitItem({ id, title, color, subtext, onEdit, onDelete, onComplete, onFail }: HabitItemProps) {
+export default function HabitItem({
+  id = 0,
+  title,
+  color,
+  subtext,
+  onEdit = () => {},
+  onDelete = () => {},
+  onComplete = () => {},
+  onFail = () => {},
+}: HabitItemProps) {
   const [showOptions, setShowOptions] = useState(false)
+
+  // Safe handler functions that check if id exists before calling callbacks
+  const handleEdit = () => {
+    setShowOptions(false)
+    if (id !== undefined) onEdit(id)
+  }
+
+  const handleDelete = () => {
+    setShowOptions(false)
+    if (id !== undefined) onDelete(id)
+  }
+
+  const handleComplete = () => {
+    if (id !== undefined) onComplete(id)
+  }
+
+  const handleFail = () => {
+    if (id !== undefined) onFail(id)
+  }
 
   return (
     <View style={tw`bg-gray-800 rounded-xl mb-3 overflow-hidden shadow-lg`}>
@@ -29,10 +57,10 @@ export default function HabitItem({ id, title, color, subtext, onEdit, onDelete,
               {subtext && <Text style={tw`text-gray-400 text-sm`}>{subtext}</Text>}
             </View>
             <View style={tw`flex-row items-center`}>
-              <TouchableOpacity style={tw`mr-2 p-1`} onPress={() => onFail(id)}>
+              <TouchableOpacity style={tw`mr-2 p-1`} onPress={handleFail}>
                 <Ionicons name="remove-circle-outline" size={28} color="#9CA3AF" />
               </TouchableOpacity>
-              <TouchableOpacity style={tw`mr-2 p-1`} onPress={() => onComplete(id)}>
+              <TouchableOpacity style={tw`mr-2 p-1`} onPress={handleComplete}>
                 <Ionicons name="checkmark-circle-outline" size={28} color="#9CA3AF" />
               </TouchableOpacity>
               <TouchableOpacity style={tw`p-1`} onPress={() => setShowOptions(true)}>
@@ -50,22 +78,10 @@ export default function HabitItem({ id, title, color, subtext, onEdit, onDelete,
           onPress={() => setShowOptions(false)}
         >
           <View style={tw`bg-gray-800 rounded-xl p-4 m-4 absolute right-0 top-1/4`}>
-            <TouchableOpacity
-              style={tw`py-2`}
-              onPress={() => {
-                setShowOptions(false)
-                onEdit(id)
-              }}
-            >
+            <TouchableOpacity style={tw`py-2`} onPress={handleEdit}>
               <Text style={tw`text-white text-lg`}>Edit</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={tw`py-2`}
-              onPress={() => {
-                setShowOptions(false)
-                onDelete(id)
-              }}
-            >
+            <TouchableOpacity style={tw`py-2`} onPress={handleDelete}>
               <Text style={tw`text-white text-lg`}>Delete</Text>
             </TouchableOpacity>
           </View>
