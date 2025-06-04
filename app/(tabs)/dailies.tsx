@@ -7,7 +7,7 @@ import tw from "../../lib/tailwind"
 import AddDailyModal from "../../components/AddDailyModal"
 import ProgressBar from "../../components/ProgressBar"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useStats } from "../../contexts/StatsContext"
+import { useStats } from "../../contexts/StatsProvider"
 import React from "react"
 
 export default function Dailies() {

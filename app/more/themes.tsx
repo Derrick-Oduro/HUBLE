@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { useState } from "react"
 import tw from "../../lib/tailwind"
 import PageTemplate from "../../components/PageTemplate"
+import React from "react"
 
 export default function Themes() {
   const [darkMode, setDarkMode] = useState(true)

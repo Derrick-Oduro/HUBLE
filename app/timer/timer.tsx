@@ -15,7 +15,8 @@ import {
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useStats } from "../../contexts/StatsContext"
+import { useStats } from "../../contexts/StatsProvider"
+import React from "react"
 
 // Mock data for habits - in a real app, this would come from your habits state/database
 const habitsList = [
@@ -49,7 +50,7 @@ export default function Timer() {
   const [selectedHabit, setSelectedHabit] = useState(null)
   const [countdownToStart, setCountdownToStart] = useState(0)
 
-  // Stats context
+  // Stats context - Updated to use StatsProvider
   const { updateFocusSessions } = useStats()
 
   // Audio reference (mock - would use actual audio API in a real app)
@@ -230,7 +231,7 @@ export default function Timer() {
     }
 
     saveTimerStats()
-  }, [totalSessionsToday, streak])
+  }, [totalSessionsToday, streak, updateFocusSessions])
 
   const handleSessionEnd = () => {
     setIsRunning(false)
@@ -609,7 +610,6 @@ export default function Timer() {
           </View>
         </View>
       </Modal>
-      ;
       <Modal
         animationType="slide"
         transparent={true}
@@ -650,4 +650,3 @@ export default function Timer() {
     </SafeAreaView>
   )
 }
-

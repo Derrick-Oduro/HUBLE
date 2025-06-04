@@ -4,6 +4,7 @@ import { useState } from "react"
 import { View, Text, TouchableOpacity, Modal } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../lib/tailwind"
+import React from "react"
 
 interface HabitItemProps {
   id?: number | string
@@ -14,6 +15,7 @@ interface HabitItemProps {
   onDelete?: (id: number | string) => void
   onComplete?: (id: number | string) => void
   onFail?: (id: number | string) => void
+  difficulty?: string
 }
 
 export default function HabitItem({
@@ -25,7 +27,11 @@ export default function HabitItem({
   onDelete = () => {},
   onComplete = () => {},
   onFail = () => {},
+  difficulty = "easy",
 }: HabitItemProps) {
+  // Add a visual indicator for XP gain
+  const [showXpGain, setShowXpGain] = useState(false)
+  const [xpAmount, setXpAmount] = useState(0)
   const [showOptions, setShowOptions] = useState(false)
 
   // Safe handler functions that check if id exists before calling callbacks
@@ -40,7 +46,21 @@ export default function HabitItem({
   }
 
   const handleComplete = () => {
-    if (id !== undefined) onComplete(id)
+    if (id !== undefined) {
+      // Determine XP amount based on difficulty (matching the logic in the parent component)
+      let expAmount = 0
+      if (difficulty === "easy") expAmount = 5
+      else if (difficulty === "medium") expAmount = 10
+      else if (difficulty === "hard") expAmount = 15
+      else expAmount = 5
+
+      // Show XP gain indicator
+      setXpAmount(expAmount)
+      setShowXpGain(true)
+      setTimeout(() => setShowXpGain(false), 1500)
+
+      onComplete(id)
+    }
   }
 
   const handleFail = () => {
@@ -52,6 +72,11 @@ export default function HabitItem({
       <View style={tw`border-l-4 border-${color}`}>
         <View style={tw`p-4`}>
           <View style={tw`flex-row justify-between items-start`}>
+            {showXpGain && (
+              <View style={tw`absolute right-0 top-0 bg-violet-600 px-2 py-1 rounded-full`}>
+                <Text style={tw`text-white font-bold`}>+{xpAmount} XP</Text>
+              </View>
+            )}
             <View style={tw`flex-1 mr-3`}>
               <Text style={tw`text-white text-base font-medium mb-1`}>{title}</Text>
               {subtext && <Text style={tw`text-gray-400 text-sm`}>{subtext}</Text>}
@@ -90,4 +115,3 @@ export default function HabitItem({
     </View>
   )
 }
-

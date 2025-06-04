@@ -8,7 +8,7 @@ import tw from "twrnc" // Using twrnc instead of custom tailwind
 import AddRoutineModal from "../../components/AddRoutineModal"
 import EditRoutineModal from "../../components/EditRoutineModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useStats } from "../../contexts/StatsContext"
+import { useStats } from "../../contexts/StatsProvider"
 import ProgressBar from "../../components/ProgressBar"
 import React from "react"
 

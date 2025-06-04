@@ -141,7 +141,7 @@ export function StatsProvider({ children }: { children: ReactNode }) {
       const habitsData = await AsyncStorage.getItem("habitsData")
       if (habitsData) {
         const habits = JSON.parse(habitsData)
-        const completedHabits = habits.filter((habit: { completed: any }) => habit.completed).length || 0
+        const completedHabits = habits.filter((habit) => habit.completed).length || 0
 
         setStats((prev) => ({
           ...prev,
@@ -155,7 +155,7 @@ export function StatsProvider({ children }: { children: ReactNode }) {
       const dailiesData = await AsyncStorage.getItem("dailiesData")
       if (dailiesData) {
         const dailies = JSON.parse(dailiesData)
-        const completedDailies = dailies.filter((daily: { completed: any }) => daily.completed).length
+        const completedDailies = dailies.filter((daily) => daily.completed).length
 
         setStats((prev) => ({
           ...prev,

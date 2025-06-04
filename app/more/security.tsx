@@ -5,6 +5,7 @@ import { useState } from "react"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import PageTemplate from "../../components/PageTemplate"
+import React from "react"
 
 export default function Security() {
   const [appLock, setAppLock] = useState(false)

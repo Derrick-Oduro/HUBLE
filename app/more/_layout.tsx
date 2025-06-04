@@ -1,4 +1,5 @@
 import { Stack } from "expo-router"
+import React from "react"
 
 export default function MoreLayout() {
   return (
@@ -17,17 +18,9 @@ export default function MoreLayout() {
       <Stack.Screen name="stats" />
       <Stack.Screen name="achievements" />
       <Stack.Screen name="avatar" />
-      <Stack.Screen name="equipment" />
-      <Stack.Screen name="market" />
-      <Stack.Screen name="quests" />
       <Stack.Screen name="themes" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="backup" />
-      <Stack.Screen name="security" />
+      <Stack.Screen name="settings" />
       <Stack.Screen name="help" />
-      <Stack.Screen name="news" />
-      <Stack.Screen name="feedback" />
     </Stack>
   )
 }
-

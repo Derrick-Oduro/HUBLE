@@ -8,7 +8,8 @@ import tw from "twrnc" // Using twrnc instead of custom tailwind
 import AddTaskModal from "./AddTaskModal"
 import EditTaskModal from "./EditTaskModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useStats } from "../contexts/StatsContext"
+import { useStats } from "../contexts/StatsProvider"
+import React from "react"
 
 // This function will load routines data from AsyncStorage if available,
 // but will preserve your existing routines if no data is found
@@ -404,4 +405,3 @@ export default function RoutineDetail({ route }) {
     </SafeAreaView>
   )
 }
-

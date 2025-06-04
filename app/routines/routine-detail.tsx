@@ -5,6 +5,7 @@ import { View, ActivityIndicator } from "react-native"
 import RoutineDetail from "../../components/RoutineDetail"
 import { useLocalSearchParams } from "expo-router"
 import tw from "../../lib/tailwind"
+import React from "react"
 
 export default function RoutineDetailScreen() {
   const params = useLocalSearchParams()

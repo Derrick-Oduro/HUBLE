@@ -5,7 +5,8 @@ import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Refr
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import tw from "../../lib/tailwind"
-import { useStats } from "../../contexts/StatsContext"
+import { useStats } from "../../contexts/StatsProvider"
+import React from "react"
 
 // Component for progress bars
 const StatProgressBar = ({ value, max, color, showPercentage = true }) => {
@@ -201,4 +202,3 @@ export default function Stats() {
     </SafeAreaView>
   )
 }
-

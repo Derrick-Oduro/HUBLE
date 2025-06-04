@@ -3,6 +3,7 @@
 import { View, Text, TouchableOpacity, Image } from "react-native"
 import tw from "../../lib/tailwind"
 import PageTemplate from "../../components/PageTemplate"
+import React from "react"
 
 export default function Avatar() {
   const avatarStyles = [
