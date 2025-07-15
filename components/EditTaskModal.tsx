@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { View, Text, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from "react-native"
 import tw from "../lib/tailwind"
+import { useTheme } from "../contexts/ThemeProvider"
 
 interface EditTaskModalProps {
   isVisible: boolean
@@ -12,6 +13,7 @@ interface EditTaskModalProps {
 }
 
 export default function EditTaskModal({ isVisible, onClose, onSave, task }: EditTaskModalProps) {
+  const { colors } = useTheme()
   const [taskName, setTaskName] = useState("")
 
   useEffect(() => {
@@ -33,24 +35,34 @@ export default function EditTaskModal({ isVisible, onClose, onSave, task }: Edit
   return (
     <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={tw`flex-1 justify-end`}>
-        <View style={tw`bg-gray-800 rounded-t-3xl p-6`}>
-          <Text style={tw`text-white text-2xl font-bold mb-4`}>Edit Task</Text>
+        <View style={tw`bg-black bg-opacity-50 flex-1`} />
+        <View style={[tw`rounded-t-3xl p-6`, { backgroundColor: colors.card }]}>
+          <Text style={[tw`text-2xl font-bold mb-4`, { color: colors.text }]}>Edit Task</Text>
 
           <TextInput
-            style={tw`bg-gray-700 text-white p-3 rounded-lg mb-4`}
+            style={[
+              tw`p-3 rounded-lg mb-4`,
+              { backgroundColor: colors.cardSecondary, color: colors.text }
+            ]}
             placeholder="Task Name"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.textSecondary}
             value={taskName}
             onChangeText={setTaskName}
             autoFocus={true}
           />
 
-          <TouchableOpacity style={tw`bg-violet-600 p-4 rounded-lg mb-4`} onPress={handleSave}>
+          <TouchableOpacity 
+            style={[tw`p-4 rounded-lg mb-4`, { backgroundColor: colors.accent }]} 
+            onPress={handleSave}
+          >
             <Text style={tw`text-white text-center font-bold`}>Save Changes</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={tw`bg-gray-700 p-4 rounded-lg`} onPress={onClose}>
-            <Text style={tw`text-white text-center`}>Cancel</Text>
+          <TouchableOpacity 
+            style={[tw`p-4 rounded-lg`, { backgroundColor: colors.cardSecondary }]} 
+            onPress={onClose}
+          >
+            <Text style={[tw`text-center`, { color: colors.text }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

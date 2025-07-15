@@ -1,169 +1,197 @@
 "use client"
 
-import { useState } from "react"
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Modal,
+import React, { useState } from "react"
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  Modal, 
+  ScrollView, 
+  Alert,
   KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  Platform 
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../lib/tailwind"
+import { useTheme } from "../contexts/ThemeProvider"
 
 interface AddRoutineModalProps {
   isVisible: boolean
   onClose: () => void
-  onAdd: (routine: {
-    id: string
-    title: string
-    icon: string
-    description: string
-    tasks: Array<{ id: string; name: string; completed: boolean }>
-  }) => void
+  onAdd: (routine: any) => void
 }
 
 export default function AddRoutineModal({ isVisible, onClose, onAdd }: AddRoutineModalProps) {
+  const { colors } = useTheme()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [selectedIcon, setSelectedIcon] = useState("sunny")
-  const [tasks, setTasks] = useState<Array<{ id: string; name: string; completed: boolean }>>([])
-  const [newTaskName, setNewTaskName] = useState("")
+  const [icon, setIcon] = useState("sunny")
 
-  const icons = ["sunny", "partly-sunny", "moon", "fitness", "book", "briefcase", "cafe", "restaurant", "bed", "home"]
+  const iconOptions = [
+    { name: "sunny", label: "Morning" },
+    { name: "partly-sunny", label: "Afternoon" },
+    { name: "moon", label: "Evening" },
+    { name: "fitness", label: "Exercise" },
+    { name: "book", label: "Study" },
+    { name: "cafe", label: "Work" },
+    { name: "leaf", label: "Health" },
+    { name: "heart", label: "Self-care" },
+  ]
 
-  const handleAddTask = () => {
-    if (newTaskName.trim()) {
-      setTasks([
-        ...tasks,
-        {
-          id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: newTaskName,
-          completed: false,
-        },
-      ])
-      setNewTaskName("")
+  const resetForm = () => {
+    setTitle("")
+    setDescription("")
+    setIcon("sunny")
+  }
+
+  const handleClose = () => {
+    resetForm()
+    onClose()
+  }
+
+  const handleSubmit = () => {
+    if (!title.trim()) {
+      Alert.alert("Error", "Please enter a routine title")
+      return
     }
-  }
 
-  const handleRemoveTask = (id: string) => {
-    setTasks(tasks.filter((task) => task.id !== id))
-  }
+    const routine = {
+      title: title.trim(),
+      description: description.trim(),
+      icon,
+    }
 
-  const handleAdd = () => {
-    if (!title.trim()) return
-
-    onAdd({
-      id: Date.now().toString(),
-      title,
-      icon: selectedIcon,
-      description,
-      tasks,
-    })
-
-    // Reset form
-    setTitle("")
-    setDescription("")
-    setSelectedIcon("sunny")
-    setTasks([])
-    onClose()
-  }
-
-  const handleCancel = () => {
-    // Reset form
-    setTitle("")
-    setDescription("")
-    setSelectedIcon("sunny")
-    setTasks([])
-    onClose()
+    onAdd(routine)
+    handleClose()
   }
 
   return (
-    <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={handleCancel}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={tw`flex-1 justify-end`}>
-        <View style={tw`bg-gray-800 rounded-t-3xl p-6 max-h-[90%]`}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={tw`text-white text-2xl font-bold mb-4`}>Add New Routine</Text>
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView 
+        style={[tw`flex-1`, { backgroundColor: colors.background }]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        {/* Header */}
+        <View style={[
+          tw`flex-row items-center justify-between p-5 border-b`,
+          { borderColor: colors.cardSecondary }
+        ]}>
+          <TouchableOpacity onPress={handleClose}>
+            <Ionicons name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+          
+          <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>
+            New Routine
+          </Text>
+          
+          <TouchableOpacity
+            style={[
+              tw`px-4 py-2 rounded-lg`,
+              { backgroundColor: colors.accent }
+            ]}
+            onPress={handleSubmit}
+          >
+            <Text style={tw`text-white font-bold`}>Save</Text>
+          </TouchableOpacity>
+        </View>
 
-            <TextInput
-              style={tw`bg-gray-700 text-white p-3 rounded-lg mb-4`}
-              placeholder="Routine Name"
-              placeholderTextColor="#9CA3AF"
-              value={title}
-              onChangeText={setTitle}
-            />
+        <ScrollView style={tw`flex-1 p-5`} showsVerticalScrollIndicator={false}>
+          {/* Basic Info */}
+          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+              Basic Information
+            </Text>
 
-            <TextInput
-              style={tw`bg-gray-700 text-white p-3 rounded-lg mb-4 min-h-[80px]`}
-              placeholder="Description"
-              placeholderTextColor="#9CA3AF"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-            />
+            <View style={tw`mb-4`}>
+              <Text style={[tw`font-medium mb-2`, { color: colors.text }]}>
+                Routine Title *
+              </Text>
+              <TextInput
+                style={[
+                  tw`rounded-xl p-4 text-base`,
+                  {
+                    backgroundColor: colors.cardSecondary,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.cardSecondary,
+                  }
+                ]}
+                placeholder="Enter routine name"
+                placeholderTextColor={colors.textSecondary}
+                value={title}
+                onChangeText={setTitle}
+                maxLength={50}
+              />
+            </View>
 
-            <Text style={tw`text-white font-medium mb-2`}>Choose an Icon:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`pb-2 mb-4`}>
-              {icons.map((icon) => (
+            <View>
+              <Text style={[tw`font-medium mb-2`, { color: colors.text }]}>
+                Description
+              </Text>
+              <TextInput
+                style={[
+                  tw`rounded-xl p-4 text-base`,
+                  {
+                    backgroundColor: colors.cardSecondary,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.cardSecondary,
+                    minHeight: 80,
+                  }
+                ]}
+                placeholder="Describe your routine"
+                placeholderTextColor={colors.textSecondary}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                textAlignVertical="top"
+                maxLength={200}
+              />
+            </View>
+          </View>
+
+          {/* Icon Selection */}
+          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+              Choose Icon
+            </Text>
+            
+            <View style={tw`flex-row flex-wrap`}>
+              {iconOptions.map((iconOption) => (
                 <TouchableOpacity
-                  key={icon}
-                  style={tw`mr-3 p-3 ${selectedIcon === icon ? "bg-violet-600" : "bg-gray-700"} rounded-full`}
-                  onPress={() => setSelectedIcon(icon)}
+                  key={iconOption.name}
+                  style={[
+                    tw`rounded-xl p-4 mr-3 mb-3 items-center`,
+                    {
+                      backgroundColor: icon === iconOption.name ? colors.accent : colors.cardSecondary,
+                      minWidth: 80,
+                    }
+                  ]}
+                  onPress={() => setIcon(iconOption.name)}
                 >
-                  <Ionicons name={icon} size={24} color="white" />
+                  <Ionicons 
+                    name={iconOption.name} 
+                    size={24} 
+                    color={icon === iconOption.name ? "white" : colors.text}
+                    style={tw`mb-1`}
+                  />
+                  <Text style={[
+                    tw`text-xs font-medium text-center`,
+                    { color: icon === iconOption.name ? "white" : colors.text }
+                  ]}>
+                    {iconOption.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-
-            <Text style={tw`text-white font-medium mb-2`}>Add Tasks:</Text>
-            <View style={tw`flex-row mb-4`}>
-              <TextInput
-                style={tw`bg-gray-700 text-white p-3 rounded-l-lg flex-1`}
-                placeholder="Add a task"
-                placeholderTextColor="#9CA3AF"
-                value={newTaskName}
-                onChangeText={setNewTaskName}
-              />
-              <TouchableOpacity style={tw`bg-violet-600 p-3 rounded-r-lg`} onPress={handleAddTask}>
-                <Ionicons name="add" size={24} color="white" />
-              </TouchableOpacity>
             </View>
-
-            <Text style={tw`text-white font-medium mb-2`}>Tasks ({tasks.length}):</Text>
-
-            <View style={tw`max-h-[200px] mb-4`}>
-              {tasks.length === 0 ? (
-                <Text style={tw`text-gray-400 text-center py-4`}>No tasks added yet</Text>
-              ) : (
-                tasks.map((task) => (
-                  <View key={task.id} style={tw`flex-row justify-between items-center bg-gray-700 p-3 rounded-lg mb-2`}>
-                    <Text style={tw`text-white flex-1`}>{task.name}</Text>
-                    <TouchableOpacity onPress={() => handleRemoveTask(task.id)}>
-                      <Ionicons name="trash-outline" size={20} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </View>
-
-            <View style={tw`mt-4`}>
-              <TouchableOpacity
-                style={tw`bg-violet-600 p-4 rounded-lg mb-4`}
-                onPress={handleAdd}
-                disabled={!title.trim()}
-              >
-                <Text style={tw`text-white text-center font-bold`}>Create Routine</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={tw`bg-gray-700 p-4 rounded-lg`} onPress={handleCancel}>
-                <Text style={tw`text-white text-center`}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   )

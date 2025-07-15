@@ -1,99 +1,200 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Modal,
+import React, { useState, useEffect } from "react"
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  Modal, 
+  ScrollView, 
+  Alert,
   KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  Platform 
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../lib/tailwind"
+import { useTheme } from "../contexts/ThemeProvider"
 
 interface EditRoutineModalProps {
   isVisible: boolean
   onClose: () => void
-  onSave: (routine: { id: string; title: string; icon: string; description: string }) => void
-  routine: { id: string; title: string; icon: string; description: string }
+  onSave: (routine: any) => void
+  routine: any
 }
 
 export default function EditRoutineModal({ isVisible, onClose, onSave, routine }: EditRoutineModalProps) {
+  const { colors } = useTheme()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [selectedIcon, setSelectedIcon] = useState("sunny")
+  const [icon, setIcon] = useState("sunny")
+
+  const iconOptions = [
+    { name: "sunny", label: "Morning" },
+    { name: "partly-sunny", label: "Afternoon" },
+    { name: "moon", label: "Evening" },
+    { name: "fitness", label: "Exercise" },
+    { name: "book", label: "Study" },
+    { name: "cafe", label: "Work" },
+    { name: "leaf", label: "Health" },
+    { name: "heart", label: "Self-care" },
+  ]
 
   useEffect(() => {
     if (routine) {
       setTitle(routine.title || "")
       setDescription(routine.description || "")
-      setSelectedIcon(routine.icon || "sunny")
+      setIcon(routine.icon || "sunny")
     }
-  }, [routine, isVisible])
-
-  const icons = ["sunny", "partly-sunny", "moon", "fitness", "book", "briefcase", "cafe", "restaurant", "bed", "home"]
+  }, [routine])
 
   const handleSave = () => {
-    if (title.trim()) {
-      onSave({
-        id: routine.id,
-        title,
-        icon: selectedIcon,
-        description,
-      })
-      onClose()
+    if (!title.trim()) {
+      Alert.alert("Error", "Please enter a routine title")
+      return
     }
+
+    const updatedRoutine = {
+      ...routine,
+      title: title.trim(),
+      description: description.trim(),
+      icon,
+    }
+
+    onSave(updatedRoutine)
+    onClose()
+  }
+
+  const handleClose = () => {
+    onClose()
   }
 
   return (
-    <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={tw`flex-1 justify-end`}>
-        <View style={tw`bg-gray-800 rounded-t-3xl p-6`}>
-          <Text style={tw`text-white text-2xl font-bold mb-4`}>Edit Routine</Text>
-
-          <TextInput
-            style={tw`bg-gray-700 text-white p-3 rounded-lg mb-4`}
-            placeholder="Routine Name"
-            placeholderTextColor="#9CA3AF"
-            value={title}
-            onChangeText={setTitle}
-          />
-
-          <TextInput
-            style={tw`bg-gray-700 text-white p-3 rounded-lg mb-4 min-h-[80px]`}
-            placeholder="Description"
-            placeholderTextColor="#9CA3AF"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-          />
-
-          <Text style={tw`text-white font-medium mb-2`}>Choose an Icon:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`pb-2`}>
-            {icons.map((icon) => (
-              <TouchableOpacity
-                key={icon}
-                style={tw`mr-3 p-3 ${selectedIcon === icon ? "bg-violet-600" : "bg-gray-700"} rounded-full`}
-                onPress={() => setSelectedIcon(icon)}
-              >
-                <Ionicons name={icon} size={24} color="white" />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <View style={tw`mt-6`}>
-            <TouchableOpacity style={tw`bg-violet-600 p-4 rounded-lg mb-4`} onPress={handleSave}>
-              <Text style={tw`text-white text-center font-bold`}>Save Changes</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={tw`bg-gray-700 p-4 rounded-lg`} onPress={onClose}>
-              <Text style={tw`text-white text-center`}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView 
+        style={[tw`flex-1`, { backgroundColor: colors.background }]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        {/* Header */}
+        <View style={[
+          tw`flex-row items-center justify-between p-5 border-b`,
+          { borderColor: colors.cardSecondary }
+        ]}>
+          <TouchableOpacity onPress={handleClose}>
+            <Ionicons name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+          
+          <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>
+            Edit Routine
+          </Text>
+          
+          <TouchableOpacity
+            style={[
+              tw`px-4 py-2 rounded-lg`,
+              { backgroundColor: colors.accent }
+            ]}
+            onPress={handleSave}
+          >
+            <Text style={tw`text-white font-bold`}>Save</Text>
+          </TouchableOpacity>
         </View>
+
+        <ScrollView style={tw`flex-1 p-5`} showsVerticalScrollIndicator={false}>
+          {/* Basic Info */}
+          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+              Routine Information
+            </Text>
+
+            <View style={tw`mb-4`}>
+              <Text style={[tw`font-medium mb-2`, { color: colors.text }]}>
+                Routine Title *
+              </Text>
+              <TextInput
+                style={[
+                  tw`rounded-xl p-4 text-base`,
+                  {
+                    backgroundColor: colors.cardSecondary,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.cardSecondary,
+                  }
+                ]}
+                placeholder="Enter routine name"
+                placeholderTextColor={colors.textSecondary}
+                value={title}
+                onChangeText={setTitle}
+                maxLength={50}
+              />
+            </View>
+
+            <View>
+              <Text style={[tw`font-medium mb-2`, { color: colors.text }]}>
+                Description
+              </Text>
+              <TextInput
+                style={[
+                  tw`rounded-xl p-4 text-base`,
+                  {
+                    backgroundColor: colors.cardSecondary,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.cardSecondary,
+                    minHeight: 80,
+                  }
+                ]}
+                placeholder="Describe your routine"
+                placeholderTextColor={colors.textSecondary}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                textAlignVertical="top"
+                maxLength={200}
+              />
+            </View>
+          </View>
+
+          {/* Icon Selection */}
+          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+              Choose Icon
+            </Text>
+            
+            <View style={tw`flex-row flex-wrap`}>
+              {iconOptions.map((iconOption) => (
+                <TouchableOpacity
+                  key={iconOption.name}
+                  style={[
+                    tw`rounded-xl p-4 mr-3 mb-3 items-center`,
+                    {
+                      backgroundColor: icon === iconOption.name ? colors.accent : colors.cardSecondary,
+                      minWidth: 80,
+                    }
+                  ]}
+                  onPress={() => setIcon(iconOption.name)}
+                >
+                  <Ionicons 
+                    name={iconOption.name} 
+                    size={24} 
+                    color={icon === iconOption.name ? "white" : colors.text}
+                    style={tw`mb-1`}
+                  />
+                  <Text style={[
+                    tw`text-xs font-medium text-center`,
+                    { color: icon === iconOption.name ? "white" : colors.text }
+                  ]}>
+                    {iconOption.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   )

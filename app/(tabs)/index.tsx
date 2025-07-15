@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, ActivityIndicator } from "react-native"
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, ActivityIndicator, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import HabitItem from "../../components/HabitItem"
@@ -9,51 +9,116 @@ import ProgressBar from "../../components/ProgressBar"
 import AddHabitModal from "../../components/AddHabitModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
+import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 
+// Enhanced habit interface with streak tracking
+interface EnhancedHabit {
+  id: number
+  title: string
+  description: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  color: string
+  completed?: boolean
+  streak?: number
+  lastCompleted?: string
+  completedDates?: string[]
+  targetDays?: number[]
+}
+
 export default function HabitsScreen() {
-  // Default habits
-  const defaultHabits = [
-    { id: 1, title: "30 minutes with the word of God", description: "", difficulty: "medium", color: "green-500" },
+  const { colors, currentTheme } = useTheme()
+  
+  // Enhanced default habits with streak data
+  const defaultHabits: EnhancedHabit[] = [
+    { 
+      id: 1, 
+      title: "30 minutes with the word of God", 
+      description: "Daily spiritual practice", 
+      difficulty: "medium", 
+      color: "green-500",
+      streak: 0,
+      completedDates: [],
+      targetDays: [1, 2, 3, 4, 5, 6, 0]
+    },
     {
       id: 2,
       title: "Read at least 20 to 30 minutes",
-      description: "Or delete it from the edit screen",
+      description: "Build knowledge through reading",
       difficulty: "easy",
       color: "blue-500",
+      streak: 0,
+      completedDates: [],
+      targetDays: [1, 2, 3, 4, 5, 6, 0]
     },
     {
       id: 3,
       title: "Wake up Time 5:30",
-      description: "I am supposed to wake up 5:30 to 40",
+      description: "Early morning routine for productivity",
       difficulty: "hard",
       color: "yellow-500",
+      streak: 0,
+      completedDates: [],
+      targetDays: [1, 2, 3, 4, 5]
     },
-    { id: 4, title: "Study/Procrastinate", description: "", difficulty: "medium", color: "green-500" },
+    { 
+      id: 4, 
+      title: "Study/Focus Time", 
+      description: "Dedicated learning and productivity", 
+      difficulty: "medium", 
+      color: "purple-500",
+      streak: 0,
+      completedDates: [],
+      targetDays: [1, 2, 3, 4, 5]
+    },
   ]
 
   const { stats, updateHabitCompletion, updateExperience, updateHealth } = useStats()
-  const [habits, setHabits] = useState(defaultHabits)
+  const [habits, setHabits] = useState<EnhancedHabit[]>(defaultHabits)
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
-  const [editingHabit, setEditingHabit] = useState(null)
+  const [editingHabit, setEditingHabit] = useState<EnhancedHabit | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Add reset function
+  // Get today's date string
+  const getTodayString = () => new Date().toISOString().split('T')[0]
+
+  // Calculate streak for a habit
+  const calculateStreak = (completedDates: string[]): number => {
+    if (!completedDates || completedDates.length === 0) return 0
+    
+    const sortedDates = completedDates.sort().reverse()
+    let streak = 0
+    let currentDate = new Date()
+    
+    for (const dateStr of sortedDates) {
+      const date = new Date(dateStr)
+      const diffTime = currentDate.getTime() - date.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      
+      if (diffDays === streak + 1 || (streak === 0 && diffDays <= 1)) {
+        streak++
+        currentDate = date
+      } else {
+        break
+      }
+    }
+    
+    return streak
+  }
+
+  // Reset function with enhanced data
   const resetToHabitsDefaults = async () => {
     try {
-      // Save default habits to AsyncStorage
       await AsyncStorage.setItem("habitsData", JSON.stringify(defaultHabits))
       setHabits(defaultHabits)
       console.log("Reset to default habits completed")
-
-      // Update stats context
       updateHabitCompletion(0, defaultHabits.length)
     } catch (e) {
       console.error("Failed to reset habits:", e)
     }
   }
 
-  // Load habits from AsyncStorage
+  // Enhanced load habits with streak calculation
   useEffect(() => {
     const loadHabits = async () => {
       try {
@@ -61,25 +126,28 @@ export default function HabitsScreen() {
         const savedData = await AsyncStorage.getItem("habitsData")
 
         if (savedData) {
-          const habitsData = JSON.parse(savedData)
+          const habitsData: EnhancedHabit[] = JSON.parse(savedData)
 
           if (habitsData.length > 0) {
-            setHabits(habitsData)
-
-            // Update stats context with current completion
-            const completedCount = habitsData.filter((habit) => habit.completed).length || 0
-            updateHabitCompletion(completedCount, habitsData.length)
+            // Update streaks for all habits
+            const habitsWithStreaks = habitsData.map(habit => ({
+              ...habit,
+              streak: calculateStreak(habit.completedDates || []),
+              completed: (habit.completedDates || []).includes(getTodayString())
+            }))
+            
+            setHabits(habitsWithStreaks)
+            
+            const completedCount = habitsWithStreaks.filter(habit => habit.completed).length
+            updateHabitCompletion(completedCount, habitsWithStreaks.length)
           } else {
-            // If empty array, use default habits
             await resetToHabitsDefaults()
           }
         } else {
-          // No data in AsyncStorage, use default habits
           await resetToHabitsDefaults()
         }
       } catch (e) {
         console.error("Failed to load habits:", e)
-        // Use defaults if there's an error
         setHabits(defaultHabits)
         updateHabitCompletion(0, defaultHabits.length)
       } finally {
@@ -91,15 +159,18 @@ export default function HabitsScreen() {
   }, [])
 
   const addHabit = async (newHabit: any) => {
-    const habitToAdd = { ...newHabit, id: habits.length > 0 ? Math.max(...habits.map((h) => h.id)) + 1 : 1 }
+    const habitToAdd: EnhancedHabit = { 
+      ...newHabit, 
+      id: habits.length > 0 ? Math.max(...habits.map((h) => h.id)) + 1 : 1,
+      streak: 0,
+      completedDates: [],
+      targetDays: newHabit.targetDays || [1, 2, 3, 4, 5, 6, 0]
+    }
     const updatedHabits = [...habits, habitToAdd]
     setHabits(updatedHabits)
 
-    // Save to AsyncStorage
     try {
       await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
-
-      // Update stats context
       updateHabitCompletion(0, updatedHabits.length)
     } catch (e) {
       console.error("Failed to save habits data:", e)
@@ -117,17 +188,14 @@ export default function HabitsScreen() {
   const updateHabit = async (updatedHabit: any) => {
     if (editingHabit) {
       const updatedHabits = habits.map((habit) =>
-        habit.id === editingHabit.id ? { ...updatedHabit, id: habit.id } : habit,
+        habit.id === editingHabit.id ? { ...habit, ...updatedHabit } : habit
       )
       setHabits(updatedHabits)
       setEditingHabit(null)
 
-      // Save to AsyncStorage
       try {
         await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
-
-        // Update stats context
-        const completedCount = updatedHabits.filter((habit) => habit.completed).length || 0
+        const completedCount = updatedHabits.filter((habit) => habit.completed).length
         updateHabitCompletion(completedCount, updatedHabits.length)
       } catch (e) {
         console.error("Failed to save habits data:", e)
@@ -136,133 +204,200 @@ export default function HabitsScreen() {
   }
 
   const deleteHabit = async (id: number) => {
-    const updatedHabits = habits.filter((habit) => habit.id !== id)
+    Alert.alert(
+      "Delete Habit",
+      "Are you sure you want to delete this habit? This will remove all progress data.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const updatedHabits = habits.filter((habit) => habit.id !== id)
+            setHabits(updatedHabits)
+
+            try {
+              await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
+              const completedCount = updatedHabits.filter((habit) => habit.completed).length
+              updateHabitCompletion(completedCount, updatedHabits.length)
+            } catch (e) {
+              console.error("Failed to save habits data:", e)
+            }
+          }
+        }
+      ]
+    )
+  }
+
+  // Enhanced habit completion with streak tracking
+  const handleHabitComplete = async (id: number) => {
+    const habit = habits.find((h) => h.id === id)
+    if (!habit) return
+
+    const today = getTodayString()
+    const wasCompletedToday = (habit.completedDates || []).includes(today)
+    
+    if (wasCompletedToday) {
+      Alert.alert("Already Completed", "You've already completed this habit today!")
+      return
+    }
+
+    let expIncrease = 0
+    let streakBonus = 0
+    
+    switch (habit.difficulty) {
+      case "easy":
+        expIncrease = 5
+        break
+      case "medium":
+        expIncrease = 10
+        break
+      case "hard":
+        expIncrease = 15
+        break
+      default:
+        expIncrease = 5
+    }
+
+    // Calculate new streak
+    const newCompletedDates = [...(habit.completedDates || []), today]
+    const newStreak = calculateStreak(newCompletedDates)
+    
+    // Streak bonus
+    if (newStreak >= 7) streakBonus = Math.floor(newStreak / 7) * 2
+    if (newStreak >= 30) streakBonus += 10 // Monthly bonus
+
+    const totalExp = expIncrease + streakBonus
+    
+    // Update experience and health
+    updateExperience(totalExp)
+    updateHealth(2)
+
+    // Show completion feedback
+    Alert.alert(
+      "Great Job! 🎉",
+      `+${totalExp} XP earned!\n${newStreak > 1 ? `🔥 ${newStreak} day streak!` : ""}${streakBonus > 0 ? `\n🌟 Streak bonus: +${streakBonus} XP` : ""}`,
+      [{ text: "Awesome!", style: "default" }]
+    )
+
+    // Update habit with completion
+    const updatedHabits = habits.map((h) => 
+      h.id === id 
+        ? { 
+            ...h, 
+            completed: true, 
+            completedDates: newCompletedDates,
+            streak: newStreak,
+            lastCompleted: today
+          } 
+        : h
+    )
+    
     setHabits(updatedHabits)
 
-    // Save to AsyncStorage
     try {
       await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
-
-      // Update stats context
-      const completedCount = updatedHabits.filter((habit) => habit.completed).length || 0
+      const completedCount = updatedHabits.filter((habit) => habit.completed).length
       updateHabitCompletion(completedCount, updatedHabits.length)
     } catch (e) {
-      console.error("Failed to save habits data:", e)
+      console.error("Failed to save habit completion:", e)
     }
   }
 
-  const handleHabitComplete = (id: number) => {
+  const handleHabitFail = async (id: number) => {
     const habit = habits.find((h) => h.id === id)
-    if (habit) {
-      let expIncrease = 0
-      switch (habit.difficulty) {
-        case "easy":
-          expIncrease = 5
-          break
-        case "medium":
-          expIncrease = 10
-          break
-        case "hard":
-          expIncrease = 15
-          break
-        default:
-          expIncrease = 5
-      }
+    if (!habit) return
 
-      // Update experience in context
-      updateExperience(expIncrease)
+    let expDecrease = 0
+    switch (habit.difficulty) {
+      case "easy":
+        expDecrease = -3
+        break
+      case "medium":
+        expDecrease = -7
+        break
+      case "hard":
+        expDecrease = -12
+        break
+      default:
+        expDecrease = -3
+    }
 
-      // Also increase health slightly when completing habits
-      updateHealth(2)
+    Alert.alert(
+      "Habit Failed",
+      `Don't give up! Tomorrow is a new day.\n${expDecrease} XP and -5 Health`,
+      [{ text: "I'll do better", style: "default" }]
+    )
 
-      // Mark habit as completed in state
-      const updatedHabits = habits.map((h) => (h.id === id ? { ...h, completed: true } : h))
-      setHabits(updatedHabits)
+    updateExperience(expDecrease)
+    updateHealth(-5)
 
-      // Save to AsyncStorage and update stats
-      try {
-        AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
+    // Reset streak if failed
+    const updatedHabits = habits.map((h) => 
+      h.id === id 
+        ? { ...h, completed: false, streak: 0 }
+        : h
+    )
+    
+    setHabits(updatedHabits)
 
-        // Update stats context
-        const completedCount = updatedHabits.filter((habit) => habit.completed).length || 0
-        updateHabitCompletion(completedCount, updatedHabits.length)
-      } catch (e) {
-        console.error("Failed to save habit completion:", e)
-      }
+    try {
+      await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
+      const completedCount = updatedHabits.filter((habit) => habit.completed).length
+      updateHabitCompletion(completedCount, updatedHabits.length)
+    } catch (e) {
+      console.error("Failed to save habit failure:", e)
     }
   }
 
-  const handleHabitFail = (id: number) => {
-    const habit = habits.find((h) => h.id === id)
-    if (habit) {
-      let expDecrease = 0
-      switch (habit.difficulty) {
-        case "easy":
-          expDecrease = -3
-          break
-        case "medium":
-          expDecrease = -7
-          break
-        case "hard":
-          expDecrease = -12
-          break
-        default:
-          expDecrease = -3
-      }
-
-      // Update experience in context (negative value for decrease)
-      updateExperience(expDecrease)
-
-      // Decrease health when failing habits
-      updateHealth(-5)
-
-      // Mark habit as failed (not completed) in state
-      const updatedHabits = habits.map((h) => (h.id === id ? { ...h, completed: false } : h))
-      setHabits(updatedHabits)
-
-      // Save to AsyncStorage and update stats
-      try {
-        AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
-
-        // Update stats context
-        const completedCount = updatedHabits.filter((habit) => habit.completed).length || 0
-        updateHabitCompletion(completedCount, updatedHabits.length)
-      } catch (e) {
-        console.error("Failed to save habit failure:", e)
-      }
-    }
-  }
+  // Calculate completion stats
+  const completedToday = habits.filter(h => h.completed).length
+  const totalHabits = habits.length
+  const completionPercentage = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0
 
   if (loading) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-        <StatusBar barStyle="light-content" />
+      <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
         <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading...</Text>
         </View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-      <StatusBar barStyle="light-content" />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
-        {/* Top Section */}
-        <View style={tw`flex-row justify-between items-center mb-4`}>
-          <Text style={tw`text-white text-lg font-bold`}>Habits</Text>
-          <TouchableOpacity onPress={() => setIsAddModalVisible(true)}>
-            <Ionicons name="add-circle-outline" size={28} color="#8B5CF6" />
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <View style={tw`flex-1 px-5 pt-3`}>
+        
+        {/* Minimalist Header */}
+        <View style={tw`flex-row justify-between items-center mb-6`}>
+          <View>
+            <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Habits</Text>
+            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+              {completedToday}/{totalHabits} completed
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={[tw`p-3 rounded-lg`, { backgroundColor: colors.accent }]}
+            onPress={() => setIsAddModalVisible(true)}
+          >
+            <Ionicons name="add" size={20} color="white" />
           </TouchableOpacity>
         </View>
 
-        {/* User Stats */}
-        <View style={tw`mb-4 bg-gray-800 p-4 rounded-xl`}>
+        {/* Stats Card */}
+        <View style={[tw`rounded-lg p-4 mb-6`, { backgroundColor: colors.card }]}>
           {stats.levelMessage && (
-            <Text style={tw`text-green-400 text-sm font-bold text-center mb-2`}>{stats.levelMessage}</Text>
+            <View style={[tw`px-3 py-2 rounded-lg mb-3`, { backgroundColor: colors.success + '20' }]}>
+              <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
+                🎉 {stats.levelMessage}
+              </Text>
+            </View>
           )}
 
-          {/* Health bar first, with level beside it */}
           <ProgressBar
             value={stats.health}
             max={stats.maxHealth}
@@ -272,31 +407,53 @@ export default function HabitsScreen() {
             level={stats.level}
           />
 
-          {/* Experience bar second */}
-          <ProgressBar value={stats.experience} max={stats.maxExperience} color="yellow-500" label="Experience" />
+          <ProgressBar 
+            value={stats.experience} 
+            max={stats.maxExperience} 
+            color="yellow-500" 
+            label="Experience" 
+          />
 
-          <Text style={tw`text-white mt-2`}>
-            💎 {stats.gemsEarned} 🟡 {stats.coinsEarned}
-          </Text>
+          <View style={[tw`flex-row justify-between items-center mt-3 pt-3 border-t`, { borderColor: colors.cardSecondary }]}>
+            <Text style={[tw``, { color: colors.textSecondary }]}>
+              💎 {stats.gemsEarned}  🪙 {stats.coinsEarned}
+            </Text>
+            <Text style={[tw`font-bold`, { color: colors.accent }]}>Level {stats.level}</Text>
+          </View>
         </View>
 
-        {/* Habit List */}
-        <ScrollView>
-          {habits.map((habit) => (
-            <HabitItem
-              key={habit.id}
-              id={habit.id}
-              title={habit.title}
-              color={habit.color}
-              subtext={habit.description}
-              onEdit={editHabit}
-              onDelete={deleteHabit}
-              onComplete={handleHabitComplete}
-              onFail={handleHabitFail}
-            />
-          ))}
+        {/* Cool Habit List */}
+        <ScrollView showsVerticalScrollIndicator={false} style={tw`flex-1`}>
+          {habits.length === 0 ? (
+            <View style={tw`items-center py-8`}>
+              <Ionicons name="leaf-outline" size={48} color={colors.textSecondary} />
+              <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No habits yet</Text>
+              <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
+                Add your first habit to get started
+              </Text>
+            </View>
+          ) : (
+            habits.map((habit) => (
+              <View key={habit.id}>
+                <HabitItem
+                  id={habit.id}
+                  title={habit.title}
+                  color={habit.color}
+                  subtext={`${habit.description}${habit.streak > 0 ? ` • 🔥 ${habit.streak} day streak` : ""}`}
+                  completed={habit.completed}
+                  streak={habit.streak}
+                  difficulty={habit.difficulty}
+                  onEdit={editHabit}
+                  onDelete={deleteHabit}
+                  onComplete={handleHabitComplete}
+                  onFail={handleHabitFail}
+                />
+              </View>
+            ))
+          )}
         </ScrollView>
 
+        {/* Modal */}
         {editingHabit ? (
           <AddHabitModal
             isVisible={isAddModalVisible}
@@ -308,7 +465,11 @@ export default function HabitsScreen() {
             initialValues={editingHabit}
           />
         ) : (
-          <AddHabitModal isVisible={isAddModalVisible} onClose={() => setIsAddModalVisible(false)} onAdd={addHabit} />
+          <AddHabitModal 
+            isVisible={isAddModalVisible} 
+            onClose={() => setIsAddModalVisible(false)} 
+            onAdd={addHabit} 
+          />
         )}
       </View>
     </SafeAreaView>

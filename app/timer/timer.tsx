@@ -11,25 +11,35 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  Animated,
+  Easing,
+  Vibration,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
+import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 
-// Mock data for habits - in a real app, this would come from your habits state/database
+// Mock data for habits
 const habitsList = [
-  { id: 1, title: "Read", duration: 30 * 60, color: "green-500" },
-  { id: 2, title: "Study", duration: 45 * 60, color: "blue-500" },
-  { id: 3, title: "Meditate", duration: 10 * 60, color: "purple-500" },
-  { id: 4, title: "Exercise", duration: 20 * 60, color: "red-500" },
+  { id: 1, title: "📚 Deep Work", duration: 50 * 60, color: "#3B82F6", emoji: "📚" },
+  { id: 2, title: "📖 Reading", duration: 30 * 60, color: "#10B981", emoji: "📖" },
+  { id: 3, title: "🧘 Meditation", duration: 15 * 60, color: "#8B5CF6", emoji: "🧘" },
+  { id: 4, title: "💪 Exercise", duration: 25 * 60, color: "#EF4444", emoji: "💪" },
+  { id: 5, title: "🎨 Creative Work", duration: 45 * 60, color: "#F59E0B", emoji: "🎨" },
+  { id: 6, title: "📝 Writing", duration: 40 * 60, color: "#EC4899", emoji: "📝" },
 ]
 
 export default function Timer() {
+  const { colors } = useTheme()
+  
   // Timer states
-  const [time, setTime] = useState(25 * 60) // 25 minutes default
+  const [time, setTime] = useState(25 * 60)
+  const [originalTime, setOriginalTime] = useState(25 * 60)
   const [isRunning, setIsRunning] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const [isWorkSession, setIsWorkSession] = useState(true)
   const [sessionCount, setSessionCount] = useState(0)
   const [totalSessionsToday, setTotalSessionsToday] = useState(0)
@@ -40,114 +50,69 @@ export default function Timer() {
   const [workTime, setWorkTime] = useState(25 * 60)
   const [breakTime, setBreakTime] = useState(5 * 60)
   const [longBreakTime, setLongBreakTime] = useState(15 * 60)
-  const [autoStartEnabled, setAutoStartEnabled] = useState(true)
+  const [autoStartEnabled, setAutoStartEnabled] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [vibrationEnabled, setVibrationEnabled] = useState(true)
 
   // UI states
   const [showSettings, setShowSettings] = useState(false)
   const [showHabitSelector, setShowHabitSelector] = useState(false)
+  const [showTimeEditor, setShowTimeEditor] = useState(false)
   const [selectedHabit, setSelectedHabit] = useState(null)
   const [countdownToStart, setCountdownToStart] = useState(0)
 
-  // Stats context - Updated to use StatsProvider
-  const { updateFocusSessions } = useStats()
+  // Animation values
+  const pulseAnim = useRef(new Animated.Value(1)).current
+  const progressAnim = useRef(new Animated.Value(0)).current
 
-  // Audio reference (mock - would use actual audio API in a real app)
-  const audioRef = useRef(null)
+  // Stats context
+  const { stats, updateFocusSessions, updateFocusTime, updateExperience } = useStats()
 
-  // Default timer preferences
+  // Default preferences
   const defaultTimerPreferences = {
     workTime: 25 * 60,
     breakTime: 5 * 60,
     longBreakTime: 15 * 60,
-    autoStartEnabled: true,
+    autoStartEnabled: false,
     soundEnabled: true,
     vibrationEnabled: true,
   }
 
-  // Reset function
-  const resetToTimerDefaults = async () => {
-    try {
-      // Save default timer preferences to AsyncStorage
-      await AsyncStorage.setItem("timerPreferences", JSON.stringify(defaultTimerPreferences))
-
-      // Reset timer stats
-      await AsyncStorage.setItem(
-        "timerStats",
-        JSON.stringify({
-          totalSessionsToday: 0,
-          streak: 0,
-        }),
-      )
-
-      // Reset timer settings
-      setWorkTime(defaultTimerPreferences.workTime)
-      setBreakTime(defaultTimerPreferences.breakTime)
-      setLongBreakTime(defaultTimerPreferences.longBreakTime)
-      setAutoStartEnabled(defaultTimerPreferences.autoStartEnabled)
-      setSoundEnabled(defaultTimerPreferences.soundEnabled)
-      setVibrationEnabled(defaultTimerPreferences.vibrationEnabled)
-
-      // Reset timer state
-      setTime(defaultTimerPreferences.workTime)
-      setIsRunning(false)
-      setIsWorkSession(true)
-      setSessionCount(0)
-      setTotalSessionsToday(0)
-      setStreak(0)
-
-      // Update stats context
-      updateFocusSessions(0)
-
-      console.log("Reset to default timer settings completed")
-    } catch (e) {
-      console.error("Failed to reset timer settings:", e)
-    }
-  }
-
-  // Load timer settings from AsyncStorage
+  // Load timer settings
   useEffect(() => {
     const loadTimerSettings = async () => {
       try {
         setLoading(true)
 
-        // Load timer preferences
         const savedPreferences = await AsyncStorage.getItem("timerPreferences")
         if (savedPreferences) {
           const preferences = JSON.parse(savedPreferences)
-          setWorkTime(preferences.workTime)
-          setBreakTime(preferences.breakTime)
-          setLongBreakTime(preferences.longBreakTime)
-          setAutoStartEnabled(preferences.autoStartEnabled)
-          setSoundEnabled(preferences.soundEnabled)
-          setVibrationEnabled(preferences.vibrationEnabled)
+          setWorkTime(preferences.workTime || defaultTimerPreferences.workTime)
+          setBreakTime(preferences.breakTime || defaultTimerPreferences.breakTime)
+          setLongBreakTime(preferences.longBreakTime || defaultTimerPreferences.longBreakTime)
+          setAutoStartEnabled(preferences.autoStartEnabled ?? defaultTimerPreferences.autoStartEnabled)
+          setSoundEnabled(preferences.soundEnabled ?? defaultTimerPreferences.soundEnabled)
+          setVibrationEnabled(preferences.vibrationEnabled ?? defaultTimerPreferences.vibrationEnabled)
 
-          // Also set the current time if not in a session
           if (!isRunning) {
-            setTime(isWorkSession ? preferences.workTime : preferences.breakTime)
+            const initialTime = preferences.workTime || defaultTimerPreferences.workTime
+            setTime(initialTime)
+            setOriginalTime(initialTime)
           }
         } else {
-          // No preferences saved, use defaults
-          await resetToTimerDefaults()
+          setTime(defaultTimerPreferences.workTime)
+          setOriginalTime(defaultTimerPreferences.workTime)
         }
 
-        // Load timer stats
         const savedStats = await AsyncStorage.getItem("timerStats")
         if (savedStats) {
           const stats = JSON.parse(savedStats)
           setTotalSessionsToday(stats.totalSessionsToday || 0)
           setStreak(stats.streak || 0)
-
-          // Update stats context
           updateFocusSessions(stats.totalSessionsToday || 0)
         }
       } catch (e) {
         console.error("Failed to load timer settings:", e)
-        // Use defaults if there's an error
-        setWorkTime(defaultTimerPreferences.workTime)
-        setBreakTime(defaultTimerPreferences.breakTime)
-        setLongBreakTime(defaultTimerPreferences.longBreakTime)
       } finally {
         setLoading(false)
       }
@@ -156,7 +121,7 @@ export default function Timer() {
     loadTimerSettings()
   }, [])
 
-  // Effect for the main timer
+  // Timer countdown effect
   useEffect(() => {
     let interval
 
@@ -164,14 +129,14 @@ export default function Timer() {
       interval = setInterval(() => {
         setTime((prevTime) => prevTime - 1)
       }, 1000)
-    } else if (time === 0) {
+    } else if (time === 0 && isRunning) {
       handleSessionEnd()
     }
 
     return () => clearInterval(interval)
   }, [isRunning, time])
 
-  // Effect for auto-start countdown
+  // Auto-start countdown
   useEffect(() => {
     let countdownInterval
 
@@ -180,6 +145,7 @@ export default function Timer() {
         setCountdownToStart((prev) => {
           if (prev <= 1) {
             setIsRunning(true)
+            setIsPaused(false)
             return 0
           }
           return prev - 1
@@ -190,7 +156,37 @@ export default function Timer() {
     return () => clearInterval(countdownInterval)
   }, [countdownToStart])
 
-  // Save timer settings when they change
+  // Pulse animation when running
+  useEffect(() => {
+    if (isRunning) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 1000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      )
+      pulse.start()
+      return () => pulse.stop()
+    } else {
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start()
+    }
+  }, [isRunning])
+
+  // Save preferences
   useEffect(() => {
     const saveTimerPreferences = async () => {
       try {
@@ -202,7 +198,6 @@ export default function Timer() {
           soundEnabled,
           vibrationEnabled,
         }
-
         await AsyncStorage.setItem("timerPreferences", JSON.stringify(preferences))
       } catch (e) {
         console.error("Failed to save timer preferences:", e)
@@ -212,18 +207,12 @@ export default function Timer() {
     saveTimerPreferences()
   }, [workTime, breakTime, longBreakTime, autoStartEnabled, soundEnabled, vibrationEnabled])
 
-  // Save timer stats when they change
+  // Save stats
   useEffect(() => {
     const saveTimerStats = async () => {
       try {
-        const stats = {
-          totalSessionsToday,
-          streak,
-        }
-
+        const stats = { totalSessionsToday, streak }
         await AsyncStorage.setItem("timerStats", JSON.stringify(stats))
-
-        // Update stats context
         updateFocusSessions(totalSessionsToday)
       } catch (e) {
         console.error("Failed to save timer stats:", e)
@@ -231,52 +220,50 @@ export default function Timer() {
     }
 
     saveTimerStats()
-  }, [totalSessionsToday, streak, updateFocusSessions])
+  }, [totalSessionsToday, streak])
 
   const handleSessionEnd = () => {
     setIsRunning(false)
+    setIsPaused(false)
 
-    // Play sound and vibrate if enabled
-    if (soundEnabled) {
-      // In a real app, you would play a sound here
-      console.log("Playing sound alert")
-      // Example: audioRef.current.play();
-    }
-
+    // Haptic feedback
     if (vibrationEnabled) {
-      // In a real app, you would trigger vibration here
-      console.log("Vibrating")
-      // Example: Vibration.vibrate();
+      Vibration.vibrate([0, 500, 200, 500])
     }
 
     if (isWorkSession) {
-      // Work session completed
+      // Work session completed - award XP and update stats
+      const sessionMinutes = Math.ceil(originalTime / 60)
+      const xpGain = sessionMinutes * 2 // 2 XP per minute
+      
+      updateExperience(xpGain)
+      updateFocusTime(sessionMinutes)
+      
       const newTotalSessions = totalSessionsToday + 1
       setTotalSessionsToday(newTotalSessions)
       setStreak((prev) => prev + 1)
       setSessionCount((prevCount) => prevCount + 1)
 
-      // Update stats context
-      updateFocusSessions(newTotalSessions)
-
       // Determine next break type
-      if (sessionCount === 3) {
+      if ((sessionCount + 1) % 4 === 0) {
         setTime(longBreakTime)
-        setSessionCount(0)
+        setOriginalTime(longBreakTime)
       } else {
         setTime(breakTime)
+        setOriginalTime(breakTime)
       }
     } else {
       // Break session completed
       setTime(workTime)
-      setSelectedHabit(null) // Clear selected habit after break
+      setOriginalTime(workTime)
+      setSelectedHabit(null)
     }
 
     setIsWorkSession(!isWorkSession)
 
-    // Auto-start next session after a brief countdown if enabled
+    // Auto-start if enabled
     if (autoStartEnabled) {
-      setCountdownToStart(5) // 5 second countdown
+      setCountdownToStart(3)
     }
   }
 
@@ -287,203 +274,403 @@ export default function Timer() {
   }
 
   const toggleTimer = () => {
-    setIsRunning(!isRunning)
-    setCountdownToStart(0) // Cancel any auto-start countdown
+    if (isRunning) {
+      setIsRunning(false)
+      setIsPaused(true)
+    } else {
+      setIsRunning(true)
+      setIsPaused(false)
+      setCountdownToStart(0)
+    }
   }
 
   const resetTimer = () => {
     setIsRunning(false)
-    setTime(workTime)
+    setIsPaused(false)
+    const resetTime = selectedHabit ? selectedHabit.duration : workTime
+    setTime(resetTime)
+    setOriginalTime(resetTime)
     setIsWorkSession(true)
     setSessionCount(0)
-    setSelectedHabit(null)
     setCountdownToStart(0)
   }
 
   const selectHabit = (habit) => {
     setSelectedHabit(habit)
     setTime(habit.duration)
+    setOriginalTime(habit.duration)
     setWorkTime(habit.duration)
     setShowHabitSelector(false)
   }
 
-  // Calculate progress percentage
-  const progressPercentage = isWorkSession
-    ? ((workTime - time) / workTime) * 100
-    : ((breakTime - time) / breakTime) * 100
-
-  // Helper function to create circular progress segments
-  const getCircularProgressStyles = (percentage) => {
-    const size = 256 // Size of the circle in pixels
-    const strokeWidth = 8 // Width of the progress stroke
-    const radius = (size - strokeWidth) / 2
-    const circumference = 2 * Math.PI * radius
-    const strokeDashoffset = circumference - (percentage / 100) * circumference
-
-    return {
-      size,
-      radius,
-      strokeWidth,
-      circumference,
-      strokeDashoffset,
+  // Handle timer tap for editing
+  const handleTimerTap = () => {
+    if (!isRunning) {
+      setShowTimeEditor(true)
     }
   }
 
-  const progressStyles = getCircularProgressStyles(progressPercentage)
+  // Update time from editor
+  const updateTimeFromEditor = (newTimeInMinutes) => {
+    const newTimeInSeconds = newTimeInMinutes * 60
+    setTime(newTimeInSeconds)
+    setOriginalTime(newTimeInSeconds)
+    
+    if (isWorkSession) {
+      setWorkTime(newTimeInSeconds)
+    }
+    
+    setShowTimeEditor(false)
+  }
+
+  // Calculate progress
+  const progressPercentage = originalTime > 0 ? ((originalTime - time) / originalTime) * 100 : 0
+  const circumference = 2 * Math.PI * 120 // radius of 120
+  const strokeDashoffset = circumference - (progressPercentage / 100) * circumference
 
   if (loading) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-        <StatusBar barStyle="light-content" />
+      <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={colors.isDark ? "light-content" : "dark-content"} />
         <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading timer...</Text>
         </View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-      <StatusBar barStyle="light-content" />
-      <View style={tw`flex-1 px-5 pt-6 pb-4`}>
-        {/* Header with edit button */}
-        <View style={tw`flex-row justify-between items-center mb-6`}>
-          <Text style={tw`text-white text-2xl font-bold`}>
-            {selectedHabit ? selectedHabit.title : isWorkSession ? "Focus Time" : "Break Time"}
-          </Text>
-          <TouchableOpacity style={tw`p-2`} onPress={() => setShowSettings(true)}>
-            <Ionicons name="create-outline" size={24} color="white" />
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={colors.isDark ? "light-content" : "dark-content"} />
+      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 pt-6 pb-4`}>
+        
+        {/* Modern Header */}
+        <View style={tw`flex-row justify-between items-center mb-8`}>
+          <View style={tw`flex-1`}>
+            <Text style={[tw`text-3xl font-bold mb-1`, { color: colors.text }]}>
+              {selectedHabit ? selectedHabit.title : isWorkSession ? "🎯 Focus Time" : "☕ Break Time"}
+            </Text>
+            <Text style={[tw`text-base`, { color: colors.textSecondary }]}>
+              {isWorkSession ? `Session ${sessionCount + 1}` : "Recharge & relax"}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={[
+              tw`p-3 rounded-xl`,
+              { backgroundColor: colors.card }
+            ]} 
+            onPress={() => setShowSettings(true)}
+          >
+            <Ionicons name="settings-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
 
-        {/* Streak display */}
-        <View style={tw`bg-gray-800 rounded-xl p-3 mb-6`}>
-          <View style={tw`flex-row justify-between items-center`}>
-            <Text style={tw`text-white font-medium`}>Today's Sessions:</Text>
-            <Text style={tw`text-white font-bold`}>{totalSessionsToday}</Text>
+        {/* Stats Cards */}
+        <View style={tw`flex-row mb-8`}>
+          <View style={[tw`flex-1 rounded-2xl p-4 mr-2`, { backgroundColor: colors.card }]}>
+            <View style={tw`flex-row items-center mb-2`}>
+              <Text style={tw`text-2xl mr-2`}>🔥</Text>
+              <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Streak</Text>
+            </View>
+            <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{streak}</Text>
           </View>
-          <View style={tw`flex-row justify-between items-center mt-1`}>
-            <Text style={tw`text-white font-medium`}>Current Streak:</Text>
-            <Text style={tw`text-white font-bold`}>{streak} 🔥</Text>
+          
+          <View style={[tw`flex-1 rounded-2xl p-4 ml-2`, { backgroundColor: colors.card }]}>
+            <View style={tw`flex-row items-center mb-2`}>
+              <Text style={tw`text-2xl mr-2`}>⏱️</Text>
+              <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Today</Text>
+            </View>
+            <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{totalSessionsToday}</Text>
           </View>
         </View>
 
-        {/* Timer display */}
-        <View style={tw`items-center`}>
-          <View
-            style={tw`w-64 h-64 rounded-full bg-gray-800 flex justify-center items-center shadow-lg mb-4 relative overflow-hidden`}
+        {/* Main Timer Circle */}
+        <View style={tw`items-center mb-8`}>
+          <TouchableOpacity 
+            onPress={handleTimerTap}
+            style={tw`items-center justify-center`}
+            disabled={isRunning}
+            activeOpacity={0.8}
           >
-            {/* SVG-like circular progress indicator */}
-            <View
-              style={{
-                position: "absolute",
-                width: progressStyles.size,
-                height: progressStyles.size,
-                borderRadius: progressStyles.size / 2,
-                borderWidth: progressStyles.strokeWidth,
-                borderColor: "transparent",
-                borderTopColor: "#8B5CF6", // Violet color
-                transform: [{ rotate: `-90deg` }],
-                opacity: progressPercentage > 0 ? 1 : 0,
-                // This creates a rotation animation as the progress increases
-                transform: [{ rotateZ: `-${90 - progressPercentage * 3.6}deg` }],
-              }}
-            />
-
-            {/* Additional segments to create a more complete circle */}
-            {progressPercentage > 25 && (
-              <View
-                style={{
-                  position: "absolute",
-                  width: progressStyles.size,
-                  height: progressStyles.size,
-                  borderRadius: progressStyles.size / 2,
-                  borderWidth: progressStyles.strokeWidth,
-                  borderColor: "transparent",
-                  borderRightColor: "#8B5CF6",
-                  transform: [{ rotate: `0deg` }],
-                }}
-              />
-            )}
-
-            {progressPercentage > 50 && (
-              <View
-                style={{
-                  position: "absolute",
-                  width: progressStyles.size,
-                  height: progressStyles.size,
-                  borderRadius: progressStyles.size / 2,
-                  borderWidth: progressStyles.strokeWidth,
-                  borderColor: "transparent",
-                  borderBottomColor: "#8B5CF6",
-                  transform: [{ rotate: `0deg` }],
-                }}
-              />
-            )}
-
-            {progressPercentage > 75 && (
-              <View
-                style={{
-                  position: "absolute",
-                  width: progressStyles.size,
-                  height: progressStyles.size,
-                  borderRadius: progressStyles.size / 2,
-                  borderWidth: progressStyles.strokeWidth,
-                  borderColor: "transparent",
-                  borderLeftColor: "#8B5CF6",
-                  transform: [{ rotate: `0deg` }],
-                }}
-              />
-            )}
-
-            <Text style={tw`text-6xl font-bold text-white`}>{formatTime(time)}</Text>
-            <Text style={tw`text-lg text-gray-400 mt-2`}>
-              {isWorkSession ? `Session ${sessionCount + 1} / 4` : "Break"}
-            </Text>
-
-            {/* Auto-start countdown */}
-            {countdownToStart > 0 && (
-              <View style={tw`absolute bottom-4 bg-violet-600 px-3 py-1 rounded-full`}>
-                <Text style={tw`text-white font-bold`}>Starting in {countdownToStart}...</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Control buttons */}
-          <View style={tw`flex-row justify-center items-center mb-6`}>
-            <TouchableOpacity style={tw`mx-2 p-4 bg-violet-600 rounded-full shadow-lg`} onPress={toggleTimer}>
-              <Ionicons name={isRunning ? "pause" : "play"} size={32} color="white" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={tw`mx-2 p-4 bg-gray-700 rounded-full shadow-lg`} onPress={resetTimer}>
-              <Ionicons name="refresh" size={32} color="white" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Habit selection button - only show during work sessions and when not running */}
-          {isWorkSession && !isRunning && (
-            <TouchableOpacity
-              style={tw`bg-gray-800 py-3 px-6 rounded-xl mb-6 flex-row items-center`}
-              onPress={() => setShowHabitSelector(true)}
+            <Animated.View
+              style={[
+                tw`w-80 h-80 rounded-full items-center justify-center relative`,
+                {
+                  backgroundColor: colors.card,
+                  transform: [{ scale: pulseAnim }],
+                  shadowColor: selectedHabit?.color || colors.accent,
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: isRunning ? 0.3 : 0.1,
+                  shadowRadius: 20,
+                  elevation: 10,
+                }
+              ]}
             >
-              <Ionicons name="list-outline" size={20} color="white" style={tw`mr-2`} />
-              <Text style={tw`text-white font-medium`}>
-                {selectedHabit ? `Change Habit (${selectedHabit.title})` : "Select a Habit"}
-              </Text>
-            </TouchableOpacity>
-          )}
+              {/* Progress Circle */}
+              <View style={tw`absolute inset-4`}>
+                <View
+                  style={{
+                    width: 288,
+                    height: 288,
+                    borderRadius: 144,
+                    borderWidth: 8,
+                    borderColor: colors.cardSecondary,
+                    position: 'absolute',
+                  }}
+                />
+                {progressPercentage > 0 && (
+                  <View
+                    style={{
+                      width: 288,
+                      height: 288,
+                      borderRadius: 144,
+                      borderWidth: 8,
+                      borderColor: 'transparent',
+                      borderTopColor: selectedHabit?.color || colors.accent,
+                      position: 'absolute',
+                      transform: [
+                        { rotate: '-90deg' },
+                        { rotateZ: `${(progressPercentage * 3.6)}deg` }
+                      ],
+                    }}
+                  />
+                )}
+              </View>
+
+              {/* Timer Content */}
+              <View style={tw`items-center justify-center`}>
+                <Text style={[
+                  tw`text-6xl font-bold mb-2`,
+                  { color: selectedHabit?.color || colors.text }
+                ]}>
+                  {formatTime(time)}
+                </Text>
+                
+                {!isRunning && (
+                  <Text style={[tw`text-base mb-2`, { color: colors.textSecondary }]}>
+                    Tap to edit time
+                  </Text>
+                )}
+                
+                {selectedHabit && (
+                  <View style={tw`items-center`}>
+                    <Text style={[tw`text-lg font-semibold`, { color: colors.text }]}>
+                      {selectedHabit.title}
+                    </Text>
+                  </View>
+                )}
+                
+                {countdownToStart > 0 && (
+                  <View style={[
+                    tw`absolute -bottom-8 px-4 py-2 rounded-xl`,
+                    { backgroundColor: selectedHabit?.color || colors.accent }
+                  ]}>
+                    <Text style={tw`text-white font-bold`}>
+                      Starting in {countdownToStart}...
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          </TouchableOpacity>
         </View>
 
-        {/* Info section */}
-        <View style={tw`bg-gray-800 rounded-xl p-4 shadow-lg mt-auto`}>
-          <Text style={tw`text-white text-center mb-2`}>Pomodoro Technique</Text>
-          <Text style={tw`text-gray-400 text-center`}>
-            Work for 25 minutes, then take a 5-minute break.
-            {"\n"}
-            After 4 sessions, take a longer 15-minute break.
-          </Text>
+        {/* Control Buttons */}
+        <View style={tw`flex-row justify-center items-center mb-8`}>
+          <TouchableOpacity 
+            style={[
+              tw`w-16 h-16 rounded-full items-center justify-center mx-4`,
+              { backgroundColor: colors.card }
+            ]} 
+            onPress={resetTimer}
+          >
+            <Ionicons name="refresh-outline" size={28} color={colors.text} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              tw`w-20 h-20 rounded-full items-center justify-center mx-4`,
+              { 
+                backgroundColor: selectedHabit?.color || colors.accent,
+                shadowColor: selectedHabit?.color || colors.accent,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }
+            ]} 
+            onPress={toggleTimer}
+          >
+            <Ionicons 
+              name={isRunning ? "pause" : isPaused ? "play" : "play"} 
+              size={32} 
+              color="white" 
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              tw`w-16 h-16 rounded-full items-center justify-center mx-4`,
+              { backgroundColor: colors.card }
+            ]} 
+            onPress={() => setShowHabitSelector(true)}
+          >
+            <Ionicons name="list-outline" size={28} color={colors.text} />
+          </TouchableOpacity>
         </View>
-      </View>
+
+        {/* Quick Action Cards */}
+        {!isRunning && (
+          <View style={tw`mb-6`}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Quick Start</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-1`}>
+              {[
+                { title: "Pomodoro", time: 25, color: "#EF4444", emoji: "🍅" },
+                { title: "Short Focus", time: 15, color: "#F59E0B", emoji: "⚡" },
+                { title: "Deep Work", time: 50, color: "#3B82F6", emoji: "🎯" },
+                { title: "Quick Task", time: 10, color: "#10B981", emoji: "⚡" },
+              ].map((preset, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    tw`rounded-xl p-4 mx-1 items-center`,
+                    { backgroundColor: colors.card, minWidth: 100 }
+                  ]}
+                  onPress={() => {
+                    const newTime = preset.time * 60
+                    setTime(newTime)
+                    setOriginalTime(newTime)
+                    setWorkTime(newTime)
+                    setSelectedHabit({ 
+                      title: preset.title, 
+                      duration: newTime, 
+                      color: preset.color, 
+                      emoji: preset.emoji 
+                    })
+                  }}
+                >
+                  <Text style={tw`text-2xl mb-1`}>{preset.emoji}</Text>
+                  <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>{preset.title}</Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>{preset.time}m</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Stats Integration */}
+        <View style={[tw`rounded-2xl p-4`, { backgroundColor: colors.card }]}>
+          <Text style={[tw`text-lg font-bold mb-3`, { color: colors.text }]}>Progress Today</Text>
+          
+          <View style={tw`flex-row justify-between items-center mb-2`}>
+            <Text style={[tw``, { color: colors.textSecondary }]}>Focus Sessions</Text>
+            <Text style={[tw`font-semibold`, { color: colors.text }]}>{stats.focusSessionsToday}</Text>
+          </View>
+          
+          <View style={tw`flex-row justify-between items-center mb-2`}>
+            <Text style={[tw``, { color: colors.textSecondary }]}>Total Focus Time</Text>
+            <Text style={[tw`font-semibold`, { color: colors.text }]}>{stats.totalFocusTime}m</Text>
+          </View>
+          
+          <View style={tw`flex-row justify-between items-center`}>
+            <Text style={[tw``, { color: colors.textSecondary }]}>XP Earned</Text>
+            <Text style={[tw`font-semibold`, { color: colors.accent }]}>+{stats.totalFocusTime * 2} XP</Text>
+          </View>
+        </View>
+
+      </ScrollView>
+
+      {/* Time Editor Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showTimeEditor}
+        onRequestClose={() => setShowTimeEditor(false)}
+      >
+        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center`}>
+          <View style={[tw`rounded-3xl p-6 mx-8`, { backgroundColor: colors.card }]}>
+            <Text style={[tw`text-2xl font-bold text-center mb-6`, { color: colors.text }]}>Set Timer</Text>
+            
+            <View style={tw`items-center mb-6`}>
+              <Text style={[tw`mb-4`, { color: colors.textSecondary }]}>Minutes</Text>
+              <View style={tw`flex-row items-center justify-center`}>
+                <TouchableOpacity
+                  style={[
+                    tw`w-12 h-12 rounded-full items-center justify-center`,
+                    { backgroundColor: colors.cardSecondary }
+                  ]}
+                  onPress={() => {
+                    const currentMinutes = Math.floor(time / 60)
+                    if (currentMinutes > 1) {
+                      updateTimeFromEditor(currentMinutes - 1)
+                    }
+                  }}
+                >
+                  <Ionicons name="remove" size={24} color={colors.text} />
+                </TouchableOpacity>
+                
+                <Text style={[tw`text-4xl font-bold mx-8`, { color: colors.text }]}>
+                  {Math.floor(time / 60)}
+                </Text>
+                
+                <TouchableOpacity
+                  style={[
+                    tw`w-12 h-12 rounded-full items-center justify-center`,
+                    { backgroundColor: colors.cardSecondary }
+                  ]}
+                  onPress={() => {
+                    const currentMinutes = Math.floor(time / 60)
+                    updateTimeFromEditor(currentMinutes + 1)
+                  }}
+                >
+                  <Ionicons name="add" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Quick time presets */}
+            <View style={tw`flex-row flex-wrap justify-center mb-6`}>
+              {[5, 10, 15, 25, 30, 45, 50, 60].map((minutes) => (
+                <TouchableOpacity
+                  key={minutes}
+                  style={[
+                    tw`px-4 py-2 rounded-xl m-1`,
+                    { 
+                      backgroundColor: Math.floor(time / 60) === minutes ? colors.accent : colors.cardSecondary
+                    }
+                  ]}
+                  onPress={() => updateTimeFromEditor(minutes)}
+                >
+                  <Text style={[
+                    tw`font-semibold`,
+                    { color: Math.floor(time / 60) === minutes ? "white" : colors.text }
+                  ]}>
+                    {minutes}m
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={tw`flex-row`}>
+              <TouchableOpacity
+                style={[tw`flex-1 py-3 rounded-xl mr-2`, { backgroundColor: colors.cardSecondary }]}
+                onPress={() => setShowTimeEditor(false)}
+              >
+                <Text style={[tw`text-center font-semibold`, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[tw`flex-1 py-3 rounded-xl ml-2`, { backgroundColor: colors.accent }]}
+                onPress={() => setShowTimeEditor(false)}
+              >
+                <Text style={tw`text-white text-center font-semibold`}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Settings Modal */}
       <Modal
         animationType="slide"
@@ -492,115 +679,93 @@ export default function Timer() {
         onRequestClose={() => setShowSettings(false)}
       >
         <View style={tw`flex-1 bg-black bg-opacity-50 justify-end`}>
-          <View style={tw`bg-gray-800 rounded-t-3xl p-6`}>
+          <View style={[tw`rounded-t-3xl p-6`, { backgroundColor: colors.card }]}>
             <View style={tw`flex-row justify-between items-center mb-6`}>
-              <Text style={tw`text-white text-2xl font-bold`}>Timer Settings</Text>
+              <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Timer Settings</Text>
               <TouchableOpacity onPress={() => setShowSettings(false)}>
-                <Ionicons name="close" size={24} color="white" />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={tw`mb-4`}>
-              {/* Time settings */}
-              <Text style={tw`text-white text-lg font-bold mb-2`}>Time Settings (minutes)</Text>
-
-              <View style={tw`flex-row justify-between items-center mb-4`}>
-                <Text style={tw`text-white`}>Work Session:</Text>
-                <View style={tw`flex-row items-center`}>
-                  <TouchableOpacity
-                    style={tw`bg-gray-700 w-8 h-8 rounded-full items-center justify-center`}
-                    onPress={() => setWorkTime((prev) => Math.max(prev - 60, 60))}
-                  >
-                    <Ionicons name="remove" size={20} color="white" />
-                  </TouchableOpacity>
-                  <Text style={tw`text-white mx-3`}>{Math.floor(workTime / 60)}</Text>
-                  <TouchableOpacity
-                    style={tw`bg-gray-700 w-8 h-8 rounded-full items-center justify-center`}
-                    onPress={() => setWorkTime((prev) => prev + 60)}
-                  >
-                    <Ionicons name="add" size={20} color="white" />
-                  </TouchableOpacity>
-                </View>
+            <ScrollView style={tw`mb-4 max-h-80`}>
+              {/* Default Times */}
+              <View style={tw`mb-6`}>
+                <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Default Times</Text>
+                
+                {[
+                  { label: "Work Session", value: workTime, setter: setWorkTime },
+                  { label: "Short Break", value: breakTime, setter: setBreakTime },
+                  { label: "Long Break", value: longBreakTime, setter: setLongBreakTime }
+                ].map((item, index) => (
+                  <View key={index} style={tw`flex-row justify-between items-center mb-4`}>
+                    <Text style={[tw``, { color: colors.text }]}>{item.label}</Text>
+                    <View style={tw`flex-row items-center`}>
+                      <TouchableOpacity
+                        style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: colors.cardSecondary }]}
+                        onPress={() => item.setter(prev => Math.max(prev - 60, 60))}
+                      >
+                        <Ionicons name="remove" size={16} color={colors.text} />
+                      </TouchableOpacity>
+                      <Text style={[tw`mx-4 min-w-12 text-center`, { color: colors.text }]}>
+                        {Math.floor(item.value / 60)}m
+                      </Text>
+                      <TouchableOpacity
+                        style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: colors.cardSecondary }]}
+                        onPress={() => item.setter(prev => prev + 60)}
+                      >
+                        <Ionicons name="add" size={16} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
               </View>
 
-              <View style={tw`flex-row justify-between items-center mb-4`}>
-                <Text style={tw`text-white`}>Short Break:</Text>
-                <View style={tw`flex-row items-center`}>
-                  <TouchableOpacity
-                    style={tw`bg-gray-700 w-8 h-8 rounded-full items-center justify-center`}
-                    onPress={() => setBreakTime((prev) => Math.max(prev - 60, 60))}
-                  >
-                    <Ionicons name="remove" size={20} color="white" />
-                  </TouchableOpacity>
-                  <Text style={tw`text-white mx-3`}>{Math.floor(breakTime / 60)}</Text>
-                  <TouchableOpacity
-                    style={tw`bg-gray-700 w-8 h-8 rounded-full items-center justify-center`}
-                    onPress={() => setBreakTime((prev) => prev + 60)}
-                  >
-                    <Ionicons name="add" size={20} color="white" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={tw`flex-row justify-between items-center mb-6`}>
-                <Text style={tw`text-white`}>Long Break:</Text>
-                <View style={tw`flex-row items-center`}>
-                  <TouchableOpacity
-                    style={tw`bg-gray-700 w-8 h-8 rounded-full items-center justify-center`}
-                    onPress={() => setLongBreakTime((prev) => Math.max(prev - 60, 60))}
-                  >
-                    <Ionicons name="remove" size={20} color="white" />
-                  </TouchableOpacity>
-                  <Text style={tw`text-white mx-3`}>{Math.floor(longBreakTime / 60)}</Text>
-                  <TouchableOpacity
-                    style={tw`bg-gray-700 w-8 h-8 rounded-full items-center justify-center`}
-                    onPress={() => setLongBreakTime((prev) => prev + 60)}
-                  >
-                    <Ionicons name="add" size={20} color="white" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Other settings */}
-              <Text style={tw`text-white text-lg font-bold mb-2`}>Preferences</Text>
-
-              <View style={tw`flex-row justify-between items-center mb-4`}>
-                <Text style={tw`text-white`}>Auto-start next session</Text>
-                <Switch
-                  value={autoStartEnabled}
-                  onValueChange={setAutoStartEnabled}
-                  trackColor={{ false: "#767577", true: "#8B5CF6" }}
-                  thumbColor={autoStartEnabled ? "#f4f3f4" : "#f4f3f4"}
-                />
-              </View>
-
-              <View style={tw`flex-row justify-between items-center mb-4`}>
-                <Text style={tw`text-white`}>Sound alerts</Text>
-                <Switch
-                  value={soundEnabled}
-                  onValueChange={setSoundEnabled}
-                  trackColor={{ false: "#767577", true: "#8B5CF6" }}
-                  thumbColor={soundEnabled ? "#f4f3f4" : "#f4f3f4"}
-                />
-              </View>
-
-              <View style={tw`flex-row justify-between items-center mb-4`}>
-                <Text style={tw`text-white`}>Vibration</Text>
-                <Switch
-                  value={vibrationEnabled}
-                  onValueChange={setVibrationEnabled}
-                  trackColor={{ false: "#767577", true: "#8B5CF6" }}
-                  thumbColor={vibrationEnabled ? "#f4f3f4" : "#f4f3f4"}
-                />
+              {/* Preferences */}
+              <View style={tw`mb-6`}>
+                <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Preferences</Text>
+                
+                {[
+                  { 
+                    label: "Auto-start sessions", 
+                    desc: "Automatically start next session", 
+                    value: autoStartEnabled, 
+                    setter: setAutoStartEnabled 
+                  },
+                  { 
+                    label: "Sound alerts", 
+                    desc: "Play sound when session ends", 
+                    value: soundEnabled, 
+                    setter: setSoundEnabled 
+                  },
+                  { 
+                    label: "Vibration", 
+                    desc: "Vibrate when session ends", 
+                    value: vibrationEnabled, 
+                    setter: setVibrationEnabled 
+                  }
+                ].map((setting, index) => (
+                  <View key={index} style={tw`flex-row justify-between items-center mb-4`}>
+                    <View style={tw`flex-1 mr-4`}>
+                      <Text style={[tw`font-medium`, { color: colors.text }]}>{setting.label}</Text>
+                      <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{setting.desc}</Text>
+                    </View>
+                    <Switch
+                      value={setting.value}
+                      onValueChange={setting.setter}
+                      trackColor={{ false: colors.cardSecondary, true: colors.accent }}
+                      thumbColor={setting.value ? "#f4f3f4" : "#f4f3f4"}
+                    />
+                  </View>
+                ))}
               </View>
             </ScrollView>
 
             <TouchableOpacity
-              style={tw`bg-violet-600 p-4 rounded-lg`}
+              style={[tw`py-4 rounded-xl`, { backgroundColor: colors.accent }]}
               onPress={() => {
-                // Apply settings
                 if (!isRunning) {
                   setTime(isWorkSession ? workTime : breakTime)
+                  setOriginalTime(isWorkSession ? workTime : breakTime)
                 }
                 setShowSettings(false)
               }}
@@ -610,6 +775,8 @@ export default function Timer() {
           </View>
         </View>
       </Modal>
+
+      {/* Habit Selector Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -617,11 +784,11 @@ export default function Timer() {
         onRequestClose={() => setShowHabitSelector(false)}
       >
         <View style={tw`flex-1 bg-black bg-opacity-50 justify-end`}>
-          <View style={tw`bg-gray-800 rounded-t-3xl p-6`}>
+          <View style={[tw`rounded-t-3xl p-6`, { backgroundColor: colors.card }]}>
             <View style={tw`flex-row justify-between items-center mb-6`}>
-              <Text style={tw`text-white text-2xl font-bold`}>Select a Habit</Text>
+              <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Choose Focus</Text>
               <TouchableOpacity onPress={() => setShowHabitSelector(false)}>
-                <Ionicons name="close" size={24} color="white" />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -629,20 +796,31 @@ export default function Timer() {
               {habitsList.map((habit) => (
                 <TouchableOpacity
                   key={habit.id}
-                  style={tw`flex-row items-center p-4 bg-gray-700 rounded-lg mb-2 border-l-4 border-${habit.color}`}
+                  style={[
+                    tw`flex-row items-center p-4 rounded-2xl mb-3`,
+                    { 
+                      backgroundColor: colors.cardSecondary,
+                      borderLeftWidth: 4,
+                      borderLeftColor: habit.color
+                    }
+                  ]}
                   onPress={() => selectHabit(habit)}
                 >
+                  <Text style={tw`text-4xl mr-4`}>{habit.emoji}</Text>
                   <View style={tw`flex-1`}>
-                    <Text style={tw`text-white font-bold`}>{habit.title}</Text>
-                    <Text style={tw`text-gray-400`}>{Math.floor(habit.duration / 60)} minutes</Text>
+                    <Text style={[tw`font-bold text-lg`, { color: colors.text }]}>{habit.title}</Text>
+                    <Text style={[tw``, { color: colors.textSecondary }]}>{Math.floor(habit.duration / 60)} minutes</Text>
                   </View>
-                  <Ionicons name="timer-outline" size={24} color="white" />
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            <TouchableOpacity style={tw`bg-gray-700 p-4 rounded-lg`} onPress={() => setShowHabitSelector(false)}>
-              <Text style={tw`text-white text-center`}>Cancel</Text>
+            <TouchableOpacity 
+              style={[tw`py-4 rounded-xl`, { backgroundColor: colors.cardSecondary }]} 
+              onPress={() => setShowHabitSelector(false)}
+            >
+              <Text style={[tw`text-center font-semibold`, { color: colors.text }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

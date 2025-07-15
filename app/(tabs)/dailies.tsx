@@ -1,275 +1,311 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, ActivityIndicator } from "react-native"
+import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import AddDailyModal from "../../components/AddDailyModal"
-import ProgressBar from "../../components/ProgressBar"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
+import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 
-export default function Dailies() {
-  // Default dailies that will be restored when the app is reset
-  const defaultDailies = [
-    { id: "1", name: "Morning Walk", completed: false },
-    { id: "2", name: "Read 10 pages", completed: false },
-  ]
+// Enhanced daily task interface
+interface DailyTask {
+  id: number
+  title: string
+  description: string
+  priority: 'low' | 'medium' | 'high'
+  difficulty: 'easy' | 'medium' | 'hard'
+  category: string
+  dueDate?: string
+  completed: boolean
+  dateCreated: string
+  tags?: string[]
+  xp?: number
+}
 
-  const { stats, updateDailyCompletion, updateExperience, updateHealth } = useStats()
-  const [tasks, setTasks] = useState(defaultDailies)
+export default function DailiesScreen() {
+  const { colors, currentTheme } = useTheme()
+  const { updateExperience, updateHealth } = useStats()
+  const [dailies, setDailies] = useState<DailyTask[]>([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
-  const [loading, setLoading] = useState(true)
 
-  // Add reset function
-  const resetToDailiesDefaults = async () => {
-    try {
-      // Save default dailies to AsyncStorage
-      await AsyncStorage.setItem("dailiesData", JSON.stringify(defaultDailies))
-      setTasks(defaultDailies)
-      console.log("Reset to default dailies completed")
-
-      // Update stats context
-      updateDailyCompletion(0, defaultDailies.length)
-    } catch (e) {
-      console.error("Failed to reset dailies:", e)
-    }
-  }
-
-  // Load dailies from AsyncStorage
+  // Load dailies from storage
   useEffect(() => {
-    const loadDailies = async () => {
-      try {
-        setLoading(true)
-        const savedData = await AsyncStorage.getItem("dailiesData")
-
-        if (savedData) {
-          const dailiesData = JSON.parse(savedData)
-
-          if (dailiesData.length > 0) {
-            setTasks(dailiesData)
-
-            // Update stats context with current completion
-            const completedCount = dailiesData.filter((task) => task.completed).length
-            updateDailyCompletion(completedCount, dailiesData.length)
-          } else {
-            // If empty array, use default dailies
-            await resetToDailiesDefaults()
-          }
-        } else {
-          // No data in AsyncStorage, use default dailies
-          await resetToDailiesDefaults()
-        }
-      } catch (e) {
-        console.error("Failed to load dailies:", e)
-        // Use defaults if there's an error
-        setTasks(defaultDailies)
-        updateDailyCompletion(0, defaultDailies.length)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadDailies()
   }, [])
 
-  const toggleTask = async (id: string) => {
-    const task = tasks.find((t) => t.id === id)
-    const wasCompleted = task?.completed || false
-
-    // Update task completion status
-    const updatedTasks = tasks.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task))
-
-    setTasks(updatedTasks)
-
-    // Save the updated tasks to AsyncStorage
+  const loadDailies = async () => {
     try {
-      await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedTasks))
-
-      // Update stats context with new completion count
-      const completedCount = updatedTasks.filter((task) => task.completed).length
-      updateDailyCompletion(completedCount, updatedTasks.length)
-    } catch (e) {
-      console.error("Failed to save dailies data:", e)
-    }
-
-    // Update experience when task is completed/uncompleted
-    if (!wasCompleted) {
-      // Task is being completed - increase experience
-      updateExperience(10)
-
-      // Also increase health slightly when completing tasks
-      updateHealth(2)
-    } else {
-      // Task is being uncompleted - decrease experience
-      updateExperience(-10)
-
-      // Decrease health when uncompleting tasks
-      updateHealth(-3)
+      const savedDailies = await AsyncStorage.getItem("dailiesData")
+      if (savedDailies) {
+        setDailies(JSON.parse(savedDailies))
+      }
+    } catch (error) {
+      console.error("Error loading dailies:", error)
     }
   }
 
-  const addTask = async (taskName: string) => {
-    const newTask = {
-      id: Date.now().toString(),
-      name: taskName,
+  const saveDailies = async (newDailies: DailyTask[]) => {
+    try {
+      await AsyncStorage.setItem("dailiesData", JSON.stringify(newDailies))
+    } catch (error) {
+      console.error("Error saving dailies:", error)
+    }
+  }
+
+  const addDaily = async (newDaily: any) => {
+    const taskToAdd: DailyTask = {
+      ...newDaily,
+      id: Date.now(),
       completed: false,
+      dateCreated: new Date().toISOString().split('T')[0],
     }
-
-    const updatedTasks = [...tasks, newTask]
-    setTasks(updatedTasks)
-
-    // Save the updated tasks to AsyncStorage
-    try {
-      await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedTasks))
-
-      // Update stats context with new task count
-      const completedCount = updatedTasks.filter((task) => task.completed).length
-      updateDailyCompletion(completedCount, updatedTasks.length)
-    } catch (e) {
-      console.error("Failed to save dailies data:", e)
-    }
+    
+    const updatedDailies = [...dailies, taskToAdd]
+    setDailies(updatedDailies)
+    await saveDailies(updatedDailies)
   }
 
-  const deleteTask = async (id: string) => {
-    const task = tasks.find((t) => t.id === id)
-
-    // If deleting a completed task, decrease experience
-    if (task?.completed) {
-      // Decrease experience
-      updateExperience(-10)
-
-      // Decrease health
-      updateHealth(-5)
-    } else {
-      // If deleting any task, decrease health slightly
-      updateHealth(-2)
-    }
-
-    // Remove the task
-    const updatedTasks = tasks.filter((task) => task.id !== id)
-    setTasks(updatedTasks)
-
-    // Save the updated tasks to AsyncStorage
-    try {
-      await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedTasks))
-
-      // Update stats context with new task count
-      const completedCount = updatedTasks.filter((task) => task.completed).length
-      updateDailyCompletion(completedCount, updatedTasks.length)
-    } catch (e) {
-      console.error("Failed to save dailies data:", e)
-    }
+  const toggleDaily = async (id: number) => {
+    const updatedDailies = dailies.map(daily => {
+      if (daily.id === id) {
+        const isCompleting = !daily.completed
+        
+        if (isCompleting) {
+          // Calculate XP based on difficulty and priority
+          let xpGain = 0
+          switch (daily.difficulty) {
+            case 'easy': xpGain = 3; break
+            case 'medium': xpGain = 6; break
+            case 'hard': xpGain = 10; break
+          }
+          
+          // Priority bonus
+          switch (daily.priority) {
+            case 'medium': xpGain += 2; break
+            case 'high': xpGain += 5; break
+          }
+          
+          updateExperience(xpGain)
+          updateHealth(1)
+          
+          Alert.alert(
+            "Task Completed! ✅",
+            `+${xpGain} XP earned!`,
+            [{ text: "Great!", style: "default" }]
+          )
+        }
+        
+        return { ...daily, completed: isCompleting }
+      }
+      return daily
+    })
+    
+    setDailies(updatedDailies)
+    await saveDailies(updatedDailies)
   }
 
-  // Calculate completion percentage for display
-  const completedTasks = tasks.filter((task) => task.completed).length
-  const totalTasks = tasks.length
-  const completionPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
-
-  if (loading) {
-    return (
-      <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-        <StatusBar barStyle="light-content" />
-        <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-        </View>
-      </SafeAreaView>
+  const deleteDaily = async (id: number) => {
+    Alert.alert(
+      "Delete Task",
+      "Are you sure you want to delete this task?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const updatedDailies = dailies.filter(daily => daily.id !== id)
+            setDailies(updatedDailies)
+            await saveDailies(updatedDailies)
+          }
+        }
+      ]
     )
   }
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return colors.error
+      case 'medium': return colors.warning
+      case 'low': return colors.success
+      default: return colors.textSecondary
+    }
+  }
+
+  const getDifficultyIcon = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return "⭐"
+      case 'medium': return "⭐⭐"
+      case 'hard': return "⭐⭐⭐"
+      default: return "⭐"
+    }
+  }
+
+  // Calculate stats
+  const completedCount = dailies.filter(d => d.completed).length
+  const totalCount = dailies.length
+  const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-      <StatusBar barStyle="light-content" />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
-        <View style={tw`flex-row justify-between items-center mb-6 mt-2`}>
-          <Text style={tw`text-white text-2xl font-bold`}>Dailies</Text>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <View style={tw`flex-1 px-5 pt-3`}>
+        
+        {/* Header */}
+        <View style={tw`flex-row justify-between items-center mb-6`}>
+          <View>
+            <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Daily Tasks</Text>
+            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+              {completedCount}/{totalCount} completed today
+            </Text>
+          </View>
           <TouchableOpacity
-            style={tw`bg-violet-600 rounded-full p-2 shadow-lg`}
+            style={[tw`p-3 rounded-lg`, { backgroundColor: colors.accent }]}
             onPress={() => setIsAddModalVisible(true)}
           >
-            <Ionicons name="add" size={24} color="white" />
+            <Ionicons name="add" size={20} color="white" />
           </TouchableOpacity>
         </View>
 
-        {/* User Stats */}
-        <View style={tw`mb-4 bg-gray-800 p-4 rounded-xl`}>
-          {stats.levelMessage && (
-            <Text style={tw`text-green-400 text-sm font-bold text-center mb-2`}>{stats.levelMessage}</Text>
-          )}
-
-          {/* Health bar first, with level beside it */}
-          <ProgressBar
-            value={stats.health}
-            max={stats.maxHealth}
-            color="red-500"
-            label="Health"
-            showLevel={true}
-            level={stats.level}
-          />
-
-          {/* Experience bar second */}
-          <ProgressBar value={stats.experience} max={stats.maxExperience} color="yellow-500" label="Experience" />
-
-          <Text style={tw`text-white mt-2`}>
-            💎 {stats.gemsEarned} 🟡 {stats.coinsEarned}
-          </Text>
-        </View>
-
-        {/* Daily Progress */}
-        <View style={tw`bg-gray-800 rounded-xl p-4 mb-4 shadow-lg`}>
+        {/* Progress Section */}
+        <View style={[tw`rounded-lg p-4 mb-6`, { backgroundColor: colors.card }]}>
           <View style={tw`flex-row justify-between items-center mb-2`}>
-            <Text style={tw`text-white text-lg font-bold`}>Daily Progress</Text>
-            <Text style={tw`text-white text-lg font-medium`}>
-              {completedTasks}/{totalTasks}
-            </Text>
+            <Text style={[tw`font-medium`, { color: colors.text }]}>Progress</Text>
+            <Text style={[tw`font-bold`, { color: colors.accent }]}>{completionPercentage}%</Text>
           </View>
-
-          {/* Progress Bar */}
-          <View style={tw`h-2.5 bg-gray-700 rounded-full overflow-hidden mb-1`}>
-            <View style={[tw`h-full rounded-full bg-green-500`, { width: `${completionPercentage}%` }]} />
+          <View style={[tw`h-0.5 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
+            <View 
+              style={[
+                tw`h-full rounded-full`,
+                { 
+                  width: `${completionPercentage}%`,
+                  backgroundColor: colors.accent,
+                  shadowColor: colors.accent,
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.6,
+                  shadowRadius: 2,
+                  elevation: 2,
+                }
+              ]} 
+            />
           </View>
-
-          <Text style={tw`text-gray-400 text-sm`}>
-            {completedTasks === totalTasks
-              ? "All tasks completed! Great job!"
-              : `${totalTasks - completedTasks} tasks remaining`}
-          </Text>
         </View>
 
+        {/* Tasks List */}
         <FlatList
-          data={tasks}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => toggleTask(item.id)}
-              style={tw`flex-row items-center justify-between bg-gray-800 p-4 rounded-lg mb-2`}
-            >
-              <View style={tw`flex-row items-center`}>
-                <Ionicons
-                  name={item.completed ? "checkbox" : "square-outline"}
-                  size={24}
-                  color={item.completed ? "#10B981" : "#9CA3AF"}
-                />
-                <Text
-                  style={tw`text-lg font-medium ml-2 ${item.completed ? "line-through text-gray-400" : "text-white"}`}
-                >
-                  {item.name}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation()
-                  deleteTask(item.id)
-                }}
-              >
-                <Ionicons name="trash-outline" size={24} color="#9CA3AF" />
-              </TouchableOpacity>
-            </TouchableOpacity>
+          data={dailies}
+          keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={() => (
+            <View style={tw`items-center py-8`}>
+              <Ionicons name="list-outline" size={48} color={colors.textSecondary} />
+              <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No daily tasks yet</Text>
+              <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
+                Add your first task to get started
+              </Text>
+            </View>
           )}
+          renderItem={({ item }) => {
+            const priorityColor = getPriorityColor(item.priority)
+            
+            return (
+              <View style={[
+                tw`rounded-2xl p-4 mb-3`,
+                { 
+                  backgroundColor: colors.card,
+                  borderLeftWidth: 4,
+                  borderLeftColor: priorityColor,
+                  shadowColor: colors.accent,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }
+              ]}>
+                <View style={tw`flex-row items-start justify-between`}>
+                  <View style={tw`flex-1 mr-3`}>
+                    <View style={tw`flex-row items-center mb-2`}>
+                      <Text style={[
+                        tw`text-lg font-bold flex-1`,
+                        { 
+                          color: item.completed ? colors.textSecondary : colors.text,
+                          textDecorationLine: item.completed ? 'line-through' : 'none'
+                        }
+                      ]}>
+                        {item.title}
+                      </Text>
+                      <Text style={tw`text-sm ml-2`}>{getDifficultyIcon(item.difficulty)}</Text>
+                    </View>
+                    
+                    {item.description && (
+                      <Text style={[
+                        tw`text-sm mb-2`,
+                        { color: colors.textSecondary }
+                      ]}>
+                        {item.description}
+                      </Text>
+                    )}
+                    
+                    <View style={tw`flex-row items-center justify-between`}>
+                      <View style={tw`flex-row items-center`}>
+                        <View style={[
+                          tw`px-2 py-1 rounded-full mr-2`,
+                          { backgroundColor: priorityColor + '20' }
+                        ]}>
+                          <Text style={[tw`text-xs font-bold capitalize`, { color: priorityColor }]}>
+                            {item.priority}
+                          </Text>
+                        </View>
+                        
+                        {item.category && (
+                          <View style={[
+                            tw`px-2 py-1 rounded-full`,
+                            { backgroundColor: colors.cardSecondary }
+                          ]}>
+                            <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                              {item.category}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      
+                      <View style={tw`flex-row items-center`}>
+                        <TouchableOpacity
+                          style={[
+                            tw`w-8 h-8 rounded-full items-center justify-center mr-2`,
+                            { 
+                              backgroundColor: item.completed ? colors.success : colors.cardSecondary,
+                              borderWidth: 2,
+                              borderColor: item.completed ? colors.success : colors.textSecondary,
+                            }
+                          ]}
+                          onPress={() => toggleDaily(item.id)}
+                        >
+                          {item.completed && (
+                            <Ionicons name="checkmark" size={16} color="white" />
+                          )}
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity onPress={() => deleteDaily(item.id)}>
+                          <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )
+          }}
         />
-        <AddDailyModal isVisible={isAddModalVisible} onClose={() => setIsAddModalVisible(false)} onAdd={addTask} />
+
+        <AddDailyModal
+          isVisible={isAddModalVisible}
+          onClose={() => setIsAddModalVisible(false)}
+          onAdd={addDaily}
+        />
       </View>
     </SafeAreaView>
   )

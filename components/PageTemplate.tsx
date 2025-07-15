@@ -1,11 +1,11 @@
 "use client"
 
 import React from "react"
-
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import tw from "../lib/tailwind"
+import { useTheme } from "../contexts/ThemeProvider"
 
 interface PageTemplateProps {
   title: string
@@ -14,16 +14,17 @@ interface PageTemplateProps {
 
 export default function PageTemplate({ title, children }: PageTemplateProps) {
   const router = useRouter()
+  const { colors, currentTheme } = useTheme()
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={tw`text-white text-2xl font-bold`}>{title}</Text>
+          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{title}</Text>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView>

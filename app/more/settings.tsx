@@ -1,215 +1,200 @@
 "use client"
 
 import { useState } from "react"
-import { View, Text, TouchableOpacity, Switch, ScrollView, Alert } from "react-native"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Switch, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import { useRouter } from "expo-router"
 import tw from "../../lib/tailwind"
-import PageTemplate from "../../components/PageTemplate"
+import { useTheme } from "../../contexts/ThemeProvider"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useStats } from "../../contexts/StatsProvider"
 import React from "react"
 
 export default function Settings() {
-  const { refreshStats } = useStats()
+  const router = useRouter()
+  const { colors, currentTheme } = useTheme()
+  
+  // Settings state
+  const [notifications, setNotifications] = useState(true)
+  const [sound, setSound] = useState(true)
+  const [vibration, setVibration] = useState(true)
+  const [autoBackup, setAutoBackup] = useState(false)
+  const [analytics, setAnalytics] = useState(true)
 
-  // Notification settings
-  const [dailyReminders, setDailyReminders] = useState(true)
-  const [habitReminders, setHabitReminders] = useState(true)
-  const [routineReminders, setRoutineReminders] = useState(true)
-  const [achievementNotifications, setAchievementNotifications] = useState(true)
-
-  // Backup settings
-  const [autoBackup, setAutoBackup] = useState(true)
-  const [cloudSync, setCloudSync] = useState(false)
-
-  // App settings
-  const [soundEnabled, setSoundEnabled] = useState(true)
-  const [vibrationEnabled, setVibrationEnabled] = useState(true)
-
-  // Reset function to clear all app data
-  const resetAppData = async () => {
-    Alert.alert(
-      "Reset App Data",
-      "This will reset all your data including habits, dailies, routines, and timer settings. This action cannot be undone.",
-      [
+  const settingCategories = [
+    {
+      title: "Notifications",
+      icon: "notifications-outline",
+      items: [
         {
-          text: "Cancel",
-          style: "cancel",
+          title: "Push Notifications",
+          description: "Receive habit reminders and updates",
+          value: notifications,
+          setter: setNotifications,
+          icon: "notifications-outline",
+          color: colors.accent
         },
         {
-          text: "Reset",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Clear all app data from AsyncStorage
-              await AsyncStorage.removeItem("habitsData")
-              await AsyncStorage.removeItem("dailiesData")
-              await AsyncStorage.removeItem("routinesData")
-              await AsyncStorage.removeItem("routineTasksState")
-              await AsyncStorage.removeItem("timerPreferences")
-              await AsyncStorage.removeItem("timerStats")
-              await AsyncStorage.removeItem("userStats")
-
-              // Refresh stats to reflect the reset
-              await refreshStats()
-
-              Alert.alert("Success", "All app data has been reset successfully.")
-            } catch (error) {
-              console.error("Failed to reset app data:", error)
-              Alert.alert("Error", "Failed to reset app data. Please try again.")
-            }
+          title: "Sound",
+          description: "Play sounds for notifications",
+          value: sound,
+          setter: setSound,
+          icon: "volume-high-outline",
+          color: colors.success
+        },
+        {
+          title: "Vibration",
+          description: "Vibrate for notifications",
+          value: vibration,
+          setter: setVibration,
+          icon: "phone-portrait-outline",
+          color: colors.warning
+        }
+      ]
+    },
+    {
+      title: "Data & Privacy",
+      icon: "shield-outline",
+      items: [
+        {
+          title: "Auto Backup",
+          description: "Automatically backup your data",
+          value: autoBackup,
+          setter: setAutoBackup,
+          icon: "cloud-upload-outline",
+          color: "#06B6D4"
+        },
+        {
+          title: "Analytics",
+          description: "Help improve the app with usage data",
+          value: analytics,
+          setter: setAnalytics,
+          icon: "analytics-outline",
+          color: "#8B5CF6"
+        }
+      ]
+    },
+    {
+      title: "Advanced",
+      icon: "settings-outline",
+      items: [
+        {
+          title: "Reset All Data",
+          description: "Clear all habits, dailies, and progress",
+          action: () => {
+            Alert.alert(
+              "Reset All Data",
+              "This will permanently delete all your data including habits, dailies, routines, and progress. This action cannot be undone.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Reset",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await AsyncStorage.multiRemove([
+                        "habitsData",
+                        "dailiesData", 
+                        "routinesData",
+                        "statsData"
+                      ])
+                      Alert.alert("Success", "All data has been reset.")
+                    } catch (error) {
+                      Alert.alert("Error", "Failed to reset data.")
+                    }
+                  }
+                }
+              ]
+            )
           },
-        },
-      ],
-    )
-  }
+          color: colors.error
+        }
+      ]
+    }
+  ]
 
   return (
-    <PageTemplate title="Settings">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Notifications Section */}
-        <Text style={tw`text-white text-lg font-bold mb-3`}>Notifications</Text>
-        <View style={tw`bg-gray-800 rounded-xl p-4 mb-6`}>
-          <View style={tw`flex-row justify-between items-center mb-4 pb-4 border-b border-gray-700`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Daily Task Reminders</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Remind you of incomplete daily tasks</Text>
-            </View>
-            <Switch
-              value={dailyReminders}
-              onValueChange={setDailyReminders}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={dailyReminders ? "#ffffff" : "#f4f3f4"}
-            />
-          </View>
-
-          <View style={tw`flex-row justify-between items-center mb-4 pb-4 border-b border-gray-700`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Habit Reminders</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Remind you to complete your habits</Text>
-            </View>
-            <Switch
-              value={habitReminders}
-              onValueChange={setHabitReminders}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={habitReminders ? "#ffffff" : "#f4f3f4"}
-            />
-          </View>
-
-          <View style={tw`flex-row justify-between items-center mb-4 pb-4 border-b border-gray-700`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Routine Reminders</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Remind you of your routines</Text>
-            </View>
-            <Switch
-              value={routineReminders}
-              onValueChange={setRoutineReminders}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={routineReminders ? "#ffffff" : "#f4f3f4"}
-            />
-          </View>
-
-          <View style={tw`flex-row justify-between items-center`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Achievement Notifications</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Notify when you earn achievements</Text>
-            </View>
-            <Switch
-              value={achievementNotifications}
-              onValueChange={setAchievementNotifications}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={achievementNotifications ? "#ffffff" : "#f4f3f4"}
-            />
-          </View>
-        </View>
-
-        {/* Data & Backup Section */}
-        <Text style={tw`text-white text-lg font-bold mb-3`}>Data & Backup</Text>
-        <View style={tw`bg-gray-800 rounded-xl p-4 mb-6`}>
-          <View style={tw`flex-row justify-between items-center mb-4 pb-4 border-b border-gray-700`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Auto Backup</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Automatically backup your data</Text>
-            </View>
-            <Switch
-              value={autoBackup}
-              onValueChange={setAutoBackup}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={autoBackup ? "#ffffff" : "#f4f3f4"}
-            />
-          </View>
-
-          <View style={tw`flex-row justify-between items-center mb-4 pb-4 border-b border-gray-700`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Cloud Sync</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Sync data across devices</Text>
-            </View>
-            <Switch
-              value={cloudSync}
-              onValueChange={setCloudSync}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={cloudSync ? "#ffffff" : "#f4f3f4"}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={tw`flex-row justify-between items-center`}
-            onPress={() => Alert.alert("Export Data", "Your data will be exported as a JSON file.")}
-          >
-            <View>
-              <Text style={tw`text-white text-lg`}>Export Data</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Export your data as a file</Text>
-            </View>
-            <Ionicons name="download-outline" size={24} color="#8B5CF6" />
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+        {/* Header */}
+        <View style={tw`flex-row items-center mb-6 mt-2`}>
+          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
+          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Settings</Text>
         </View>
 
-        {/* App Settings Section */}
-        <Text style={tw`text-white text-lg font-bold mb-3`}>App Settings</Text>
-        <View style={tw`bg-gray-800 rounded-xl p-4 mb-6`}>
-          <View style={tw`flex-row justify-between items-center mb-4 pb-4 border-b border-gray-700`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Sound Effects</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Enable sound effects in the app</Text>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {settingCategories.map((category, categoryIndex) => (
+            <View key={categoryIndex} style={tw`mb-6`}>
+              <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+                {category.title}
+              </Text>
+              
+              <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: colors.card }]}>
+                {category.items.map((item, itemIndex) => (
+                  <View key={itemIndex}>
+                    <TouchableOpacity
+                      style={[
+                        tw`p-4 flex-row items-center`,
+                        itemIndex !== category.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.cardSecondary }
+                      ]}
+                      onPress={item.action || (() => {})}
+                      disabled={!item.action}
+                    >
+                      <View style={[
+                        tw`w-10 h-10 rounded-lg items-center justify-center mr-4`,
+                        { backgroundColor: `${item.color}20` }
+                      ]}>
+                        <Ionicons name={item.icon} size={20} color={item.color} />
+                      </View>
+                      
+                      <View style={tw`flex-1 mr-3`}>
+                        <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>
+                          {item.title}
+                        </Text>
+                        <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>
+                          {item.description}
+                        </Text>
+                      </View>
+                      
+                      {item.setter ? (
+                        <Switch
+                          value={item.value}
+                          onValueChange={item.setter}
+                          trackColor={{ false: colors.cardSecondary, true: item.color + '80' }}
+                          thumbColor={item.value ? item.color : colors.textSecondary}
+                        />
+                      ) : (
+                        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
             </View>
-            <Switch
-              value={soundEnabled}
-              onValueChange={setSoundEnabled}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={soundEnabled ? "#ffffff" : "#f4f3f4"}
-            />
+          ))}
+
+          {/* App Info */}
+          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>About</Text>
+            <View style={tw`space-y-3`}>
+              <View style={tw`flex-row justify-between`}>
+                <Text style={[tw``, { color: colors.textSecondary }]}>Version</Text>
+                <Text style={[tw`font-semibold`, { color: colors.text }]}>1.0.0</Text>
+              </View>
+              <View style={tw`flex-row justify-between`}>
+                <Text style={[tw``, { color: colors.textSecondary }]}>Build</Text>
+                <Text style={[tw`font-semibold`, { color: colors.text }]}>2025.1.15</Text>
+              </View>
+              <View style={tw`flex-row justify-between`}>
+                <Text style={[tw``, { color: colors.textSecondary }]}>Developer</Text>
+                <Text style={[tw`font-semibold`, { color: colors.text }]}>HUBLE Team</Text>
+              </View>
+            </View>
           </View>
-
-          <View style={tw`flex-row justify-between items-center mb-4 pb-4 border-b border-gray-700`}>
-            <View>
-              <Text style={tw`text-white text-lg`}>Vibration</Text>
-              <Text style={tw`text-gray-400 text-sm`}>Enable vibration feedback</Text>
-            </View>
-            <Switch
-              value={vibrationEnabled}
-              onValueChange={setVibrationEnabled}
-              trackColor={{ false: "#3f3f46", true: "#8B5CF6" }}
-              thumbColor={vibrationEnabled ? "#ffffff" : "#f4f3f4"}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={tw`flex-row justify-between items-center`}
-            onPress={() => Alert.alert("About", "HUBLE App\nVersion 1.0.0\n\nA habit tracking and productivity app.")}
-          >
-            <View>
-              <Text style={tw`text-white text-lg`}>About</Text>
-              <Text style={tw`text-gray-400 text-sm`}>App version and information</Text>
-            </View>
-            <Ionicons name="information-circle-outline" size={24} color="#8B5CF6" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Reset App Data Button */}
-        <TouchableOpacity style={tw`bg-red-600 rounded-xl p-4 items-center mb-6`} onPress={resetAppData}>
-          <Text style={tw`text-white font-medium`}>Reset App Data</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </PageTemplate>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   )
 }

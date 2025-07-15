@@ -3,61 +3,109 @@
 import { Tabs } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
+import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 
 export default function TabsLayout() {
+  const { colors, currentTheme } = useTheme()
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: tw`bg-gray-800 border-t border-gray-700`,
-        tabBarLabelStyle: tw`text-xs`,
-        tabBarActiveTintColor: "#8B5CF6", // Violet color for active tab
-        tabBarInactiveTintColor: "#9CA3AF", // Gray color for inactive tabs
+        tabBarStyle: [
+          {
+            backgroundColor: colors.card,
+            borderTopColor: colors.cardSecondary,
+            borderTopWidth: 1,
+            height: 60,
+            paddingBottom: 8,
+            paddingTop: 8,
+            shadowColor: colors.accent,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 8,
+          }
+        ],
+        tabBarLabelStyle: tw`text-xs font-medium`,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarItemStyle: tw`rounded-lg mx-1`,
       }}
     >
-      {/* 🏠 Habits (Landing Page) */}
+      {/* 🏠 Habits (Main Landing) */}
       <Tabs.Screen
         name="index"
         options={{
           title: "Habits",
-          tabBarIcon: ({ color, size }) => <Ionicons name="checkmark-circle-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "checkmark-circle" : "checkmark-circle-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
         }}
       />
 
-      {/* ✅ Dailies (To-Do List) */}
+      {/* ✅ Dailies (Dynamic XP To-Do) */}
       <Tabs.Screen
         name="dailies"
         options={{
           title: "Dailies",
-          tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "list" : "list-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
         }}
       />
 
-      {/* ⏳ Routines (Morning, Afternoon, Evening) */}
+      {/* ⏳ Routines (Morning/Evening) */}
       <Tabs.Screen
         name="routines"
         options={{
           title: "Routines",
-          tabBarIcon: ({ color, size }) => <Ionicons name="repeat-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "repeat" : "repeat-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
         }}
       />
 
-      {/* ⏱ Timer (For Learning & Breaks) */}
+      {/* ⏱ Timer (Learning Support) */}
       <Tabs.Screen
         name="timer"
         options={{
           title: "Timer",
-          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "time" : "time-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
         }}
       />
 
-      {/* ⚙️ More (Includes Settings, Stats & Profile) */}
+      {/* ⚙️ More (Stats, Social, Settings) */}
       <Tabs.Screen
         name="more"
         options={{
           title: "More",
-          tabBarIcon: ({ color, size }) => <Ionicons name="ellipsis-horizontal" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "ellipsis-horizontal" : "ellipsis-horizontal-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
         }}
       />
     </Tabs>
