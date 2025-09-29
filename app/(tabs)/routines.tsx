@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from "react-native"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Alert, RefreshControl } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useFocusEffect } from "@react-navigation/native"
@@ -14,23 +14,40 @@ import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 
 export default function Routines() {
-  const { colors } = useTheme()
+  const { colors, currentTheme } = useTheme()
   const defaultRoutines = [
-    { id: "1", title: "Morning Routine", icon: "sunny", description: "Start your day with good habits" },
-    { id: "2", title: "Afternoon Routine", icon: "partly-sunny", description: "Stay productive through the day" },
-    { id: "3", title: "Evening Routine", icon: "moon", description: "End your day on a positive note" },
+    { 
+      id: "1", 
+      title: "Morning Routine", 
+      icon: "sunny", 
+      description: "Start your day with energy and purpose" 
+    },
+    { 
+      id: "2", 
+      title: "Afternoon Routine", 
+      icon: "partly-sunny", 
+      description: "Stay productive and focused throughout the day" 
+    },
+    { 
+      id: "3", 
+      title: "Evening Routine", 
+      icon: "moon", 
+      description: "Wind down and reflect on your achievements" 
+    },
   ]
 
   const { stats, updateRoutineCompletion } = useStats()
-  const [routines, setRoutines] = useState(defaultRoutines)
+  const [routines, setRoutines] = useState([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
   const [isEditModalVisible, setIsEditModalVisible] = useState(false)
   const [editingRoutine, setEditingRoutine] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [routineStats, setRoutineStats] = useState({ completed: 0, total: 0, percentage: 0 })
+  const [routineProgress, setRoutineProgress] = useState({})
   const router = useRouter()
 
-  // Function to calculate routine completion stats
+  // Fixed - Remove dependencies that cause infinite loops
   const calculateRoutineStats = useCallback(async () => {
     try {
       const savedData = await AsyncStorage.getItem("routinesData")
@@ -41,106 +58,134 @@ export default function Routines() {
 
         let completedRoutines = 0
         let totalRoutines = routinesArray.length
+        const progressMap = {}
 
         routinesArray.forEach((routine) => {
-          if (routine.tasks && routine.tasks.length > 0) {
-            const allTasksCompleted = routine.tasks.every((task) => task.completed)
-            if (allTasksCompleted) {
-              completedRoutines++
-            }
+          const totalTasks = routine.tasks ? routine.tasks.length : 0
+          const completedTasks = routine.tasks ? routine.tasks.filter(task => task.completed).length : 0
+          const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+          
+          progressMap[routine.id] = {
+            completedTasks,
+            totalTasks,
+            percentage,
+            isComplete: percentage === 100 && totalTasks > 0
+          }
+
+          if (totalTasks > 0 && completedTasks === totalTasks) {
+            completedRoutines++
           }
         })
 
-        const percentage = totalRoutines > 0 ? Math.round((completedRoutines / totalRoutines) * 100) : 0
+        const overallPercentage = totalRoutines > 0 ? Math.round((completedRoutines / totalRoutines) * 100) : 0
         
         const newStats = {
           completed: completedRoutines,
           total: totalRoutines,
-          percentage: percentage,
+          percentage: overallPercentage,
         }
 
         setRoutineStats(newStats)
-        updateRoutineCompletion(completedRoutines, totalRoutines)
+        setRoutineProgress(progressMap)
+        
+        // Only update if values actually changed
+        if (updateRoutineCompletion) {
+          updateRoutineCompletion(completedRoutines, totalRoutines)
+        }
 
-        return { completedRoutines, totalRoutines }
+        return routinesArray
       } else {
+        // Initialize defaults if no data
         await initializeDefaultRoutines()
-        const newStats = { completed: 0, total: defaultRoutines.length, percentage: 0 }
-        setRoutineStats(newStats)
-        updateRoutineCompletion(0, defaultRoutines.length)
+        return defaultRoutines
       }
     } catch (e) {
       console.error("Failed to calculate routine stats:", e)
-      const newStats = { completed: 0, total: 0, percentage: 0 }
-      setRoutineStats(newStats)
+      setRoutineStats({ completed: 0, total: 0, percentage: 0 })
+      return []
     }
+  }, []) // Remove problematic dependencies
 
-    return { completedRoutines: 0, totalRoutines: 0 }
-  }, [updateRoutineCompletion])
-
-  const initializeDefaultRoutines = async () => {
+  const initializeDefaultRoutines = useCallback(async () => {
     try {
       const routinesObj = {}
       defaultRoutines.forEach((routine) => {
         routinesObj[routine.id] = {
           ...routine,
           tasks: [],
+          createdAt: new Date().toISOString(),
         }
       })
 
       await AsyncStorage.setItem("routinesData", JSON.stringify(routinesObj))
       setRoutines(defaultRoutines)
+      setRoutineStats({ completed: 0, total: defaultRoutines.length, percentage: 0 })
     } catch (e) {
       console.error("Failed to initialize default routines:", e)
     }
-  }
+  }, [])
 
-  useEffect(() => {
-    const loadRoutines = async () => {
-      try {
-        setLoading(true)
-        const savedData = await AsyncStorage.getItem("routinesData")
+  const loadRoutines = useCallback(async () => {
+    try {
+      setLoading(true)
+      const savedData = await AsyncStorage.getItem("routinesData")
 
-        if (savedData) {
-          const routinesData = JSON.parse(savedData)
-          const routinesArray = Object.values(routinesData)
+      if (savedData) {
+        const routinesData = JSON.parse(savedData)
+        const routinesArray = Object.values(routinesData)
 
-          if (routinesArray.length > 0) {
-            setRoutines(routinesArray)
-            await calculateRoutineStats()
-          } else {
-            await initializeDefaultRoutines()
-          }
+        if (routinesArray.length > 0) {
+          setRoutines(routinesArray)
+          // Calculate stats after setting routines
+          await calculateRoutineStats()
         } else {
           await initializeDefaultRoutines()
         }
-      } catch (e) {
-        console.error("Failed to load routines:", e)
+      } else {
         await initializeDefaultRoutines()
-      } finally {
-        setLoading(false)
       }
+    } catch (e) {
+      console.error("Failed to load routines:", e)
+      Alert.alert("Error", "Failed to load routines. Please try again.")
+      setRoutines(defaultRoutines)
+    } finally {
+      setLoading(false)
     }
+  }, [calculateRoutineStats, initializeDefaultRoutines])
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadRoutines()
+    setRefreshing(false)
+  }, [loadRoutines])
+
+  // Fixed - Only load once on mount
+  useEffect(() => {
     loadRoutines()
-  }, [])
+  }, []) // Remove loadRoutines from dependencies
 
+  // Fixed - Only recalculate stats when screen focuses
   useFocusEffect(
     useCallback(() => {
-      calculateRoutineStats()
-    }, [calculateRoutineStats])
+      if (!loading) {
+        calculateRoutineStats()
+      }
+    }, [loading])
   )
 
-  const addRoutine = async (newRoutine: { title: any; icon: any; description: any; tasks: any }) => {
-    const routineToAdd = {
-      id: Date.now().toString(),
-      title: newRoutine.title,
-      icon: newRoutine.icon,
-      description: newRoutine.description,
+  const addRoutine = async (newRoutine: { title: any; icon: any; description: any; tasks?: any }) => {
+    if (!newRoutine.title.trim()) {
+      Alert.alert("Error", "Routine title cannot be empty")
+      return
     }
 
-    const updatedRoutines = [...routines, routineToAdd]
-    setRoutines(updatedRoutines)
+    const routineToAdd = {
+      id: Date.now().toString(),
+      title: newRoutine.title.trim(),
+      icon: newRoutine.icon,
+      description: newRoutine.description.trim(),
+      createdAt: new Date().toISOString(),
+    }
 
     try {
       const existingData = await AsyncStorage.getItem("routinesData")
@@ -152,9 +197,16 @@ export default function Routines() {
       }
 
       await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
+      
+      // Update local state
+      const updatedRoutines = [...routines, routineToAdd]
+      setRoutines(updatedRoutines)
+      
+      // Recalculate stats
       await calculateRoutineStats()
     } catch (e) {
       console.error("Failed to save routine data:", e)
+      Alert.alert("Error", "Failed to save routine. Please try again.")
     }
   }
 
@@ -167,9 +219,10 @@ export default function Routines() {
   }
 
   const saveEditedRoutine = async (editedRoutine: { id: string; title: any; icon: any; description: any }) => {
-    const updatedRoutines = routines.map((routine) => (routine.id === editedRoutine.id ? editedRoutine : routine))
-    setRoutines(updatedRoutines)
-    setEditingRoutine(null)
+    if (!editedRoutine.title.trim()) {
+      Alert.alert("Error", "Routine title cannot be empty")
+      return
+    }
 
     try {
       const existingData = await AsyncStorage.getItem("routinesData")
@@ -178,43 +231,82 @@ export default function Routines() {
         if (routinesData[editedRoutine.id]) {
           routinesData[editedRoutine.id] = {
             ...routinesData[editedRoutine.id],
-            title: editedRoutine.title,
+            title: editedRoutine.title.trim(),
             icon: editedRoutine.icon,
-            description: editedRoutine.description,
+            description: editedRoutine.description.trim(),
           }
           await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
+          
+          // Update local state
+          const updatedRoutines = routines.map((routine) => 
+            routine.id === editedRoutine.id 
+              ? { ...routine, ...editedRoutine, title: editedRoutine.title.trim(), description: editedRoutine.description.trim() }
+              : routine
+          )
+          setRoutines(updatedRoutines)
+          setEditingRoutine(null)
+          
+          // Recalculate stats
           await calculateRoutineStats()
         }
       }
     } catch (e) {
       console.error("Failed to update routine data:", e)
+      Alert.alert("Error", "Failed to update routine. Please try again.")
     }
   }
 
-  const deleteRoutine = async (id) => {
-    const updatedRoutines = routines.filter((routine) => routine.id !== id)
-    setRoutines(updatedRoutines)
-
-    try {
-      const existingData = await AsyncStorage.getItem("routinesData")
-      if (existingData) {
-        const routinesData = JSON.parse(existingData)
-        delete routinesData[id]
-        await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
-        await calculateRoutineStats()
-      }
-    } catch (e) {
-      console.error("Failed to delete routine data:", e)
-    }
+  const deleteRoutine = async (id: string) => {
+    const routineToDelete = routines.find(routine => routine.id === id)
+    
+    Alert.alert(
+      "Delete Routine",
+      `Are you sure you want to delete "${routineToDelete?.title}"? This will also delete all tasks in this routine.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const existingData = await AsyncStorage.getItem("routinesData")
+              if (existingData) {
+                const routinesData = JSON.parse(existingData)
+                delete routinesData[id]
+                await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
+                
+                // Update local state
+                const updatedRoutines = routines.filter((routine) => routine.id !== id)
+                setRoutines(updatedRoutines)
+                
+                // Recalculate stats
+                await calculateRoutineStats()
+              }
+            } catch (e) {
+              console.error("Failed to delete routine data:", e)
+              Alert.alert("Error", "Failed to delete routine. Please try again.")
+            }
+          }
+        }
+      ]
+    )
   }
 
   if (loading) {
     return (
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={colors.isDark ? "light-content" : "dark-content"} />
-        <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading routines...</Text>
+        <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+        <View style={tw`flex-1 justify-center items-center px-5`}>
+          <View style={[
+            tw`w-20 h-20 rounded-full items-center justify-center mb-4`,
+            { backgroundColor: colors.accent + '20' }
+          ]}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+          <Text style={[tw`text-lg font-bold mb-2`, { color: colors.text }]}>Loading Routines</Text>
+          <Text style={[tw`text-center`, { color: colors.textSecondary }]}>
+            Setting up your daily routines...
+          </Text>
         </View>
       </SafeAreaView>
     )
@@ -222,234 +314,385 @@ export default function Routines() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.isDark ? "light-content" : "dark-content"} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      
+      <ScrollView 
+        style={tw`flex-1 px-5 pt-2`}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.accent]}
+            tintColor={colors.accent}
+          />
+        }
+      >
+        {/* Enhanced Header */}
         <View style={tw`flex-row justify-between items-center mb-6 mt-2`}>
-          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Daily Routines</Text>
+          <View>
+            <Text style={[tw`text-3xl font-bold`, { color: colors.text }]}>Daily Routines</Text>
+            <Text style={[tw`text-base mt-1`, { color: colors.textSecondary }]}>
+              {routines.length} routine{routines.length !== 1 ? 's' : ''} • {routineStats.completed} completed today
+            </Text>
+          </View>
           <TouchableOpacity
             style={[
-              tw`rounded-xl p-3 shadow-lg`,
+              tw`rounded-2xl p-4`,
               {
                 backgroundColor: colors.accent,
                 shadowColor: colors.accent,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.4,
-                shadowRadius: 4,
-                elevation: 4,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 6,
               },
             ]}
             onPress={() => setIsAddModalVisible(true)}
+            activeOpacity={0.8}
           >
             <Ionicons name="add" size={24} color="white" />
           </TouchableOpacity>
         </View>
 
-        {/* Cool Stats Card - Matching other pages */}
-        <View style={[tw`rounded-lg p-4 mb-6`, { backgroundColor: colors.card }]}>
+        {/* Enhanced Stats Card */}
+        <View style={[
+          tw`rounded-2xl p-5 mb-6`,
+          {
+            backgroundColor: colors.card,
+            shadowColor: colors.accent,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            elevation: 6,
+          }
+        ]}>
           {stats.levelMessage && (
-            <View style={[tw`px-3 py-2 rounded-lg mb-3`, { backgroundColor: colors.success + '20' }]}>
+            <View style={[
+              tw`px-4 py-3 rounded-xl mb-4`,
+              {
+                backgroundColor: colors.success + '20',
+                borderWidth: 1,
+                borderColor: colors.success + '40',
+              }
+            ]}>
               <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
                 🎉 {stats.levelMessage}
               </Text>
             </View>
           )}
 
-          {/* Health Progress - Cool Custom */}
-          <View style={tw`mb-4`}>
-            <View style={tw`flex-row justify-between items-center mb-2`}>
+          {/* Enhanced Health Progress */}
+          <View style={tw`mb-5`}>
+            <View style={tw`flex-row justify-between items-center mb-3`}>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-lg mr-2`}>❤️</Text>
-                <Text style={[tw`font-medium`, { color: colors.text }]}>Health</Text>
+                <View style={[tw`w-8 h-8 rounded-full items-center justify-center mr-3`, { backgroundColor: colors.error + '20' }]}>
+                  <Text style={tw`text-sm`}>❤️</Text>
+                </View>
+                <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>Health</Text>
               </View>
-              <Text style={[tw`text-sm`, { color: colors.text }]}>
+              <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
                 {stats.health}/{stats.maxHealth} • Level {stats.level}
               </Text>
             </View>
-            {/* Ultra-thin health bar */}
-            <View style={[tw`h-0.5 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
+            <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
               <View
                 style={[
                   tw`h-full rounded-full`,
                   {
                     width: `${Math.min(100, Math.max(0, (stats.health / stats.maxHealth) * 100))}%`,
                     backgroundColor: colors.error,
-                    shadowColor: colors.error,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.6,
-                    shadowRadius: 4,
-                    elevation: 3,
                   },
                 ]}
               />
             </View>
           </View>
 
-          {/* Experience Progress - Cool Custom */}
-          <View style={tw`mb-4`}>
-            <View style={tw`flex-row justify-between items-center mb-2`}>
+          {/* Enhanced Experience Progress */}
+          <View style={tw`mb-5`}>
+            <View style={tw`flex-row justify-between items-center mb-3`}>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-lg mr-2`}>⭐</Text>
-                <Text style={[tw`font-medium`, { color: colors.text }]}>Experience</Text>
+                <View style={[tw`w-8 h-8 rounded-full items-center justify-center mr-3`, { backgroundColor: colors.warning + '20' }]}>
+                  <Text style={tw`text-sm`}>⭐</Text>
+                </View>
+                <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>Experience</Text>
               </View>
-              <Text style={[tw`text-sm`, { color: colors.text }]}>
+              <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
                 {stats.experience}/{stats.maxExperience} XP
               </Text>
             </View>
-            {/* Ultra-thin experience bar */}
-            <View style={[tw`h-0.5 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
+            <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
               <View
                 style={[
                   tw`h-full rounded-full`,
                   {
                     width: `${Math.min(100, Math.max(0, (stats.experience / stats.maxExperience) * 100))}%`,
                     backgroundColor: colors.warning,
-                    shadowColor: colors.warning,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.6,
-                    shadowRadius: 4,
-                    elevation: 3,
                   },
                 ]}
               />
             </View>
           </View>
 
-          <View style={[tw`flex-row justify-between items-center pt-3 border-t`, { borderColor: colors.cardSecondary }]}>
-            <Text style={[tw``, { color: colors.text }]}>
-              💎 {stats.gemsEarned} 🪙 {stats.coinsEarned}
-            </Text>
-            <Text style={[tw`font-bold`, { color: colors.accent }]}>Level {stats.level}</Text>
+          <View style={[tw`flex-row justify-between items-center pt-4 border-t`, { borderColor: colors.cardSecondary }]}>
+            <View style={tw`flex-row items-center`}>
+              <Text style={[tw`text-base font-medium mr-4`, { color: colors.text }]}>
+                💎 {stats.gemsEarned}
+              </Text>
+              <Text style={[tw`text-base font-medium`, { color: colors.text }]}>
+                🪙 {stats.coinsEarned}
+              </Text>
+            </View>
+            <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: colors.accent + '20' }]}>
+              <Text style={[tw`text-sm font-bold`, { color: colors.accent }]}>Level {stats.level}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Routines Progress - Now using real stats */}
-        <View style={[tw`rounded-xl p-4 mb-4 shadow-lg`, { backgroundColor: colors.card }]}>
-          <View style={tw`flex-row justify-between items-center mb-2`}>
-            <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>Routines Progress</Text>
-            <Text style={[tw`text-lg font-medium`, { color: colors.text }]}>
-              {routineStats.completed}/{routineStats.total}
-            </Text>
+        {/* Enhanced Routines Progress */}
+        <View style={[
+          tw`rounded-2xl p-5 mb-6`,
+          {
+            backgroundColor: colors.card,
+            shadowColor: colors.success,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            elevation: 6,
+          }
+        ]}>
+          <View style={tw`flex-row justify-between items-center mb-4`}>
+            <View>
+              <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Today's Progress</Text>
+              <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>
+                {routineStats.percentage === 100 && routineStats.total > 0 ? "Perfect day! 🎉" : "Keep going!"}
+              </Text>
+            </View>
+            <View style={tw`items-end`}>
+              <Text style={[tw`text-2xl font-bold`, { color: colors.success }]}>
+                {routineStats.percentage}%
+              </Text>
+              <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+                {routineStats.completed}/{routineStats.total}
+              </Text>
+            </View>
           </View>
 
-          {/* Ultra-thin Progress Bar */}
-          <View style={[tw`h-0.5 rounded-full overflow-hidden mb-1`, { backgroundColor: colors.cardSecondary }]}>
+          <View style={[tw`h-3 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
             <View
               style={[
                 tw`h-full rounded-full`,
                 {
                   width: `${routineStats.percentage}%`,
-                  backgroundColor: colors.success,
-                  shadowColor: colors.success,
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.6,
-                  shadowRadius: 4,
-                  elevation: 3,
+                  backgroundColor: routineStats.percentage === 100 ? colors.success : colors.accent,
                 },
               ]}
             />
           </View>
 
-          <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+          <Text style={[tw`text-sm mt-3`, { color: colors.textSecondary }]}>
             {routineStats.percentage === 100 && routineStats.total > 0
-              ? "All routines completed! Great job! 🎉"
-              : `${routineStats.total - routineStats.completed} routines remaining`}
+              ? "🌟 Outstanding! All routines completed today!"
+              : `${routineStats.total - routineStats.completed} routine${routineStats.total - routineStats.completed !== 1 ? 's' : ''} remaining for today`}
           </Text>
         </View>
 
-        {/* Cool Routine Cards */}
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {routines.map((routine) => (
-            <TouchableOpacity
-              key={routine.id}
-              style={[
-                tw`rounded-2xl mb-3 overflow-hidden shadow-lg`,
-                {
-                  backgroundColor: colors.card,
-                  shadowColor: colors.accent,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 4,
-                  elevation: 4,
-                },
-              ]}
-              onPress={() =>
-                router.push({
-                  pathname: "/routines/routine-detail",
-                  params: { id: routine.id },
-                })
+        {/* Enhanced Routine Cards */}
+        <View style={tw`mb-8`}>
+          <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>
+            Your Routines ({routines.length})
+          </Text>
+          
+          {routines.length === 0 ? (
+            <View style={[
+              tw`rounded-2xl p-8 items-center`,
+              {
+                backgroundColor: colors.card,
+                shadowColor: colors.cardSecondary,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 12,
+                elevation: 6,
               }
-              activeOpacity={0.8}
-            >
-              <View style={tw`p-3`}>
-                <View style={tw`flex-row justify-between items-center mb-2`}>
-                  <View style={tw`flex-row items-center flex-1`}>
-                    <View
-                      style={[
-                        tw`w-12 h-12 rounded-xl items-center justify-center mr-3`,
-                        {
-                          backgroundColor: colors.accent + '20',
-                          borderWidth: 2,
-                          borderColor: colors.accent,
-                          shadowColor: colors.accent,
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.3,
-                          shadowRadius: 2,
-                          elevation: 2,
-                        },
-                      ]}
-                    >
-                      <Ionicons name={routine.icon} size={24} color={colors.accent} />
-                    </View>
-                    <View style={tw`flex-1`}>
-                      <Text style={[tw`text-lg font-bold`, { color: colors.text }]} numberOfLines={1}>
-                        {routine.title}
-                      </Text>
-                      <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {routine.description}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={tw`flex-row items-center`}>
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation()
-                        editRoutine(routine.id)
-                      }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={tw`mr-2`}
-                    >
-                      <Ionicons name="pencil-outline" size={18} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation()
-                        deleteRoutine(routine.id)
-                      }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+            ]}>
+              <View style={[
+                tw`w-20 h-20 rounded-full items-center justify-center mb-4`,
+                { backgroundColor: colors.accent + '20' }
+              ]}>
+                <Ionicons name="list-outline" size={40} color={colors.accent} />
               </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              <Text style={[tw`text-xl font-bold mb-2`, { color: colors.text }]}>No routines yet</Text>
+              <Text style={[tw`text-center mb-6 leading-6`, { color: colors.textSecondary }]}>
+                Create your first routine to start building healthy habits and earning rewards!
+              </Text>
+              <TouchableOpacity
+                style={[
+                  tw`px-8 py-4 rounded-xl`,
+                  {
+                    backgroundColor: colors.accent,
+                    shadowColor: colors.accent,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 6,
+                  }
+                ]}
+                onPress={() => setIsAddModalVisible(true)}
+              >
+                <Text style={tw`text-white font-bold text-base`}>Create First Routine</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            routines.map((routine) => {
+              const progress = routineProgress[routine.id] || { completedTasks: 0, totalTasks: 0, percentage: 0, isComplete: false }
+              
+              return (
+                <TouchableOpacity
+                  key={routine.id}
+                  style={[
+                    tw`rounded-2xl mb-4 overflow-hidden`,
+                    {
+                      backgroundColor: colors.card,
+                      shadowColor: progress.isComplete ? colors.success : colors.accent,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 12,
+                      elevation: 6,
+                      borderWidth: progress.isComplete ? 2 : 0,
+                      borderColor: progress.isComplete ? colors.success + '40' : 'transparent',
+                    },
+                  ]}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/routines/routine-detail",
+                      params: { id: routine.id },
+                    })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <View style={tw`p-5`}>
+                    <View style={tw`flex-row justify-between items-start mb-4`}>
+                      <View style={tw`flex-row items-center flex-1`}>
+                        <View
+                          style={[
+                            tw`w-14 h-14 rounded-2xl items-center justify-center mr-4`,
+                            {
+                              backgroundColor: progress.isComplete 
+                                ? colors.success + '20' 
+                                : colors.accent + '20',
+                              borderWidth: 2,
+                              borderColor: progress.isComplete 
+                                ? colors.success + '40' 
+                                : colors.accent + '40',
+                            },
+                          ]}
+                        >
+                          <Ionicons 
+                            name={routine.icon} 
+                            size={28} 
+                            color={progress.isComplete ? colors.success : colors.accent} 
+                          />
+                        </View>
+                        <View style={tw`flex-1`}>
+                          <View style={tw`flex-row items-center mb-1`}>
+                            <Text style={[tw`text-lg font-bold flex-1`, { color: colors.text }]} numberOfLines={1}>
+                              {routine.title}
+                            </Text>
+                            {progress.isComplete && (
+                              <View style={[tw`ml-2 px-2 py-1 rounded-full`, { backgroundColor: colors.success + '20' }]}>
+                                <Text style={[tw`text-xs font-bold`, { color: colors.success }]}>✓ Done</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[tw`text-sm leading-5`, { color: colors.textSecondary }]} numberOfLines={2}>
+                            {routine.description}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      <View style={tw`flex-row items-center ml-2`}>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation()
+                            editRoutine(routine.id)
+                          }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          style={[tw`p-2 rounded-lg mr-1`, { backgroundColor: colors.cardSecondary }]}
+                        >
+                          <Ionicons name="pencil-outline" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation()
+                            deleteRoutine(routine.id)
+                          }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          style={[tw`p-2 rounded-lg`, { backgroundColor: colors.error + '20' }]}
+                        >
+                          <Ionicons name="trash-outline" size={18} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
 
-        <AddRoutineModal isVisible={isAddModalVisible} onClose={() => setIsAddModalVisible(false)} onAdd={addRoutine} />
+                    {/* Progress Section */}
+                    {progress.totalTasks > 0 && (
+                      <View>
+                        <View style={tw`flex-row justify-between items-center mb-2`}>
+                          <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
+                            Progress: {progress.completedTasks}/{progress.totalTasks} tasks
+                          </Text>
+                          <Text style={[tw`text-sm font-bold`, { color: progress.isComplete ? colors.success : colors.accent }]}>
+                            {progress.percentage}%
+                          </Text>
+                        </View>
+                        
+                        <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
+                          <View
+                            style={[
+                              tw`h-full rounded-full`,
+                              {
+                                width: `${progress.percentage}%`,
+                                backgroundColor: progress.isComplete ? colors.success : colors.accent,
+                              },
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    )}
 
-        {editingRoutine && (
-          <EditRoutineModal
-            isVisible={isEditModalVisible}
-            onClose={() => {
-              setIsEditModalVisible(false)
-              setEditingRoutine(null)
-            }}
-            onSave={saveEditedRoutine}
-            routine={editingRoutine}
-          />
-        )}
-      </View>
+                    {progress.totalTasks === 0 && (
+                      <View style={[tw`p-3 rounded-xl`, { backgroundColor: colors.cardSecondary }]}>
+                        <Text style={[tw`text-sm text-center`, { color: colors.textSecondary }]}>
+                          📝 Tap to add tasks to this routine
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )
+            })
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Modals */}
+      <AddRoutineModal 
+        isVisible={isAddModalVisible} 
+        onClose={() => setIsAddModalVisible(false)} 
+        onAdd={addRoutine} 
+      />
+
+      {editingRoutine && (
+        <EditRoutineModal
+          isVisible={isEditModalVisible}
+          onClose={() => {
+            setIsEditModalVisible(false)
+            setEditingRoutine(null)
+          }}
+          onSave={saveEditedRoutine}
+          routine={editingRoutine}
+        />
+      )}
     </SafeAreaView>
   )
 }

@@ -190,7 +190,65 @@ const themes: Theme[] = [
     unlocked: true, // Changed to true for testing
     requirement: "Earn 3 group badges",
     icon: "rose"
-  }
+  },
+  {
+    id: "paper",
+    name: "Paper Theme",
+    description: "Clean paper with black ink",
+    category: "Elegant",
+    colors: {
+      background: "#FEFCF7",
+      card: "#FFFEF9",
+      cardSecondary: "#F8F6F0",
+      accent: "#2C2C2E",
+      text: "#1C1C1E",
+      textSecondary: "#48484A",
+      success: "#4A5D23",
+      warning: "#8B4513",
+      error: "#8B1A1A"
+    },
+    unlocked: true,
+    icon: "document-text"
+  },
+  {
+    id: "vintage-paper",
+    name: "Vintage Paper",
+    description: "Aged paper with fountain pen ink",
+    category: "Premium",
+    colors: {
+      background: "#F5F2E8",
+      card: "#F9F6EC",
+      cardSecondary: "#F0EDE1",
+      accent: "#1F1F1F",
+      text: "#2F2F2F",
+      textSecondary: "#5C5C5C",
+      success: "#355C2B",
+      warning: "#A0620E",
+      error: "#7A1A1A"
+    },
+    unlocked: false,
+    requirement: "Reach level 10",
+    icon: "library"
+  },
+  {
+    id: "notebook",
+    name: "Notebook Paper",
+    description: "Lined notebook with blue ink",
+    category: "Default",
+    colors: {
+      background: "#FDFDFD",
+      card: "#FFFFFF",
+      cardSecondary: "#F7F7F7",
+      accent: "#1E3A8A",
+      text: "#1A1A1A",
+      textSecondary: "#4D4D4D",
+      success: "#166534",
+      warning: "#B45309",
+      error: "#DC2626"
+    },
+    unlocked: true,
+    icon: "book"
+  },
 ]
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
