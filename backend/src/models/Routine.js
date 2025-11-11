@@ -1,4 +1,4 @@
-const database = require('../config/database');
+const database = require("../config/database");
 
 class Routine {
   constructor(data) {
@@ -7,9 +7,11 @@ class Routine {
     this.title = data.title;
     this.description = data.description;
     this.icon = data.icon;
-    this.tasks = typeof data.tasks === 'string' 
-      ? JSON.parse(data.tasks) 
-      : data.tasks || [];
+    this.tasks =
+      typeof data.tasks === "string"
+        ? data.tasks
+        : JSON.stringify(data.tasks || []);
+    this.completed_today = data.completed_today || false;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
   }
@@ -17,20 +19,59 @@ class Routine {
   // Create new routine
   static async create(routineData) {
     try {
-      const result = await database.run(`
-        INSERT INTO routines (user_id, title, description, icon, tasks)
-        VALUES (?, ?, ?, ?, ?)
-      `, [
-        routineData.user_id,
-        routineData.title,
-        routineData.description,
-        routineData.icon || 'list-outline',
-        JSON.stringify(routineData.tasks || [])
-      ]);
-      
+      console.log("🔄 Creating routine in database:", routineData);
+
+      const result = await database.run(
+        `INSERT INTO routines (user_id, title, description, icon, tasks)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          routineData.user_id,
+          routineData.title,
+          routineData.description || "",
+          routineData.icon || "list-outline",
+          typeof routineData.tasks === "string"
+            ? routineData.tasks
+            : JSON.stringify(routineData.tasks || []),
+        ]
+      );
+
+      console.log("✅ Routine created with ID:", result.lastID);
       return result.lastID;
     } catch (error) {
-      console.error('Error creating routine:', error);
+      console.error("❌ Error creating routine:", error);
+      throw error;
+    }
+  }
+
+  // Find routines by user ID
+  static async findByUserId(userId) {
+    try {
+      console.log("🔍 Finding routines for user:", userId);
+
+      const routines = await database.all(
+        `SELECT r.*, 
+         EXISTS(
+           SELECT 1 FROM routine_completions rc 
+           WHERE rc.routine_id = r.id 
+           AND rc.completion_date = date('now')
+         ) as completed_today
+         FROM routines r 
+         WHERE r.user_id = ?
+         ORDER BY r.created_at DESC`,
+        [userId]
+      );
+
+      console.log("✅ Found routines:", routines.length);
+
+      return routines.map(
+        (routine) =>
+          new Routine({
+            ...routine,
+            completed_today: Boolean(routine.completed_today),
+          })
+      );
+    } catch (error) {
+      console.error("❌ Error finding routines:", error);
       throw error;
     }
   }
@@ -38,180 +79,88 @@ class Routine {
   // Find routine by ID
   static async findById(id) {
     try {
-      const routine = await database.get(`
-        SELECT * FROM routines WHERE id = ?
-      `, [id]);
-      
-      return routine ? new Routine(routine) : null;
+      const routine = await database.get(
+        `SELECT r.*, 
+         EXISTS(
+           SELECT 1 FROM routine_completions rc 
+           WHERE rc.routine_id = r.id 
+           AND rc.completion_date = date('now')
+         ) as completed_today
+         FROM routines r 
+         WHERE r.id = ?`,
+        [id]
+      );
+
+      if (!routine) return null;
+
+      return new Routine({
+        ...routine,
+        completed_today: Boolean(routine.completed_today),
+      });
     } catch (error) {
-      console.error('Error finding routine by ID:', error);
+      console.error("❌ Error finding routine by ID:", error);
       throw error;
     }
   }
 
-  // Get all routines for user
-  static async findByUserId(userId) {
+  // Update routine
+  static async update(id, updateData) {
     try {
-      const routines = await database.all(`
-        SELECT r.*,
-               (
-                 SELECT COUNT(*)
-                 FROM focus_sessions fs
-                 WHERE fs.user_id = r.user_id
-                 AND fs.title LIKE '%' || r.title || '%'
-                 AND DATE(fs.completed_at) = date('now')
-               ) as completed_today
-        FROM routines r
-        WHERE r.user_id = ?
-        ORDER BY r.created_at DESC
-      `, [userId]);
-      
-      return routines.map(routine => new Routine({
-        ...routine,
-        completed_today: Boolean(routine.completed_today)
-      }));
+      await database.run(
+        `UPDATE routines 
+         SET title = ?, description = ?, icon = ?, tasks = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = ?`,
+        [
+          updateData.title,
+          updateData.description,
+          updateData.icon,
+          typeof updateData.tasks === "string"
+            ? updateData.tasks
+            : JSON.stringify(updateData.tasks || []),
+          id,
+        ]
+      );
+
+      return true;
     } catch (error) {
-      console.error('Error fetching routines:', error);
-      return [];
+      console.error("❌ Error updating routine:", error);
+      throw error;
     }
   }
 
-  // Update routine
-  async update(updateData) {
+  // Mark routine as completed
+  static async markCompleted(routineId, userId) {
     try {
-      await database.run(`
-        UPDATE routines 
-        SET title = ?, description = ?, icon = ?, tasks = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND user_id = ?
-      `, [
-        updateData.title || this.title,
-        updateData.description || this.description,
-        updateData.icon || this.icon,
-        JSON.stringify(updateData.tasks || this.tasks),
-        this.id,
-        this.user_id
-      ]);
-      
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+
+      // Insert completion record
+      await database.run(
+        `INSERT OR IGNORE INTO routine_completions (routine_id, user_id, completion_date)
+         VALUES (?, ?, ?)`,
+        [routineId, userId, today]
+      );
+
+      // Update timestamp
+      await database.run(
+        `UPDATE routines SET updated_at = CURRENT_TIMESTAMP 
+         WHERE id = ?`,
+        [routineId]
+      );
+
       return true;
     } catch (error) {
-      console.error('Error updating routine:', error);
+      console.error("❌ Error marking routine completed:", error);
       throw error;
     }
   }
 
   // Delete routine
-  async delete() {
+  static async delete(id) {
     try {
-      await database.run('DELETE FROM routines WHERE id = ? AND user_id = ?', [this.id, this.user_id]);
+      await database.run("DELETE FROM routines WHERE id = ?", [id]);
       return true;
     } catch (error) {
-      console.error('Error deleting routine:', error);
-      throw error;
-    }
-  }
-
-  // Record routine completion
-  static async recordCompletion(routineId, userId, completedTasks = []) {
-    try {
-      const routine = await Routine.findById(routineId);
-      if (!routine || routine.user_id !== userId) {
-        throw new Error('Routine not found');
-      }
-
-      // Calculate completion percentage
-      const totalTasks = routine.tasks.length;
-      const completedCount = completedTasks.length;
-      const completionRate = totalTasks > 0 ? (completedCount / totalTasks) : 0;
-
-      // Record in focus_sessions table for tracking
-      await database.run(`
-        INSERT INTO focus_sessions (user_id, title, duration_minutes, completed_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-      `, [
-        userId,
-        `Routine: ${routine.title} (${Math.round(completionRate * 100)}%)`,
-        Math.max(completedCount * 5, 5) // Estimate 5 minutes per task
-      ]);
-
-      return {
-        routine,
-        completionRate,
-        completedTasks: completedCount,
-        totalTasks
-      };
-    } catch (error) {
-      console.error('Error recording routine completion:', error);
-      throw error;
-    }
-  }
-
-  // Get routine completion history
-  static async getCompletionHistory(routineId, days = 30) {
-    try {
-      const routine = await Routine.findById(routineId);
-      if (!routine) return [];
-
-      const history = await database.all(`
-        SELECT 
-          DATE(completed_at) as date,
-          COUNT(*) as completions,
-          AVG(duration_minutes) as avg_duration
-        FROM focus_sessions
-        WHERE user_id = ?
-        AND title LIKE '%' || ? || '%'
-        AND completed_at >= datetime('now', '-${days} days')
-        GROUP BY DATE(completed_at)
-        ORDER BY date DESC
-      `, [routine.user_id, routine.title]);
-      
-      return history;
-    } catch (error) {
-      console.error('Error fetching routine history:', error);
-      return [];
-    }
-  }
-
-  // Get routine statistics
-  static async getRoutineStats(userId, days = 30) {
-    try {
-      const stats = await database.all(`
-        SELECT 
-          r.id,
-          r.title,
-          COUNT(fs.id) as total_completions,
-          AVG(fs.duration_minutes) as avg_duration,
-          MAX(DATE(fs.completed_at)) as last_completed
-        FROM routines r
-        LEFT JOIN focus_sessions fs ON fs.user_id = r.user_id 
-          AND fs.title LIKE '%' || r.title || '%'
-          AND fs.completed_at >= datetime('now', '-${days} days')
-        WHERE r.user_id = ?
-        GROUP BY r.id, r.title
-        ORDER BY total_completions DESC
-      `, [userId]);
-      
-      return stats;
-    } catch (error) {
-      console.error('Error fetching routine stats:', error);
-      return [];
-    }
-  }
-
-  // Duplicate routine
-  async duplicate(newTitle = null) {
-    try {
-      const duplicatedRoutine = {
-        user_id: this.user_id,
-        title: newTitle || `${this.title} (Copy)`,
-        description: this.description,
-        icon: this.icon,
-        tasks: [...this.tasks] // Create a copy of tasks array
-      };
-
-      const newRoutineId = await Routine.create(duplicatedRoutine);
-      return await Routine.findById(newRoutineId);
-    } catch (error) {
-      console.error('Error duplicating routine:', error);
+      console.error("❌ Error deleting routine:", error);
       throw error;
     }
   }

@@ -12,6 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
+import { routinesAPI } from "../../lib/api"
 
 export default function Routines() {
   const { colors, currentTheme } = useTheme()
@@ -128,6 +129,53 @@ export default function Routines() {
   const loadRoutines = useCallback(async () => {
     try {
       setLoading(true)
+      
+      // Check if user is logged in
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+      
+      if (token && isGuest !== 'true') {
+        console.log('🔄 Loading routines from backend...')
+        try {
+          // Load from backend
+          const response = await routinesAPI.getRoutines()
+          
+          if (response.success && response.routines) {
+            // Convert backend format to your frontend format
+            const convertedRoutines = response.routines.map((backendRoutine: any) => ({
+              id: backendRoutine.id.toString(),
+              title: backendRoutine.title,
+              description: backendRoutine.description || '',
+              icon: backendRoutine.icon || 'list-outline',
+              tasks: typeof backendRoutine.tasks === 'string' 
+                ? JSON.parse(backendRoutine.tasks) 
+                : (backendRoutine.tasks || []),
+              createdAt: backendRoutine.created_at || new Date().toISOString(),
+              completed_today: backendRoutine.completed_today || false
+            }))
+            
+            setRoutines(convertedRoutines)
+            
+            // Cache for offline use - convert to object format for compatibility
+            const routinesObj = {}
+            convertedRoutines.forEach((routine: any) => {
+              routinesObj[routine.id] = routine
+            })
+            await AsyncStorage.setItem("routinesData", JSON.stringify(routinesObj))
+            
+            // Calculate stats after setting routines
+            await calculateRoutineStats()
+            
+            console.log('✅ Routines loaded from backend:', convertedRoutines)
+            return
+          }
+        } catch (error) {
+          console.error('❌ Backend failed, loading from local:', error)
+        }
+      }
+
+      // Load from local storage (guest mode or backup)
+      console.log('📱 Loading routines from local storage...')
       const savedData = await AsyncStorage.getItem("routinesData")
 
       if (savedData) {
@@ -161,8 +209,83 @@ export default function Routines() {
 
   // Fixed - Only load once on mount
   useEffect(() => {
+    const loadRoutines = async () => {
+      try {
+        setLoading(true)
+        
+        // Check if user is logged in
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
+        
+        if (token && isGuest !== 'true') {
+          console.log('🔄 Loading routines from backend...')
+          try {
+            // Load from backend
+            const response = await routinesAPI.getRoutines()
+            
+            if (response.success && response.routines) {
+              // Convert backend format to your frontend format
+              const convertedRoutines = response.routines.map((backendRoutine: any) => ({
+                id: backendRoutine.id.toString(),
+                title: backendRoutine.title,
+                description: backendRoutine.description || '',
+                icon: backendRoutine.icon || 'list-outline',
+                tasks: typeof backendRoutine.tasks === 'string' 
+                  ? JSON.parse(backendRoutine.tasks) 
+                  : (backendRoutine.tasks || []),
+                createdAt: backendRoutine.created_at || new Date().toISOString(),
+                completed_today: backendRoutine.completed_today || false
+              }))
+              
+              setRoutines(convertedRoutines)
+              
+              // Cache for offline use - convert to object format for compatibility
+              const routinesObj = {}
+              convertedRoutines.forEach((routine: any) => {
+                routinesObj[routine.id] = routine
+              })
+              await AsyncStorage.setItem("routinesData", JSON.stringify(routinesObj))
+              
+              // Calculate stats after setting routines
+              await calculateRoutineStats()
+              
+              console.log('✅ Routines loaded from backend:', convertedRoutines)
+              return
+            }
+          } catch (error) {
+            console.error('❌ Backend failed, loading from local:', error)
+          }
+        }
+
+        // Load from local storage (guest mode or backup)
+        console.log('📱 Loading routines from local storage...')
+        const savedData = await AsyncStorage.getItem("routinesData")
+
+        if (savedData) {
+          const routinesData = JSON.parse(savedData)
+          const routinesArray = Object.values(routinesData)
+
+          if (routinesArray.length > 0) {
+            setRoutines(routinesArray)
+            // Calculate stats after setting routines
+            await calculateRoutineStats()
+          } else {
+            await initializeDefaultRoutines()
+          }
+        } else {
+          await initializeDefaultRoutines()
+        }
+      } catch (e) {
+        console.error("Failed to load routines:", e)
+        Alert.alert("Error", "Failed to load routines. Please try again.")
+        setRoutines(defaultRoutines)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     loadRoutines()
-  }, []) // Remove loadRoutines from dependencies
+  }, []) // Remove dependencies to prevent infinite loops
 
   // Fixed - Only recalculate stats when screen focuses
   useFocusEffect(
@@ -179,23 +302,64 @@ export default function Routines() {
       return
     }
 
-    const routineToAdd = {
-      id: Date.now().toString(),
-      title: newRoutine.title.trim(),
-      icon: newRoutine.icon,
-      description: newRoutine.description.trim(),
-      createdAt: new Date().toISOString(),
-    }
-
     try {
-      const existingData = await AsyncStorage.getItem("routinesData")
-      const routinesData = existingData ? JSON.parse(existingData) : {}
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
 
-      routinesData[routineToAdd.id] = {
-        ...routineToAdd,
+      if (token && isGuest !== 'true') {
+        console.log('➕ Adding routine to backend:', newRoutine)
+        
+        try {
+          const response = await routinesAPI.createRoutine(newRoutine)
+          
+          if (response.success) {
+            // Convert backend routine to frontend format
+            const newBackendRoutine = {
+              id: response.routine.id.toString(),
+              title: response.routine.title,
+              description: response.routine.description || '',
+              icon: response.routine.icon || 'list-outline',
+              tasks: typeof response.routine.tasks === 'string' 
+                ? JSON.parse(response.routine.tasks) 
+                : (response.routine.tasks || []),
+              createdAt: response.routine.created_at || new Date().toISOString()
+            }
+            
+            const updatedRoutines = [...routines, newBackendRoutine]
+            setRoutines(updatedRoutines)
+            
+            // Cache locally in object format
+            const existingData = await AsyncStorage.getItem("routinesData")
+            const routinesData = existingData ? JSON.parse(existingData) : {}
+            routinesData[newBackendRoutine.id] = newBackendRoutine
+            await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
+            
+            // Recalculate stats
+            await calculateRoutineStats()
+            
+            console.log('✅ Routine added to backend successfully')
+            return
+          }
+        } catch (error) {
+          console.error('❌ Failed to add to backend, saving locally:', error)
+        }
+      }
+
+      // Guest mode or backend failed - save locally
+      console.log('📱 Adding routine locally:', newRoutine)
+      const routineToAdd = {
+        id: Date.now().toString(),
+        title: newRoutine.title.trim(),
+        icon: newRoutine.icon,
+        description: newRoutine.description.trim(),
+        createdAt: new Date().toISOString(),
         tasks: newRoutine.tasks || [],
       }
 
+      const existingData = await AsyncStorage.getItem("routinesData")
+      const routinesData = existingData ? JSON.parse(existingData) : {}
+
+      routinesData[routineToAdd.id] = routineToAdd
       await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
       
       // Update local state
@@ -225,6 +389,61 @@ export default function Routines() {
     }
 
     try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('✏️ Updating routine on backend:', editedRoutine)
+        
+        try {
+          // Get current routine data with tasks
+          const currentRoutine = routines.find(r => r.id === editedRoutine.id)
+          const updateData = {
+            title: editedRoutine.title.trim(),
+            description: editedRoutine.description.trim(),
+            icon: editedRoutine.icon,
+            tasks: currentRoutine?.tasks || []
+          }
+          
+          const response = await routinesAPI.updateRoutine(parseInt(editedRoutine.id), updateData)
+          
+          if (response.success) {
+            // Update local state
+            const updatedRoutines = routines.map((routine) => 
+              routine.id === editedRoutine.id 
+                ? { ...routine, ...editedRoutine, title: editedRoutine.title.trim(), description: editedRoutine.description.trim() }
+                : routine
+            )
+            setRoutines(updatedRoutines)
+            
+            // Update local storage
+            const existingData = await AsyncStorage.getItem("routinesData")
+            if (existingData) {
+              const routinesData = JSON.parse(existingData)
+              if (routinesData[editedRoutine.id]) {
+                routinesData[editedRoutine.id] = {
+                  ...routinesData[editedRoutine.id],
+                  title: editedRoutine.title.trim(),
+                  icon: editedRoutine.icon,
+                  description: editedRoutine.description.trim(),
+                }
+                await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
+              }
+            }
+            
+            setEditingRoutine(null)
+            await calculateRoutineStats()
+            
+            console.log('✅ Routine updated on backend successfully')
+            return
+          }
+        } catch (error) {
+          console.error('❌ Failed to update on backend, updating locally:', error)
+        }
+      }
+
+      // Guest mode or backend failed - update locally
+      console.log('📱 Updating routine locally:', editedRoutine)
       const existingData = await AsyncStorage.getItem("routinesData")
       if (existingData) {
         const routinesData = JSON.parse(existingData)
@@ -269,6 +488,24 @@ export default function Routines() {
           style: "destructive",
           onPress: async () => {
             try {
+              const token = await AsyncStorage.getItem('userToken')
+              const isGuest = await AsyncStorage.getItem('isGuest')
+
+              if (token && isGuest !== 'true') {
+                console.log('🗑️ Deleting routine from backend:', id)
+                
+                try {
+                  const response = await routinesAPI.deleteRoutine(parseInt(id))
+                  
+                  if (response.success) {
+                    console.log('✅ Routine deleted from backend successfully')
+                  }
+                } catch (error) {
+                  console.error('❌ Failed to delete from backend:', error)
+                }
+              }
+
+              // Delete locally (always do this)
               const existingData = await AsyncStorage.getItem("routinesData")
               if (existingData) {
                 const routinesData = JSON.parse(existingData)
@@ -355,101 +592,105 @@ export default function Routines() {
           </TouchableOpacity>
         </View>
 
-        {/* Enhanced Stats Card */}
+        {/* REPLACE: Simple Character Stats Header - Same as Habits */}
         <View style={[
-          tw`rounded-2xl p-5 mb-6`,
-          {
-            backgroundColor: colors.card,
-            shadowColor: colors.accent,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            elevation: 6,
-          }
+          tw`rounded-xl p-4 mb-4 flex-row items-center justify-between`,
+          { backgroundColor: colors.card }
         ]}>
-          {stats.levelMessage && (
+          {/* Left side - User info */}
+          <View style={tw`flex-row items-center flex-1`}>
             <View style={[
-              tw`px-4 py-3 rounded-xl mb-4`,
-              {
-                backgroundColor: colors.success + '20',
-                borderWidth: 1,
-                borderColor: colors.success + '40',
-              }
+              tw`w-10 h-10 rounded-full items-center justify-center mr-3`,
+              { backgroundColor: colors.accent + '20' }
             ]}>
-              <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
-                🎉 {stats.levelMessage}
+              <Text style={tw`text-lg`}>🧙‍♂️</Text>
+            </View>
+            <View style={tw`flex-1`}>
+              <Text style={[tw`font-bold text-base`, { color: colors.text }]}>
+                Level {stats.level} Hero
+              </Text>
+              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                {routineStats.completed}/{routineStats.total} routines done
               </Text>
             </View>
-          )}
+          </View>
 
-          {/* Enhanced Health Progress */}
-          <View style={tw`mb-5`}>
-            <View style={tw`flex-row justify-between items-center mb-3`}>
-              <View style={tw`flex-row items-center`}>
-                <View style={[tw`w-8 h-8 rounded-full items-center justify-center mr-3`, { backgroundColor: colors.error + '20' }]}>
-                  <Text style={tw`text-sm`}>❤️</Text>
-                </View>
-                <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>Health</Text>
-              </View>
-              <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
-                {stats.health}/{stats.maxHealth} • Level {stats.level}
+          {/* Right side - Currency & Streak */}
+          <View style={tw`items-end`}>
+            <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
+              💎 {stats.gemsEarned}  🪙 {stats.coinsEarned}
+            </Text>
+            <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+              🔥 {stats.currentStreak} streak
+            </Text>
+          </View>
+        </View>
+
+        {/* Simple Progress Bars - FIXED */}
+        <View style={[
+          tw`rounded-xl p-4 mb-4`,
+          { backgroundColor: colors.card }
+        ]}>
+          {/* Health Bar - FIXED */}
+          <View style={tw`mb-3`}>
+            <View style={tw`flex-row justify-between items-center mb-1`}>
+              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
+                ❤️ Health
+              </Text>
+              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                {stats.health || 100}/{stats.maxHealth || 100}
               </Text>
             </View>
-            <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
+            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
               <View
                 style={[
-                  tw`h-full rounded-full`,
+                  tw`h-2 rounded-full`,
                   {
-                    width: `${Math.min(100, Math.max(0, (stats.health / stats.maxHealth) * 100))}%`,
-                    backgroundColor: colors.error,
-                  },
+                    width: `${Math.min(((stats.health || 100) / (stats.maxHealth || 100)) * 100, 100)}%`,
+                    backgroundColor: '#ef4444',
+                  }
                 ]}
               />
             </View>
           </View>
 
-          {/* Enhanced Experience Progress */}
-          <View style={tw`mb-5`}>
-            <View style={tw`flex-row justify-between items-center mb-3`}>
-              <View style={tw`flex-row items-center`}>
-                <View style={[tw`w-8 h-8 rounded-full items-center justify-center mr-3`, { backgroundColor: colors.warning + '20' }]}>
-                  <Text style={tw`text-sm`}>⭐</Text>
-                </View>
-                <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>Experience</Text>
-              </View>
-              <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
-                {stats.experience}/{stats.maxExperience} XP
+          {/* Experience Bar - FIXED */}
+          <View>
+            <View style={tw`flex-row justify-between items-center mb-1`}>
+              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
+                ⚡ Experience
+              </Text>
+              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                {(stats.experience || 0) % 100}/100
               </Text>
             </View>
-            <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
+            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
               <View
                 style={[
-                  tw`h-full rounded-full`,
+                  tw`h-2 rounded-full`,
                   {
-                    width: `${Math.min(100, Math.max(0, (stats.experience / stats.maxExperience) * 100))}%`,
-                    backgroundColor: colors.warning,
-                  },
+                    width: `${((stats.experience || 0) % 100)}%`,
+                    backgroundColor: '#eab308',
+                  }
                 ]}
               />
-            </View>
-          </View>
-
-          <View style={[tw`flex-row justify-between items-center pt-4 border-t`, { borderColor: colors.cardSecondary }]}>
-            <View style={tw`flex-row items-center`}>
-              <Text style={[tw`text-base font-medium mr-4`, { color: colors.text }]}>
-                💎 {stats.gemsEarned}
-              </Text>
-              <Text style={[tw`text-base font-medium`, { color: colors.text }]}>
-                🪙 {stats.coinsEarned}
-              </Text>
-            </View>
-            <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: colors.accent + '20' }]}>
-              <Text style={[tw`text-sm font-bold`, { color: colors.accent }]}>Level {stats.level}</Text>
             </View>
           </View>
         </View>
 
-        {/* Enhanced Routines Progress */}
+        {/* Level Up Message (if exists) */}
+        {stats.levelMessage && (
+          <View style={[
+            tw`px-4 py-3 rounded-xl mb-4`,
+            { backgroundColor: colors.success + '20' }
+          ]}>
+            <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
+              {stats.levelMessage}
+            </Text>
+          </View>
+        )}
+
+        {/* Keep the existing Enhanced Routines Progress section */}
         <View style={[
           tw`rounded-2xl p-5 mb-6`,
           {
@@ -461,6 +702,7 @@ export default function Routines() {
             elevation: 6,
           }
         ]}>
+          {/* This existing routine progress section can stay as it shows routine-specific info */}
           <View style={tw`flex-row justify-between items-center mb-4`}>
             <View>
               <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Today's Progress</Text>
@@ -497,6 +739,7 @@ export default function Routines() {
           </Text>
         </View>
 
+        {/* Enhanced Routine Cards section continues as normal... */}
         {/* Enhanced Routine Cards */}
         <View style={tw`mb-8`}>
           <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>

@@ -12,11 +12,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
+import { routinesAPI } from "../../lib/api"
 
 export default function RoutineDetail() {
   const { colors, currentTheme } = useTheme()
   const { id } = useLocalSearchParams()
-  const { updateExperience, addCoins } = useStats()
+  const { updateExperience, updateCoins } = useStats() // ← FIX: Change addCoins to updateCoins
   const router = useRouter()
   
   const [routine, setRoutine] = useState(null)
@@ -73,6 +74,33 @@ export default function RoutineDetail() {
     setTasks(updatedTasks)
 
     try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('➕ Adding task to backend routine:', id)
+        
+        try {
+          // Update the routine with new tasks on backend
+          const currentRoutine = routine
+          const updateData = {
+            title: currentRoutine.title,
+            description: currentRoutine.description,
+            icon: currentRoutine.icon,
+            tasks: updatedTasks
+          }
+          
+          const response = await routinesAPI.updateRoutine(parseInt(id), updateData)
+          
+          if (response.success) {
+            console.log('✅ Task added to backend routine successfully')
+          }
+        } catch (error) {
+          console.error('❌ Failed to update backend routine, continuing locally:', error)
+        }
+      }
+
+      // Always update local storage
       const savedData = await AsyncStorage.getItem("routinesData")
       if (savedData) {
         const routinesData = JSON.parse(savedData)
@@ -96,7 +124,7 @@ export default function RoutineDetail() {
         // Reward for completing task (only when checking off)
         if (newCompleted && !wasCompleted) {
           updateExperience(10)
-          addCoins(5)
+          updateCoins(5)
           
           // Optional: Show satisfying feedback
           Alert.alert(
@@ -115,6 +143,50 @@ export default function RoutineDetail() {
     setTasks(updatedTasks)
 
     try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('✅ Updating task on backend routine:', id)
+        
+        try {
+          // Update the routine with modified tasks on backend
+          const currentRoutine = routine
+          const updateData = {
+            title: currentRoutine.title,
+            description: currentRoutine.description,
+            icon: currentRoutine.icon,
+            tasks: updatedTasks
+          }
+          
+          const response = await routinesAPI.updateRoutine(parseInt(id), updateData)
+          
+          if (response.success) {
+            console.log('✅ Task updated on backend routine successfully')
+            
+            // Check if all tasks are completed and trigger routine completion
+            const completedTasks = updatedTasks.filter(task => task.completed)
+            if (completedTasks.length === updatedTasks.length && updatedTasks.length > 0) {
+              try {
+                const completeResponse = await routinesAPI.completeRoutine(parseInt(id), completedTasks.map((_, index) => index))
+                if (completeResponse.success) {
+                  Alert.alert(
+                    "Routine Completed! 🎉",
+                    `${completeResponse.message || 'Amazing work!'}\n+${completeResponse.rewards?.experience || 20} XP, +${completeResponse.rewards?.coins || 10} Coins!`,
+                    [{ text: "Awesome!", style: "default" }]
+                  )
+                }
+              } catch (error) {
+                console.error('❌ Failed to complete routine on backend:', error)
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ Failed to update backend routine, continuing locally:', error)
+        }
+      }
+
+      // Always update local storage
       const savedData = await AsyncStorage.getItem("routinesData")
       if (savedData) {
         const routinesData = JSON.parse(savedData)
@@ -147,6 +219,33 @@ export default function RoutineDetail() {
     setEditingTask(null)
 
     try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('✏️ Updating task on backend routine:', id)
+        
+        try {
+          // Update the routine with modified tasks on backend
+          const currentRoutine = routine
+          const updateData = {
+            title: currentRoutine.title,
+            description: currentRoutine.description,
+            icon: currentRoutine.icon,
+            tasks: updatedTasks
+          }
+          
+          const response = await routinesAPI.updateRoutine(parseInt(id), updateData)
+          
+          if (response.success) {
+            console.log('✅ Task updated on backend routine successfully')
+          }
+        } catch (error) {
+          console.error('❌ Failed to update backend routine, continuing locally:', error)
+        }
+      }
+
+      // Always update local storage
       const savedData = await AsyncStorage.getItem("routinesData")
       if (savedData) {
         const routinesData = JSON.parse(savedData)

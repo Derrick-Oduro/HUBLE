@@ -11,6 +11,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
+import { habitsAPI } from "../../lib/api"
 
 // Enhanced habit interface with streak tracking
 interface EnhancedHabit {
@@ -123,6 +124,51 @@ export default function HabitsScreen() {
     const loadHabits = async () => {
       try {
         setLoading(true)
+        
+        // Check if user is logged in
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
+        
+        if (token && isGuest !== 'true') {
+          console.log('🔄 Loading habits from backend...')
+          try {
+            // Load from backend
+            const response = await habitsAPI.getHabits()
+            
+            if (response.success && response.habits) {
+              // Convert backend format to your frontend format
+              const convertedHabits = response.habits.map((backendHabit: any) => ({
+                id: backendHabit.id,
+                title: backendHabit.title,
+                description: backendHabit.description,
+                difficulty: backendHabit.difficulty,
+                color: backendHabit.color,
+                completed: backendHabit.is_completed_today,
+                streak: backendHabit.streak || 0,
+                completedDates: [], // Will be populated if needed
+                targetDays: typeof backendHabit.target_days === 'string' 
+                  ? JSON.parse(backendHabit.target_days) 
+                  : (backendHabit.target_days || [1, 2, 3, 4, 5, 6, 0])
+              }))
+              
+              setHabits(convertedHabits)
+              
+              // Cache for offline use
+              await AsyncStorage.setItem("habitsData", JSON.stringify(convertedHabits))
+              
+              const completedCount = convertedHabits.filter((h: any) => h.completed).length
+              updateHabitCompletion(completedCount, convertedHabits.length)
+              
+              console.log('✅ Habits loaded from backend:', convertedHabits)
+              return
+            }
+          } catch (error) {
+            console.error('❌ Backend failed, loading from local:', error)
+          }
+        }
+
+        // Load from local storage (guest mode or backup)
+        console.log('📱 Loading habits from local storage...')
         const savedData = await AsyncStorage.getItem("habitsData")
 
         if (savedData) {
@@ -159,17 +205,59 @@ export default function HabitsScreen() {
   }, [])
 
   const addHabit = async (newHabit: any) => {
-    const habitToAdd: EnhancedHabit = { 
-      ...newHabit, 
-      id: habits.length > 0 ? Math.max(...habits.map((h) => h.id)) + 1 : 1,
-      streak: 0,
-      completedDates: [],
-      targetDays: newHabit.targetDays || [1, 2, 3, 4, 5, 6, 0]
-    }
-    const updatedHabits = [...habits, habitToAdd]
-    setHabits(updatedHabits)
-
     try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('➕ Adding habit to backend:', newHabit)
+        
+        try {
+          const response = await habitsAPI.createHabit(newHabit)
+          
+          if (response.success) {
+            // Convert backend habit to frontend format
+            const newBackendHabit = {
+              id: response.habit.id,
+              title: response.habit.title,
+              description: response.habit.description,
+              difficulty: response.habit.difficulty,
+              color: response.habit.color,
+              completed: false,
+              streak: 0,
+              completedDates: [],
+              targetDays: typeof response.habit.target_days === 'string' 
+                ? JSON.parse(response.habit.target_days) 
+                : response.habit.target_days
+            }
+            
+            const updatedHabits = [...habits, newBackendHabit]
+            setHabits(updatedHabits)
+            
+            // Cache locally
+            await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
+            updateHabitCompletion(0, updatedHabits.length)
+            
+            console.log('✅ Habit added to backend successfully')
+            return
+          }
+        } catch (error) {
+          console.error('❌ Failed to add to backend, saving locally:', error)
+        }
+      }
+
+      // Guest mode or backend failed - save locally
+      console.log('📱 Adding habit locally:', newHabit)
+      const habitToAdd: EnhancedHabit = { 
+        ...newHabit, 
+        id: habits.length > 0 ? Math.max(...habits.map((h) => h.id)) + 1 : 1,
+        streak: 0,
+        completedDates: [],
+        targetDays: newHabit.targetDays || [1, 2, 3, 4, 5, 6, 0]
+      }
+      const updatedHabits = [...habits, habitToAdd]
+      setHabits(updatedHabits)
+
       await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
       updateHabitCompletion(0, updatedHabits.length)
     } catch (e) {
@@ -213,10 +301,28 @@ export default function HabitsScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            const updatedHabits = habits.filter((habit) => habit.id !== id)
-            setHabits(updatedHabits)
-
             try {
+              const token = await AsyncStorage.getItem('userToken')
+              const isGuest = await AsyncStorage.getItem('isGuest')
+
+              if (token && isGuest !== 'true') {
+                console.log('🗑️ Deleting habit from backend:', id)
+                
+                try {
+                  const response = await habitsAPI.deleteHabit(id)
+                  
+                  if (response.success) {
+                    console.log('✅ Habit deleted from backend successfully')
+                  }
+                } catch (error) {
+                  console.error('❌ Failed to delete from backend:', error)
+                }
+              }
+
+              // Delete locally (always do this)
+              const updatedHabits = habits.filter((habit) => habit.id !== id)
+              setHabits(updatedHabits)
+
               await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
               const completedCount = updatedHabits.filter((habit) => habit.completed).length
               updateHabitCompletion(completedCount, updatedHabits.length)
@@ -237,68 +343,131 @@ export default function HabitsScreen() {
     const today = getTodayString()
     const wasCompletedToday = (habit.completedDates || []).includes(today)
     
-    if (wasCompletedToday) {
+    if (wasCompletedToday || habit.completed) {
       Alert.alert("Already Completed", "You've already completed this habit today!")
       return
     }
 
-    let expIncrease = 0
-    let streakBonus = 0
-    
-    switch (habit.difficulty) {
-      case "easy":
-        expIncrease = 5
-        break
-      case "medium":
-        expIncrease = 10
-        break
-      case "hard":
-        expIncrease = 15
-        break
-      default:
-        expIncrease = 5
-    }
-
-    // Calculate new streak
-    const newCompletedDates = [...(habit.completedDates || []), today]
-    const newStreak = calculateStreak(newCompletedDates)
-    
-    // Streak bonus
-    if (newStreak >= 7) streakBonus = Math.floor(newStreak / 7) * 2
-    if (newStreak >= 30) streakBonus += 10 // Monthly bonus
-
-    const totalExp = expIncrease + streakBonus
-    
-    // Update experience and health
-    updateExperience(totalExp)
-    updateHealth(2)
-
-    // Show completion feedback
-    Alert.alert(
-      "Great Job! 🎉",
-      `+${totalExp} XP earned!\n${newStreak > 1 ? `🔥 ${newStreak} day streak!` : ""}${streakBonus > 0 ? `\n🌟 Streak bonus: +${streakBonus} XP` : ""}`,
-      [{ text: "Awesome!", style: "default" }]
-    )
-
-    // Update habit with completion
-    const updatedHabits = habits.map((h) => 
-      h.id === id 
-        ? { 
-            ...h, 
-            completed: true, 
-            completedDates: newCompletedDates,
-            streak: newStreak,
-            lastCompleted: today
-          } 
-        : h
-    )
-    
-    setHabits(updatedHabits)
-
     try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('✅ Completing habit on backend:', id)
+        
+        try {
+          const response = await habitsAPI.completeHabit(id)
+          
+          if (response.success) {
+            // Update local state with backend response
+            const updatedHabits = habits.map((h) => 
+              h.id === id 
+                ? { 
+                    ...h, 
+                    completed: true, 
+                    streak: response.habit?.streak || (h.streak || 0) + 1
+                  } 
+                : h
+            )
+            
+            setHabits(updatedHabits)
+            await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
+            
+            const completedCount = updatedHabits.filter((habit) => habit.completed).length
+            updateHabitCompletion(completedCount, updatedHabits.length)
+
+            // Calculate XP based on difficulty
+            let expIncrease = 0
+            switch (habit.difficulty) {
+              case "easy":
+                expIncrease = 5
+                break
+              case "medium":
+                expIncrease = 10
+                break
+              case "hard":
+                expIncrease = 15
+                break
+              default:
+                expIncrease = 5
+            }
+
+            updateExperience(expIncrease)
+            updateHealth(2)
+
+            Alert.alert(
+              "Great Job! 🎉",
+              `${response.message || 'Habit completed!'}\n+${expIncrease} XP earned!`,
+              [{ text: "Awesome!", style: "default" }]
+            )
+            
+            console.log('✅ Habit completed on backend successfully')
+            return
+          }
+        } catch (error) {
+          console.error('❌ Failed to complete on backend, updating locally:', error)
+        }
+      }
+
+      // Guest mode or backend failed - handle locally
+      console.log('📱 Completing habit locally:', id)
+      
+      let expIncrease = 0
+      let streakBonus = 0
+      
+      switch (habit.difficulty) {
+        case "easy":
+          expIncrease = 5
+          break
+        case "medium":
+          expIncrease = 10
+          break
+        case "hard":
+          expIncrease = 15
+          break
+        default:
+          expIncrease = 5
+      }
+
+      // Calculate new streak
+      const newCompletedDates = [...(habit.completedDates || []), today]
+      const newStreak = calculateStreak(newCompletedDates)
+      
+      // Streak bonus
+      if (newStreak >= 7) streakBonus = Math.floor(newStreak / 7) * 2
+      if (newStreak >= 30) streakBonus += 10 // Monthly bonus
+
+      const totalExp = expIncrease + streakBonus
+      
+      // Update experience and health
+      updateExperience(totalExp)
+      updateHealth(2)
+
+      // Show completion feedback
+      Alert.alert(
+        "Great Job! 🎉",
+        `+${totalExp} XP earned!\n${newStreak > 1 ? `🔥 ${newStreak} day streak!` : ""}${streakBonus > 0 ? `\n🌟 Streak bonus: +${streakBonus} XP` : ""}`,
+        [{ text: "Awesome!", style: "default" }]
+      )
+
+      // Update habit with completion
+      const updatedHabits = habits.map((h) => 
+        h.id === id 
+          ? { 
+              ...h, 
+              completed: true, 
+              completedDates: newCompletedDates,
+              streak: newStreak,
+              lastCompleted: today
+            } 
+          : h
+      )
+      
+      setHabits(updatedHabits)
       await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
       const completedCount = updatedHabits.filter((habit) => habit.completed).length
       updateHabitCompletion(completedCount, updatedHabits.length)
+      
     } catch (e) {
       console.error("Failed to save habit completion:", e)
     }
@@ -388,39 +557,103 @@ export default function HabitsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Stats Card */}
-        <View style={[tw`rounded-lg p-4 mb-6`, { backgroundColor: colors.card }]}>
-          {stats.levelMessage && (
-            <View style={[tw`px-3 py-2 rounded-lg mb-3`, { backgroundColor: colors.success + '20' }]}>
-              <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
-                🎉 {stats.levelMessage}
+        {/* Simple Character Stats Header */}
+        <View style={[
+          tw`rounded-xl p-4 mb-4 flex-row items-center justify-between`,
+          { backgroundColor: colors.card }
+        ]}>
+          {/* Left side - User info */}
+          <View style={tw`flex-row items-center flex-1`}>
+            <View style={[
+              tw`w-10 h-10 rounded-full items-center justify-center mr-3`,
+              { backgroundColor: colors.accent + '20' }
+            ]}>
+              <Text style={tw`text-lg`}>🧙‍♂️</Text>
+            </View>
+            <View style={tw`flex-1`}>
+              <Text style={[tw`font-bold text-base`, { color: colors.text }]}>
+                Level {stats.level} Hero
+              </Text>
+              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                {completedToday}/{totalHabits} habits today
               </Text>
             </View>
-          )}
+          </View>
 
-          <ProgressBar
-            value={stats.health}
-            max={stats.maxHealth}
-            color="red-500"
-            label="Health"
-            showLevel={true}
-            level={stats.level}
-          />
-
-          <ProgressBar 
-            value={stats.experience} 
-            max={stats.maxExperience} 
-            color="yellow-500" 
-            label="Experience" 
-          />
-
-          <View style={[tw`flex-row justify-between items-center mt-3 pt-3 border-t`, { borderColor: colors.cardSecondary }]}>
-            <Text style={[tw``, { color: colors.textSecondary }]}>
+          {/* Right side - Currency & Streak */}
+          <View style={tw`items-end`}>
+            <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
               💎 {stats.gemsEarned}  🪙 {stats.coinsEarned}
             </Text>
-            <Text style={[tw`font-bold`, { color: colors.accent }]}>Level {stats.level}</Text>
+            <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+              🔥 {stats.currentStreak} streak
+            </Text>
           </View>
         </View>
+
+        {/* Simple Progress Bars - FIXED */}
+        <View style={[
+          tw`rounded-xl p-4 mb-4`,
+          { backgroundColor: colors.card }
+        ]}>
+          {/* Health Bar - FIXED */}
+          <View style={tw`mb-3`}>
+            <View style={tw`flex-row justify-between items-center mb-1`}>
+              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
+                ❤️ Health
+              </Text>
+              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                {stats.health || 100}/{stats.maxHealth || 100}
+              </Text>
+            </View>
+            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
+              <View
+                style={[
+                  tw`h-2 rounded-full`,
+                  {
+                    width: `${Math.min(((stats.health || 100) / (stats.maxHealth || 100)) * 100, 100)}%`,
+                    backgroundColor: '#ef4444',
+                  }
+                ]}
+              />
+            </View>
+          </View>
+
+          {/* Experience Bar - FIXED */}
+          <View>
+            <View style={tw`flex-row justify-between items-center mb-1`}>
+              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
+                ⚡ Experience
+              </Text>
+              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                {(stats.experience || 0) % 100}/100
+              </Text>
+            </View>
+            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
+              <View
+                style={[
+                  tw`h-2 rounded-full`,
+                  {
+                    width: `${((stats.experience || 0) % 100)}%`,
+                    backgroundColor: '#eab308',
+                  }
+                ]}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Level Up Message (if exists) */}
+        {stats.levelMessage && (
+          <View style={[
+            tw`px-4 py-3 rounded-xl mb-4`,
+            { backgroundColor: colors.success + '20' }
+          ]}>
+            <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
+              {stats.levelMessage}
+            </Text>
+          </View>
+        )}
 
         {/* Cool Habit List */}
         <ScrollView showsVerticalScrollIndicator={false} style={tw`flex-1`}>

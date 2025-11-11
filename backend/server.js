@@ -1,25 +1,31 @@
 require("dotenv").config();
 const app = require("./src/app");
+const os = require("os");
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || "localhost";
 
-app.listen(PORT, HOST, () => {
-  console.log("🚀 HUBLE Backend Server Started!");
-  console.log(`📍 Server running on http://${HOST}:${PORT}`);
-  console.log(`🏥 Health check: http://${HOST}:${PORT}/health`);
-  console.log(`📚 API Base URL: http://${HOST}:${PORT}/api`);
-  console.log("📱 Ready for mobile app connections!");
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log("\n🔧 Available endpoints:");
-    console.log("   POST /api/auth/register");
-    console.log("   POST /api/auth/login");
-    console.log("   GET  /api/auth/profile");
-    console.log("   GET  /api/habits");
-    console.log("   GET  /api/dailies");
-    console.log("   GET  /api/routines");
+// Get the actual network IP dynamically
+const getNetworkIP = () => {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const interface of interfaces[name]) {
+      if (interface.family === "IPv4" && !interface.internal) {
+        return interface.address;
+      }
+    }
   }
+  return "localhost";
+};
+
+const networkIP = getNetworkIP();
+
+// Listen on all network interfaces (0.0.0.0) instead of just localhost
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 HUBLE Backend Server Started!`);
+  console.log(`📍 Local access: http://localhost:${PORT}`);
+  console.log(`🌐 Network access: http://${networkIP}:${PORT}`);
+  console.log(`🏥 Health check: http://${networkIP}:${PORT}/health`);
+  console.log(`📱 Use this IP in your frontend: ${networkIP}`);
 });
 
 // Handle unhandled promise rejections

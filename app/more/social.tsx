@@ -1,16 +1,15 @@
 "use client"
 
 import { useState } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, FlatList, TextInput, Alert } from "react-native"
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
+import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
-import { useStats } from "../../contexts/StatsProvider"
-import React from "react"
 
 export default function Social() {
   const router = useRouter()
-  const { stats } = useStats()
+  const { colors, currentTheme } = useTheme() // ← ONLY ADDITION: Theme support
   const [activeTab, setActiveTab] = useState("overview")
 
   // Mock social stats
@@ -87,24 +86,24 @@ export default function Social() {
   ]
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={tw`text-white text-2xl font-bold`}>Social Hub</Text>
+          <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Social Hub</Text>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Social Stats Overview */}
           <View style={[
-            tw`bg-gray-800 rounded-2xl p-6 mb-6`,
+            tw`rounded-2xl p-6 mb-6`,
             {
-              backgroundColor: '#1F2937',
+              backgroundColor: colors.card, // ← THEME: Use theme card color
               shadowColor: '#EC4899',
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.2,
@@ -124,42 +123,42 @@ export default function Social() {
                 <Ionicons name="people" size={28} color="#EC4899" />
               </View>
               <View style={tw`flex-1`}>
-                <Text style={tw`text-white text-2xl font-bold`}>Social Profile</Text>
-                <Text style={tw`text-gray-400`}>Connect, compete & achieve together</Text>
+                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Social Profile</Text>
+                <Text style={[tw``, { color: colors.textSecondary }]}>Connect, compete & achieve together</Text>
               </View>
             </View>
 
-            <View style={tw`flex-row justify-between pt-4 border-t border-gray-700`}>
+            <View style={[tw`flex-row justify-between pt-4 border-t`, { borderColor: colors.cardSecondary }]}>
               <View style={tw`items-center`}>
-                <Text style={tw`text-white text-lg font-bold`}>{socialStats.friends}</Text>
-                <Text style={tw`text-gray-400 text-xs`}>Friends</Text>
+                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.friends}</Text>
+                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Friends</Text>
               </View>
               <View style={tw`items-center`}>
-                <Text style={tw`text-white text-lg font-bold`}>{socialStats.parties}</Text>
-                <Text style={tw`text-gray-400 text-xs`}>Parties</Text>
+                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.parties}</Text>
+                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Parties</Text>
               </View>
               <View style={tw`items-center`}>
-                <Text style={tw`text-white text-lg font-bold`}>{socialStats.groupBadges}</Text>
-                <Text style={tw`text-gray-400 text-xs`}>Badges</Text>
+                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.groupBadges}</Text>
+                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Badges</Text>
               </View>
               <View style={tw`items-center`}>
-                <Text style={tw`text-white text-lg font-bold`}>{socialStats.currentStreak}</Text>
-                <Text style={tw`text-gray-400 text-xs`}>🔥 Streak</Text>
+                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.currentStreak}</Text>
+                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>🔥 Streak</Text>
               </View>
             </View>
           </View>
 
           {/* Social Features Grid */}
           <View style={tw`mb-6`}>
-            <Text style={tw`text-white text-xl font-bold mb-4`}>Features</Text>
+            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Features</Text>
             <View style={tw`flex-row flex-wrap justify-between`}>
               {socialFeatures.map((feature, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
-                    tw`w-40 bg-gray-800 rounded-2xl p-4 mb-4`,
+                    tw`w-40 rounded-2xl p-4 mb-4`,
                     {
-                      backgroundColor: '#1F2937',
+                      backgroundColor: colors.card, // ← THEME: Use theme card color
                       shadowColor: feature.color,
                       shadowOffset: { width: 0, height: 2 },
                       shadowOpacity: 0.1,
@@ -176,14 +175,14 @@ export default function Social() {
                     <Ionicons name={feature.icon} size={24} color={feature.color} />
                   </View>
                   
-                  <Text style={tw`text-white font-bold text-base mb-1`}>{feature.title}</Text>
-                  <Text style={tw`text-gray-400 text-sm mb-3`}>{feature.description}</Text>
+                  <Text style={[tw`font-bold text-base mb-1`, { color: colors.text }]}>{feature.title}</Text>
+                  <Text style={[tw`text-sm mb-3`, { color: colors.textSecondary }]}>{feature.description}</Text>
                   
                   <View style={tw`flex-row items-center justify-between`}>
                     <Text style={[tw`font-bold text-lg`, { color: feature.color }]}>
                       {feature.count}
                     </Text>
-                    <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                    <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
                   </View>
                 </TouchableOpacity>
               ))}
@@ -192,18 +191,18 @@ export default function Social() {
 
           {/* Recent Activity */}
           <View style={[
-            tw`bg-gray-800 rounded-2xl p-5 mb-6`,
-            { backgroundColor: '#1F2937' }
+            tw`rounded-2xl p-5 mb-6`,
+            { backgroundColor: colors.card } // ← THEME: Use theme card color
           ]}>
             <View style={tw`flex-row justify-between items-center mb-4`}>
-              <Text style={tw`text-white text-lg font-bold`}>Recent Activity</Text>
+              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>Recent Activity</Text>
               <TouchableOpacity>
                 <Text style={tw`text-pink-400 font-semibold`}>View All</Text>
               </TouchableOpacity>
             </View>
             
             {recentActivity.map((activity) => (
-              <View key={activity.id} style={tw`flex-row items-center py-3 border-b border-gray-700 last:border-b-0`}>
+              <View key={activity.id} style={[tw`flex-row items-center py-3 border-b last:border-b-0`, { borderColor: colors.cardSecondary }]}>
                 <View style={[
                   tw`w-10 h-10 rounded-lg items-center justify-center mr-3`,
                   { backgroundColor: `${activity.color}20` }
@@ -212,8 +211,8 @@ export default function Social() {
                 </View>
                 
                 <View style={tw`flex-1`}>
-                  <Text style={tw`text-white font-medium`}>{activity.message}</Text>
-                  <Text style={tw`text-gray-400 text-sm`}>{activity.time}</Text>
+                  <Text style={[tw`font-medium`, { color: colors.text }]}>{activity.message}</Text>
+                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{activity.time}</Text>
                 </View>
               </View>
             ))}
@@ -221,10 +220,10 @@ export default function Social() {
 
           {/* Quick Actions */}
           <View style={[
-            tw`bg-gray-800 rounded-2xl p-5 mb-6`,
-            { backgroundColor: '#1F2937' }
+            tw`rounded-2xl p-5 mb-6`,
+            { backgroundColor: colors.card } // ← THEME: Use theme card color
           ]}>
-            <Text style={tw`text-white text-lg font-bold mb-4`}>Quick Actions</Text>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Quick Actions</Text>
             
             <View style={tw`flex-row justify-between`}>
               <TouchableOpacity 
@@ -265,22 +264,22 @@ export default function Social() {
 
           {/* Privacy Settings */}
           <View style={[
-            tw`bg-gray-800 rounded-2xl p-5`,
-            { backgroundColor: '#1F2937' }
+            tw`rounded-2xl p-5`,
+            { backgroundColor: colors.card } // ← THEME: Use theme card color
           ]}>
-            <Text style={tw`text-white text-lg font-bold mb-4`}>Privacy & Visibility</Text>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Privacy & Visibility</Text>
             
             <TouchableOpacity 
-              style={tw`flex-row items-center justify-between py-3 border-b border-gray-700`}
+              style={[tw`flex-row items-center justify-between py-3 border-b`, { borderColor: colors.cardSecondary }]}
               onPress={() => router.push('/more/social/privacy')}
             >
               <View style={tw`flex-row items-center`}>
-                <Ionicons name="eye-outline" size={20} color="#6B7280" style={tw`mr-3`} />
-                <Text style={tw`text-white font-medium`}>Profile Visibility</Text>
+                <Ionicons name="eye-outline" size={20} color={colors.textSecondary} style={tw`mr-3`} />
+                <Text style={[tw`font-medium`, { color: colors.text }]}>Profile Visibility</Text>
               </View>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-gray-400 mr-2`}>Public</Text>
-                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                <Text style={[tw`mr-2`, { color: colors.textSecondary }]}>Public</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
               </View>
             </TouchableOpacity>
 
@@ -289,12 +288,12 @@ export default function Social() {
               onPress={() => router.push('/more/social/blocked-users')}
             >
               <View style={tw`flex-row items-center`}>
-                <Ionicons name="ban-outline" size={20} color="#6B7280" style={tw`mr-3`} />
-                <Text style={tw`text-white font-medium`}>Blocked Users</Text>
+                <Ionicons name="ban-outline" size={20} color={colors.textSecondary} style={tw`mr-3`} />
+                <Text style={[tw`font-medium`, { color: colors.text }]}>Blocked Users</Text>
               </View>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-gray-400 mr-2`}>0</Text>
-                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                <Text style={[tw`mr-2`, { color: colors.textSecondary }]}>0</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
               </View>
             </TouchableOpacity>
           </View>

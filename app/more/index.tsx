@@ -7,12 +7,53 @@ import tw from "../../lib/tailwind"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
-import React from "react"
+import React, { useState, useEffect } from "react"
 
 export default function More() {
   const router = useRouter()
   const { stats } = useStats()
   const { colors, currentTheme } = useTheme()
+  
+  // Add state for user data
+  const [userData, setUserData] = useState(null)
+  const [isGuest, setIsGuest] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // Load user data when component mounts
+  useEffect(() => {
+    loadUserData()
+  }, [])
+
+  // Update the loadUserData function with more logging:
+  const loadUserData = async () => {
+    try {
+      console.log('🔍 Loading user data from AsyncStorage...');
+      
+      const userDataString = await AsyncStorage.getItem("userData")
+      const guestStatus = await AsyncStorage.getItem("isGuest")
+      const isLoggedIn = await AsyncStorage.getItem("isLoggedIn")
+      const userToken = await AsyncStorage.getItem("userToken")
+      
+      console.log('📥 Raw userData:', userDataString);
+      console.log('📥 Guest status:', guestStatus);
+      console.log('📥 Is logged in:', isLoggedIn);
+      console.log('📥 User token:', userToken ? 'Present' : 'Missing');
+      
+      if (userDataString) {
+        const user = JSON.parse(userDataString)
+        console.log('✅ Parsed user data:', user);
+        setUserData(user)
+      } else {
+        console.log('❌ No user data found in AsyncStorage');
+      }
+      
+      setIsGuest(guestStatus === "true")
+    } catch (error) {
+      console.error("❌ Error loading user data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Function to navigate to a specific page
   const navigateTo = (path: string) => {
@@ -21,8 +62,12 @@ export default function More() {
 
   const handleLogout = async () => {
     try {
-      // Clear the authentication token
+      // Clear all authentication data
       await AsyncStorage.removeItem("userToken")
+      await AsyncStorage.removeItem("userData")
+      await AsyncStorage.removeItem("isLoggedIn")
+      await AsyncStorage.removeItem("isGuest")
+      
       // Navigate back to login screen
       router.replace("/(auth)/login")
     } catch (error) {
@@ -94,6 +139,20 @@ export default function More() {
     },
   ]
 
+  // Show loading state while fetching user data
+  if (loading) {
+    return (
+      <SafeAreaView style={[tw`flex-1 justify-center items-center`, { backgroundColor: colors.background }]}>
+        <Text style={[tw`text-lg`, { color: colors.text }]}>Loading...</Text>
+      </SafeAreaView>
+    )
+  }
+
+  // Get display values with fallbacks
+  const displayName = userData?.username || "Guest User"
+  const displayEmail = userData?.email || "guest@huble.app"
+  const userHandle = isGuest ? "@Guest" : `@${userData?.username || "user"}`
+
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
@@ -130,9 +189,20 @@ export default function More() {
               <FontAwesome5 name="user-astronaut" size={24} color={colors.accent} />
             </View>
             <View style={tw`flex-1`}>
-              <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>WhiteMisty</Text>
-              <Text style={[tw`text-base`, { color: colors.textSecondary }]}>@WhiteMisty</Text>
-              <View style={tw`flex-row items-center mt-2`}>
+              <View style={tw`flex-row items-center mb-1`}>
+                <Text style={[tw`text-2xl font-bold mr-2`, { color: colors.text }]}>{displayName}</Text>
+                {isGuest && (
+                  <View style={[
+                    tw`px-2 py-1 rounded-full`,
+                    { backgroundColor: colors.warning + '20' }
+                  ]}>
+                    <Text style={[tw`text-xs font-bold`, { color: colors.warning }]}>GUEST</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[tw`text-base mb-1`, { color: colors.textSecondary }]}>{userHandle}</Text>
+              <Text style={[tw`text-sm mb-2`, { color: colors.textSecondary }]}>{displayEmail}</Text>
+              <View style={tw`flex-row items-center`}>
                 <View style={[
                   tw`px-3 py-1 rounded-full mr-2`,
                   { backgroundColor: colors.accent + '20' }
@@ -155,6 +225,26 @@ export default function More() {
               <Ionicons name="create-outline" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
+
+          {/* User ID & Join Date (if available) */}
+          {userData?.id && (
+            <View style={[tw`mb-4 p-3 rounded-lg`, { backgroundColor: colors.cardSecondary }]}>
+              <Text style={[tw`text-xs font-bold mb-1`, { color: colors.textSecondary }]}>USER ID</Text>
+              <Text style={[tw`text-sm font-mono`, { color: colors.text }]}>#{userData.id}</Text>
+              {userData.createdAt && (
+                <>
+                  <Text style={[tw`text-xs font-bold mt-2 mb-1`, { color: colors.textSecondary }]}>MEMBER SINCE</Text>
+                  <Text style={[tw`text-sm`, { color: colors.text }]}>
+                    {new Date(userData.createdAt).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
 
           {/* Quick Stats */}
           <View style={[tw`flex-row justify-between pt-4 border-t`, { borderColor: colors.cardSecondary }]}>
@@ -262,7 +352,9 @@ export default function More() {
             activeOpacity={0.8}
           >
             <Ionicons name="log-out-outline" size={20} color="white" style={tw`mr-2`} />
-            <Text style={tw`text-white font-bold text-lg`}>Sign Out</Text>
+            <Text style={tw`text-white font-bold text-lg`}>
+              {isGuest ? "End Guest Session" : "Sign Out"}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

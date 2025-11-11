@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert } from "react-native"
+import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import AddDailyModal from "../../components/AddDailyModal"
@@ -9,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
+import { dailiesAPI } from "../../lib/api"
 
 // Enhanced daily task interface
 interface DailyTask {
@@ -23,29 +24,77 @@ interface DailyTask {
   dateCreated: string
   tags?: string[]
   xp?: number
+  // Backend fields
+  is_completed_today?: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 export default function DailiesScreen() {
   const { colors, currentTheme } = useTheme()
-  const { updateExperience, updateHealth } = useStats()
+  // ← FIX: Use the correct function names from StatsProvider
+  const { stats, addExperience, addHealth, updateCoins } = useStats()
   const [dailies, setDailies] = useState<DailyTask[]>([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
 
   // Load dailies from storage
   useEffect(() => {
+    const loadDailies = async () => {
+      try {
+        // Check if user is logged in
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
+        
+        if (token && isGuest !== 'true') {
+          console.log('🔄 Loading dailies from backend...')
+          try {
+            // Load from backend
+            const response = await dailiesAPI.getDailies()
+            
+            if (response.success && response.dailies) {
+              // Convert backend format to your frontend format
+              const convertedDailies = response.dailies.map((backendDaily: any) => ({
+                id: backendDaily.id,
+                title: backendDaily.title,
+                description: backendDaily.description || '',
+                priority: backendDaily.priority || 'medium',
+                difficulty: backendDaily.difficulty || 'medium',
+                category: backendDaily.category || 'General',
+                dueDate: backendDaily.due_date,
+                completed: backendDaily.is_completed_today || false,
+                dateCreated: backendDaily.created_at ? new Date(backendDaily.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                tags: typeof backendDaily.tags === 'string' 
+                  ? JSON.parse(backendDaily.tags || '[]') 
+                  : (backendDaily.tags || [])
+              }))
+              
+              setDailies(convertedDailies)
+              
+              // Cache for offline use
+              await AsyncStorage.setItem("dailiesData", JSON.stringify(convertedDailies))
+              
+              console.log('✅ Dailies loaded from backend:', convertedDailies)
+              return
+            }
+          } catch (error) {
+            console.error('❌ Backend failed, loading from local:', error)
+          }
+        }
+
+        // Load from local storage (guest mode or backup)
+        console.log('📱 Loading dailies from local storage...')
+        const savedDailies = await AsyncStorage.getItem("dailiesData")
+        if (savedDailies) {
+          setDailies(JSON.parse(savedDailies))
+        }
+        
+      } catch (error) {
+        console.error("Error loading dailies:", error)
+      }
+    }
+
     loadDailies()
   }, [])
-
-  const loadDailies = async () => {
-    try {
-      const savedDailies = await AsyncStorage.getItem("dailiesData")
-      if (savedDailies) {
-        setDailies(JSON.parse(savedDailies))
-      }
-    } catch (error) {
-      console.error("Error loading dailies:", error)
-    }
-  }
 
   const saveDailies = async (newDailies: DailyTask[]) => {
     try {
@@ -56,55 +105,168 @@ export default function DailiesScreen() {
   }
 
   const addDaily = async (newDaily: any) => {
-    const taskToAdd: DailyTask = {
-      ...newDaily,
-      id: Date.now(),
-      completed: false,
-      dateCreated: new Date().toISOString().split('T')[0],
+    try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('➕ Adding daily to backend:', newDaily)
+        
+        try {
+          const response = await dailiesAPI.createDaily(newDaily)
+          
+          if (response.success) {
+            // Convert backend daily to frontend format
+            const newBackendDaily = {
+              id: response.daily.id,
+              title: response.daily.title,
+              description: response.daily.description || '',
+              priority: response.daily.priority || 'medium',
+              difficulty: response.daily.difficulty || 'medium',
+              category: response.daily.category || 'General',
+              dueDate: response.daily.due_date,
+              completed: false,
+              dateCreated: new Date().toISOString().split('T')[0],
+              tags: typeof response.daily.tags === 'string' 
+                ? JSON.parse(response.daily.tags || '[]') 
+                : (response.daily.tags || [])
+            }
+            
+            const updatedDailies = [...dailies, newBackendDaily]
+            setDailies(updatedDailies)
+            
+            // Cache locally
+            await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedDailies))
+            
+            console.log('✅ Daily added to backend successfully')
+            return
+          }
+        } catch (error) {
+          console.error('❌ Failed to add to backend, saving locally:', error)
+        }
+      }
+
+      // Guest mode or backend failed - save locally
+      console.log('📱 Adding daily locally:', newDaily)
+      const taskToAdd: DailyTask = {
+        ...newDaily,
+        id: Date.now(),
+        completed: false,
+        dateCreated: new Date().toISOString().split('T')[0],
+      }
+      
+      const updatedDailies = [...dailies, taskToAdd]
+      setDailies(updatedDailies)
+      await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedDailies))
+      
+    } catch (error) {
+      console.error("Error adding daily:", error)
     }
-    
-    const updatedDailies = [...dailies, taskToAdd]
-    setDailies(updatedDailies)
-    await saveDailies(updatedDailies)
   }
 
   const toggleDaily = async (id: number) => {
-    const updatedDailies = dailies.map(daily => {
-      if (daily.id === id) {
-        const isCompleting = !daily.completed
+    try {
+      const daily = dailies.find(d => d.id === id)
+      if (!daily) return
+
+      const isCompleting = !daily.completed
+      
+      if (isCompleting) {
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
+
+        if (token && isGuest !== 'true') {
+          console.log('✅ Completing daily on backend:', id)
+          
+          try {
+            const response = await dailiesAPI.completeDaily(id)
+            
+            if (response.success) {
+              // Update local state with backend response
+              const updatedDailies = dailies.map(d => 
+                d.id === id 
+                  ? { ...d, completed: true } 
+                  : d
+              )
+              
+              setDailies(updatedDailies)
+              await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedDailies))
+
+              // Calculate XP based on difficulty and priority
+              let xpGain = 0
+              switch (daily.difficulty) {
+                case 'easy': xpGain = 3; break
+                case 'medium': xpGain = 6; break
+                case 'hard': xpGain = 10; break
+              }
+              
+              // Priority bonus
+              switch (daily.priority) {
+                case 'medium': xpGain += 2; break
+                case 'high': xpGain += 5; break
+              }
+
+              // ← FIX: Use correct function names
+              addExperience(xpGain)
+              addHealth(1)
+              updateCoins(2) // Give 2 coins for completing a daily
+              
+              Alert.alert(
+                "Task Completed! ✅",
+                `+${xpGain} XP, +1 Health, +2 Coins earned!`,
+                [{ text: "Great!", style: "default" }]
+              )
+              
+              console.log('✅ Daily completed on backend successfully')
+              return
+            }
+          } catch (error) {
+            console.error('❌ Failed to complete on backend, updating locally:', error)
+          }
+        }
+
+        // Guest mode or backend failed - handle locally
+        console.log('📱 Completing daily locally:', id)
         
-        if (isCompleting) {
-          // Calculate XP based on difficulty and priority
-          let xpGain = 0
-          switch (daily.difficulty) {
-            case 'easy': xpGain = 3; break
-            case 'medium': xpGain = 6; break
-            case 'hard': xpGain = 10; break
-          }
-          
-          // Priority bonus
-          switch (daily.priority) {
-            case 'medium': xpGain += 2; break
-            case 'high': xpGain += 5; break
-          }
-          
-          updateExperience(xpGain)
-          updateHealth(1)
-          
-          Alert.alert(
-            "Task Completed! ✅",
-            `+${xpGain} XP earned!`,
-            [{ text: "Great!", style: "default" }]
-          )
+        // Calculate XP based on difficulty and priority
+        let xpGain = 0
+        switch (daily.difficulty) {
+          case 'easy': xpGain = 3; break
+          case 'medium': xpGain = 6; break
+          case 'hard': xpGain = 10; break
         }
         
-        return { ...daily, completed: isCompleting }
+        // Priority bonus
+        switch (daily.priority) {
+          case 'medium': xpGain += 2; break
+          case 'high': xpGain += 5; break
+        }
+        
+        // ← FIX: Use correct function names
+        addExperience(xpGain)
+        addHealth(1)
+        updateCoins(2) // Give 2 coins for completing a daily
+        
+        Alert.alert(
+          "Task Completed! ✅",
+          `+${xpGain} XP, +1 Health, +2 Coins earned!`,
+          [{ text: "Great!", style: "default" }]
+        )
       }
-      return daily
-    })
-    
-    setDailies(updatedDailies)
-    await saveDailies(updatedDailies)
+      
+      // Update local state (always do this)
+      const updatedDailies = dailies.map(d => 
+        d.id === id 
+          ? { ...d, completed: isCompleting } 
+          : d
+      )
+      
+      setDailies(updatedDailies)
+      await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedDailies))
+      
+    } catch (error) {
+      console.error("Error toggling daily:", error)
+    }
   }
 
   const deleteDaily = async (id: number) => {
@@ -117,9 +279,32 @@ export default function DailiesScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            const updatedDailies = dailies.filter(daily => daily.id !== id)
-            setDailies(updatedDailies)
-            await saveDailies(updatedDailies)
+            try {
+              const token = await AsyncStorage.getItem('userToken')
+              const isGuest = await AsyncStorage.getItem('isGuest')
+
+              if (token && isGuest !== 'true') {
+                console.log('🗑️ Deleting daily from backend:', id)
+                
+                try {
+                  const response = await dailiesAPI.deleteDaily(id)
+                  
+                  if (response.success) {
+                    console.log('✅ Daily deleted from backend successfully')
+                  }
+                } catch (error) {
+                  console.error('❌ Failed to delete from backend:', error)
+                }
+              }
+
+              // Delete locally (always do this)
+              const updatedDailies = dailies.filter(daily => daily.id !== id)
+              setDailies(updatedDailies)
+              await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedDailies))
+              
+            } catch (error) {
+              console.error("Error deleting daily:", error)
+            }
           }
         }
       ]
@@ -149,164 +334,280 @@ export default function DailiesScreen() {
   const totalCount = dailies.length
   const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
+  // Calculate daily completion stats
+  const completedDailies = dailies.filter(daily => daily.completed).length
+  const totalDailies = dailies.length
+
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
-      <View style={tw`flex-1 px-5 pt-3`}>
-        
-        {/* Header */}
-        <View style={tw`flex-row justify-between items-center mb-6`}>
+      
+      {/* Use FlatList with ListHeaderComponent instead of ScrollView */}
+      <FlatList
+        style={tw`flex-1 px-5 pt-2`}
+        data={dailies}
+        keyExtractor={(item) => item.id.toString()}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={() => (
           <View>
-            <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Daily Tasks</Text>
-            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
-              {completedCount}/{totalCount} completed today
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[tw`p-3 rounded-lg`, { backgroundColor: colors.accent }]}
-            onPress={() => setIsAddModalVisible(true)}
-          >
-            <Ionicons name="add" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
+            {/* Header */}
+            <View style={tw`flex-row justify-between items-center mb-6 mt-2`}>
+              <View>
+                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Daily Tasks</Text>
+                <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>
+                  {completedDailies}/{totalDailies} completed today
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  tw`rounded-2xl p-4`,
+                  { backgroundColor: colors.accent }
+                ]}
+                onPress={() => setIsAddModalVisible(true)}
+              >
+                <Ionicons name="add" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
 
-        {/* Progress Section */}
-        <View style={[tw`rounded-lg p-4 mb-6`, { backgroundColor: colors.card }]}>
-          <View style={tw`flex-row justify-between items-center mb-2`}>
-            <Text style={[tw`font-medium`, { color: colors.text }]}>Progress</Text>
-            <Text style={[tw`font-bold`, { color: colors.accent }]}>{completionPercentage}%</Text>
-          </View>
-          <View style={[tw`h-0.5 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
-            <View 
-              style={[
-                tw`h-full rounded-full`,
-                { 
-                  width: `${completionPercentage}%`,
-                  backgroundColor: colors.accent,
-                  shadowColor: colors.accent,
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.6,
-                  shadowRadius: 2,
-                  elevation: 2,
-                }
-              ]} 
-            />
-          </View>
-        </View>
+            {/* Simple Character Stats Header - Same as Habits */}
+            <View style={[
+              tw`rounded-xl p-4 mb-4 flex-row items-center justify-between`,
+              { backgroundColor: colors.card }
+            ]}>
+              {/* Left side - User info */}
+              <View style={tw`flex-row items-center flex-1`}>
+                <View style={[
+                  tw`w-10 h-10 rounded-full items-center justify-center mr-3`,
+                  { backgroundColor: colors.accent + '20' }
+                ]}>
+                  <Text style={tw`text-lg`}>🧙‍♂️</Text>
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`font-bold text-base`, { color: colors.text }]}>
+                    Level {stats.level || 1} Hero
+                  </Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                    {completedDailies}/{totalDailies} dailies done
+                  </Text>
+                </View>
+              </View>
 
-        {/* Tasks List */}
-        <FlatList
-          data={dailies}
-          keyExtractor={(item) => item.id.toString()}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={() => (
-            <View style={tw`items-center py-8`}>
-              <Ionicons name="list-outline" size={48} color={colors.textSecondary} />
-              <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No daily tasks yet</Text>
-              <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
-                Add your first task to get started
+              {/* Right side - Currency & Streak */}
+              <View style={tw`items-end`}>
+                <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
+                  💎 {stats.gemsEarned || 0}  🪙 {stats.coinsEarned || 0}
+                </Text>
+                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                  🔥 {stats.currentStreak || 0} streak
+                </Text>
+              </View>
+            </View>
+
+            {/* Simple Progress Bars - Same as Habits */}
+            <View style={[
+              tw`rounded-xl p-4 mb-4`,
+              { backgroundColor: colors.card }
+            ]}>
+              {/* Health Bar - FIXED to always show 100/100 */}
+              <View style={tw`mb-3`}>
+                <View style={tw`flex-row justify-between items-center mb-1`}>
+                  <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
+                    ❤️ Health
+                  </Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                    {stats.health || 100}/{stats.maxHealth || 100}
+                  </Text>
+                </View>
+                <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
+                  <View
+                    style={[
+                      tw`h-2 rounded-full`,
+                      {
+                        width: `${Math.min(((stats.health || 100) / (stats.maxHealth || 100)) * 100, 100)}%`,
+                        backgroundColor: '#ef4444', // red-500
+                      }
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Experience Bar - FIXED to show current level progress */}
+              <View>
+                <View style={tw`flex-row justify-between items-center mb-1`}>
+                  <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
+                    ⚡ Experience
+                  </Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                    {(stats.experience || 0) % 100}/100
+                  </Text>
+                </View>
+                <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
+                  <View
+                    style={[
+                      tw`h-2 rounded-full`,
+                      {
+                        width: `${((stats.experience || 0) % 100)}%`,
+                        backgroundColor: '#eab308', // yellow-500
+                      }
+                    ]}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Compact Today's Progress section */}
+            <View style={[
+              tw`rounded-xl p-4 mb-4`,
+              { backgroundColor: colors.card }
+            ]}>
+              <View style={tw`flex-row justify-between items-center mb-2`}>
+                <Text style={[tw`text-base font-bold`, { color: colors.text }]}>
+                  Today's Progress
+                </Text>
+                <Text style={[tw`text-lg font-bold`, { color: colors.success }]}>
+                  {totalDailies > 0 ? Math.round((completedDailies / totalDailies) * 100) : 0}%
+                </Text>
+              </View>
+
+              <View style={[tw`h-2 rounded-full overflow-hidden mb-2`, { backgroundColor: colors.cardSecondary }]}>
+                <View
+                  style={[
+                    tw`h-full rounded-full`,
+                    {
+                      width: `${totalDailies > 0 ? (completedDailies / totalDailies) * 100 : 0}%`,
+                      backgroundColor: completedDailies === totalDailies && totalDailies > 0 ? colors.success : colors.accent,
+                    },
+                  ]}
+                />
+              </View>
+
+              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                {completedDailies === totalDailies && totalDailies > 0
+                  ? "🌟 All dailies completed!"
+                  : `${totalDailies - completedDailies} task${totalDailies - completedDailies !== 1 ? 's' : ''} remaining`}
               </Text>
             </View>
-          )}
-          renderItem={({ item }) => {
-            const priorityColor = getPriorityColor(item.priority)
-            
-            return (
+
+            {/* Level Up Message (if exists) */}
+            {stats.levelMessage && (
               <View style={[
-                tw`rounded-2xl p-4 mb-3`,
-                { 
-                  backgroundColor: colors.card,
-                  borderLeftWidth: 4,
-                  borderLeftColor: priorityColor,
-                  shadowColor: colors.accent,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 4,
-                  elevation: 2,
-                }
+                tw`px-4 py-3 rounded-xl mb-4`,
+                { backgroundColor: colors.success + '20' }
               ]}>
-                <View style={tw`flex-row items-start justify-between`}>
-                  <View style={tw`flex-1 mr-3`}>
-                    <View style={tw`flex-row items-center mb-2`}>
-                      <Text style={[
-                        tw`text-lg font-bold flex-1`,
-                        { 
-                          color: item.completed ? colors.textSecondary : colors.text,
-                          textDecorationLine: item.completed ? 'line-through' : 'none'
-                        }
+                <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
+                  {stats.levelMessage}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+        ListEmptyComponent={() => (
+          <View style={tw`items-center py-8`}>
+            <Ionicons name="list-outline" size={48} color={colors.textSecondary} />
+            <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No daily tasks yet</Text>
+            <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
+              Add your first task to get started
+            </Text>
+          </View>
+        )}
+        renderItem={({ item }) => {
+          const priorityColor = getPriorityColor(item.priority)
+          
+          return (
+            <View style={[
+              tw`rounded-xl p-3 mb-2`,
+              { 
+                backgroundColor: colors.card,
+                borderLeftWidth: 3,
+                borderLeftColor: priorityColor,
+                shadowColor: colors.accent,
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 2,
+                elevation: 1,
+              }
+            ]}>
+              <View style={tw`flex-row items-start justify-between`}>
+                <View style={tw`flex-1 mr-2`}>
+                  <View style={tw`flex-row items-center mb-1`}>
+                    <Text style={[
+                      tw`text-base font-semibold flex-1`,
+                      { 
+                        color: item.completed ? colors.textSecondary : colors.text,
+                        textDecorationLine: item.completed ? 'line-through' : 'none'
+                      }
+                    ]}>
+                      {item.title}
+                    </Text>
+                    <Text style={tw`text-xs ml-1`}>{getDifficultyIcon(item.difficulty)}</Text>
+                  </View>
+                  
+                  {item.description && (
+                    <Text style={[
+                      tw`text-xs mb-1`,
+                      { color: colors.textSecondary }
+                    ]}>
+                      {item.description}
+                    </Text>
+                  )}
+                  
+                  <View style={tw`flex-row items-center justify-between`}>
+                    <View style={tw`flex-row items-center`}>
+                      <View style={[
+                        tw`px-2 py-0.5 rounded-full mr-1`,
+                        { backgroundColor: priorityColor + '20' }
                       ]}>
-                        {item.title}
-                      </Text>
-                      <Text style={tw`text-sm ml-2`}>{getDifficultyIcon(item.difficulty)}</Text>
-                    </View>
-                    
-                    {item.description && (
-                      <Text style={[
-                        tw`text-sm mb-2`,
-                        { color: colors.textSecondary }
-                      ]}>
-                        {item.description}
-                      </Text>
-                    )}
-                    
-                    <View style={tw`flex-row items-center justify-between`}>
-                      <View style={tw`flex-row items-center`}>
-                        <View style={[
-                          tw`px-2 py-1 rounded-full mr-2`,
-                          { backgroundColor: priorityColor + '20' }
-                        ]}>
-                          <Text style={[tw`text-xs font-bold capitalize`, { color: priorityColor }]}>
-                            {item.priority}
-                          </Text>
-                        </View>
-                        
-                        {item.category && (
-                          <View style={[
-                            tw`px-2 py-1 rounded-full`,
-                            { backgroundColor: colors.cardSecondary }
-                          ]}>
-                            <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                              {item.category}
-                            </Text>
-                          </View>
-                        )}
+                        <Text style={[tw`text-xs font-medium capitalize`, { color: priorityColor }]}>
+                          {item.priority}
+                        </Text>
                       </View>
                       
-                      <View style={tw`flex-row items-center`}>
-                        <TouchableOpacity
-                          style={[
-                            tw`w-8 h-8 rounded-full items-center justify-center mr-2`,
-                            { 
-                              backgroundColor: item.completed ? colors.success : colors.cardSecondary,
-                              borderWidth: 2,
-                              borderColor: item.completed ? colors.success : colors.textSecondary,
-                            }
-                          ]}
-                          onPress={() => toggleDaily(item.id)}
-                        >
-                          {item.completed && (
-                            <Ionicons name="checkmark" size={16} color="white" />
-                          )}
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity onPress={() => deleteDaily(item.id)}>
-                          <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                      </View>
+                      {item.category && (
+                        <View style={[
+                          tw`px-2 py-0.5 rounded-full`,
+                          { backgroundColor: colors.cardSecondary }
+                        ]}>
+                          <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                            {item.category}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={tw`flex-row items-center`}>
+                      <TouchableOpacity
+                        style={[
+                          tw`w-7 h-7 rounded-full items-center justify-center mr-1`,
+                          { 
+                            backgroundColor: item.completed ? colors.success : colors.cardSecondary,
+                            borderWidth: 1.5,
+                            borderColor: item.completed ? colors.success : colors.textSecondary,
+                          }
+                        ]}
+                        onPress={() => toggleDaily(item.id)}
+                      >
+                        {item.completed && (
+                          <Ionicons name="checkmark" size={14} color="white" />
+                        )}
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity onPress={() => deleteDaily(item.id)}>
+                        <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
               </View>
-            )
-          }}
-        />
+            </View>
+          )
+        }}
+      />
 
-        <AddDailyModal
-          isVisible={isAddModalVisible}
-          onClose={() => setIsAddModalVisible(false)}
-          onAdd={addDaily}
-        />
-      </View>
+      <AddDailyModal
+        isVisible={isAddModalVisible}
+        onClose={() => setIsAddModalVisible(false)}
+        onAdd={addDaily}
+      />
     </SafeAreaView>
   )
 }

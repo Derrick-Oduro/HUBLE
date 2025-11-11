@@ -23,13 +23,21 @@ import { useTheme } from "../../contexts/ThemeProvider"
 import { useStats } from "../../contexts/StatsProvider"
 import React from "react"
 
-// API Configuration
-const API_BASE_URL = 'http://localhost:3000/api' // Update with your backend URL
+// Find your computer's IP address first
+const getAPIBaseURL = () => {
+  if (__DEV__) {
+    // Force use of your computer's IP address for physical device
+    return 'http://10.174.59.124:3000/api';
+  }
+  return 'https://your-production-api.com/api';
+};
+
+const API_BASE_URL = 'http://10.30.28.124:3000/api';
 
 export default function SignupScreen() {
   const router = useRouter()
   const { colors } = useTheme()
-  const { loadStats } = useStats()
+  const { loadUserStats } = useStats() // ← FIX: Change from loadStats to loadUserStats
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -69,19 +77,35 @@ export default function SignupScreen() {
     setErrors({});
 
     try {
+      const requestData = {
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
+        password: password
+      };
+      
+      console.log('🚀 Attempting signup to:', `${API_BASE_URL}/auth/register`);
+      console.log('📤 Request data:', requestData);
+      
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          username: username.trim(),
-          email: email.trim().toLowerCase(),
-          password: password
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response headers:', response.headers);
+      
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ HTTP Error:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      console.log('✅ Response data:', data);
 
       if (data.success) {
         // Store authentication data
@@ -89,8 +113,14 @@ export default function SignupScreen() {
         await AsyncStorage.setItem("userData", JSON.stringify(data.user));
         await AsyncStorage.setItem("isLoggedIn", "true");
 
-        // Load user stats
-        await loadStats();
+        // Load user stats (FIX: Change function name)
+        if (loadUserStats) {
+          try {
+            await loadUserStats(); // ← FIX: Change from loadStats() to loadUserStats()
+          } catch (statsError) {
+            console.warn('Failed to load stats:', statsError);
+          }
+        }
 
         Alert.alert(
           "Account Created! 🎉",
@@ -112,11 +142,27 @@ export default function SignupScreen() {
       }
 
     } catch (error) {
-      console.error("Signup error:", error);
-      Alert.alert(
-        "Connection Error", 
-        "Unable to connect to server. Please check your internet connection and try again."
-      );
+      console.error("❌ Signup error:", error);
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+      
+      // More specific error messages
+      if (error.message.includes('Network request failed')) {
+        Alert.alert(
+          "Connection Error", 
+          "Cannot reach the server. Make sure your backend is running."
+        );
+      } else if (error.message.includes('timeout')) {
+        Alert.alert(
+          "Timeout Error", 
+          "Server is taking too long to respond."
+        );
+      } else {
+        Alert.alert(
+          "Error", 
+          `Signup failed: ${error.message}`
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +195,7 @@ export default function SignupScreen() {
         await AsyncStorage.setItem("isLoggedIn", "true");
         await AsyncStorage.setItem("isGuest", "true");
 
-        await loadStats();
+        await loadUserStats(); // ← FIX: Change from loadStats() to loadUserStats()
         router.replace("/(tabs)");
       } else {
         Alert.alert("Error", "Failed to create guest account. Please try again.");
@@ -159,6 +205,47 @@ export default function SignupScreen() {
       Alert.alert("Error", "Failed to create guest account. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const testBackendConnection = async () => {
+    try {
+      console.log('🔍 Testing backend connection...');
+      console.log('🔍 API URL:', API_BASE_URL);
+      
+      // Test health endpoint first
+      const healthURL = API_BASE_URL.replace('/api', '/health');
+      console.log('🔍 Health URL:', healthURL);
+      
+      const response = await fetch(healthURL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Backend response:', data);
+        Alert.alert('✅ Success', `Backend connected!\nMessage: ${data.message || 'OK'}`);
+        
+        // Now test the signup endpoint exists
+        console.log('🔍 Testing signup endpoint...');
+        const signupResponse = await fetch(`${API_BASE_URL}/auth/register`, {
+          method: 'OPTIONS', // Just check if endpoint exists
+        });
+        console.log('📥 Signup endpoint status:', signupResponse.status);
+        
+      } else {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('❌ Connection test failed:', error);
+      Alert.alert('❌ Connection Failed', `Error: ${error.message}`);
     }
   };
 
@@ -330,6 +417,19 @@ export default function SignupScreen() {
             >
               <Text style={[tw`font-medium`, { color: colors.text }]}>
                 Continue as Guest
+              </Text>
+            </TouchableOpacity>
+
+            {/* Test Backend Connection - Temporary Button */}
+            <TouchableOpacity
+              style={[
+                tw`py-2 px-4 rounded-lg mb-4`,
+                { backgroundColor: colors.cardSecondary }
+              ]}
+              onPress={testBackendConnection}
+            >
+              <Text style={[tw`text-center`, { color: colors.text }]}>
+                Test Backend Connection
               </Text>
             </TouchableOpacity>
           </View>

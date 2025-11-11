@@ -24,12 +24,14 @@ import { useStats } from "../../contexts/StatsProvider"
 import React from "react"
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:3000/api' // Update with your backend URL
+const API_BASE_URL = __DEV__ 
+  ? 'http://10.30.28.124:3000/api'
+  : 'https://your-production-api.com/api';
 
 export default function LoginScreen() {
   const router = useRouter()
   const { colors } = useTheme()
-  const { loadStats } = useStats()
+  const { loadUserStats } = useStats()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -98,12 +100,17 @@ export default function LoginScreen() {
         await AsyncStorage.setItem("isLoggedIn", "true");
 
         // Load user stats
-        await loadStats();
+        await loadUserStats();
 
         Alert.alert(
           "Welcome Back! 👋",
-          `Good to see you again, ${data.user.username}!`,
-          [{ text: "Continue", onPress: () => router.replace("/(tabs)") }]
+          `Hi ${data.user.username}! Ready to continue your journey?`,
+          [
+            {
+              text: "Let's Go! 🚀",
+              onPress: () => router.replace("/(tabs)"),
+            },
+          ]
         );
 
       } else {
@@ -157,7 +164,7 @@ export default function LoginScreen() {
         await AsyncStorage.setItem("isLoggedIn", "true");
         await AsyncStorage.setItem("isGuest", "true");
 
-        await loadStats();
+        await loadUserStats();
         router.replace("/(tabs)");
       } else {
         Alert.alert("Error", "Failed to create guest session. Please try again.");

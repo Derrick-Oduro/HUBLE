@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const { validationResult } = require('express-validator');
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const { validationResult } = require("express-validator");
 
 class AuthController {
   // Register new user
@@ -11,8 +11,8 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          error: 'Validation failed',
-          details: errors.array()
+          error: "Validation failed",
+          details: errors.array(),
         });
       }
 
@@ -23,7 +23,7 @@ class AuthController {
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          error: 'User with this email already exists'
+          error: "User with this email already exists",
         });
       }
 
@@ -33,23 +33,22 @@ class AuthController {
 
       // Generate JWT token
       const token = jwt.sign(
-        { id: user.id }, 
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
+        { id: user.id },
+        process.env.JWT_SECRET || "your-secret-key",
+        { expiresIn: "7d" }
       );
 
       res.status(201).json({
         success: true,
-        message: 'User created successfully',
+        message: "User created successfully",
         token,
-        user: user.toJSON()
+        user: user.toJSON(),
       });
-
     } catch (error) {
-      console.error('Registration error:', error);
-      res.status(500).json({ 
+      console.error("Registration error:", error);
+      res.status(500).json({
         success: false,
-        error: 'Failed to create account. Please try again.' 
+        error: "Failed to create account. Please try again.",
       });
     }
   }
@@ -62,8 +61,8 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          error: 'Validation failed',
-          details: errors.array()
+          error: "Validation failed",
+          details: errors.array(),
         });
       }
 
@@ -72,40 +71,39 @@ class AuthController {
       // Find user by email
       const user = await User.findByCredentials(email);
       if (!user) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          error: 'Invalid email or password' 
+          error: "Invalid email or password",
         });
       }
 
       // Verify password
       const isValidPassword = await user.verifyPassword(password);
       if (!isValidPassword) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          error: 'Invalid email or password' 
+          error: "Invalid email or password",
         });
       }
 
       // Generate JWT token
       const token = jwt.sign(
-        { id: user.id }, 
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
+        { id: user.id },
+        process.env.JWT_SECRET || "your-secret-key",
+        { expiresIn: "7d" }
       );
 
       res.json({
         success: true,
-        message: 'Login successful',
+        message: "Login successful",
         token,
-        user: user.toJSON()
+        user: user.toJSON(),
       });
-
     } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ 
+      console.error("Login error:", error);
+      res.status(500).json({
         success: false,
-        error: 'Login failed. Please try again.' 
+        error: "Login failed. Please try again.",
       });
     }
   }
@@ -117,19 +115,19 @@ class AuthController {
       if (!user) {
         return res.status(404).json({
           success: false,
-          error: 'User not found'
+          error: "User not found",
         });
       }
 
       res.json({
         success: true,
-        user: user.toJSON()
+        user: user.toJSON(),
       });
     } catch (error) {
-      console.error('Profile error:', error);
-      res.status(500).json({ 
+      console.error("Profile error:", error);
+      res.status(500).json({
         success: false,
-        error: 'Failed to fetch profile' 
+        error: "Failed to fetch profile",
       });
     }
   }
@@ -143,7 +141,7 @@ class AuthController {
       if (!user) {
         return res.status(404).json({
           success: false,
-          error: 'User not found'
+          error: "User not found",
         });
       }
 
@@ -152,15 +150,14 @@ class AuthController {
 
       res.json({
         success: true,
-        message: 'Profile updated successfully',
-        user: updatedUser.toJSON()
+        message: "Profile updated successfully",
+        user: updatedUser.toJSON(),
       });
-
     } catch (error) {
-      console.error('Profile update error:', error);
-      res.status(500).json({ 
+      console.error("Profile update error:", error);
+      res.status(500).json({
         success: false,
-        error: 'Failed to update profile' 
+        error: "Failed to update profile",
       });
     }
   }
@@ -168,13 +165,14 @@ class AuthController {
   // Update user stats (XP, coins, etc.)
   static async updateStats(req, res) {
     try {
-      const { experience, coins, gems, health, taskCompleted, statType } = req.body;
+      const { experience, coins, gems, health, taskCompleted, statType } =
+        req.body;
       const user = await User.findById(req.user.id);
 
       if (!user) {
         return res.status(404).json({
           success: false,
-          error: 'User not found'
+          error: "User not found",
         });
       }
 
@@ -191,7 +189,7 @@ class AuthController {
         gems: newGems,
         health: health || user.health,
         total_tasks_completed: newTaskCount,
-        taskCompleted
+        taskCompleted,
       });
 
       // Record daily stats
@@ -199,7 +197,7 @@ class AuthController {
         await User.recordDailyStats(user.id, {
           experience_gained: experience || 0,
           coins_gained: coins || 0,
-          [statType]: 1 // habits_completed, dailies_completed, etc.
+          [statType]: 1, // habits_completed, dailies_completed, etc.
         });
       }
 
@@ -208,15 +206,14 @@ class AuthController {
 
       res.json({
         success: true,
-        message: 'Stats updated successfully',
-        user: updatedUser.toJSON()
+        message: "Stats updated successfully",
+        user: updatedUser.toJSON(),
       });
-
     } catch (error) {
-      console.error('Stats update error:', error);
-      res.status(500).json({ 
+      console.error("Stats update error:", error);
+      res.status(500).json({
         success: false,
-        error: 'Failed to update stats' 
+        error: "Failed to update stats",
       });
     }
   }
@@ -232,17 +229,25 @@ class AuthController {
         stats,
         summary: {
           totalDays: stats.length,
-          averageExperience: stats.reduce((sum, day) => sum + day.experience_gained, 0) / stats.length || 0,
+          averageExperience:
+            stats.reduce((sum, day) => sum + day.experience_gained, 0) /
+              stats.length || 0,
           totalFocusTime: stats.reduce((sum, day) => sum + day.focus_time, 0),
-          totalTasksCompleted: stats.reduce((sum, day) => sum + day.habits_completed + day.dailies_completed + day.routines_completed, 0)
-        }
+          totalTasksCompleted: stats.reduce(
+            (sum, day) =>
+              sum +
+              day.habits_completed +
+              day.dailies_completed +
+              day.routines_completed,
+            0
+          ),
+        },
       });
-
     } catch (error) {
-      console.error('Stats fetch error:', error);
-      res.status(500).json({ 
+      console.error("Stats fetch error:", error);
+      res.status(500).json({
         success: false,
-        error: 'Failed to fetch stats' 
+        error: "Failed to fetch stats",
       });
     }
   }

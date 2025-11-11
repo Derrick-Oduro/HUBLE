@@ -1,293 +1,391 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect } from "react"
-import AsyncStorage from "@react-native-async-storage/async-storage"
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { statsAPI } from '../lib/api';
 
-interface StatsData {
-  // Core gamification
-  level: number
-  experience: number
-  maxExperience: number
-  health: number
-  maxHealth: number
+interface CharacterStats {
+  // Core character stats
+  level: number;
+  experience: number;
+  maxExperience: number;
+  health: number;
+  maxHealth: number;
   
   // Currency & rewards
-  gemsEarned: number
-  coinsEarned: number
+  coinsEarned: number;
+  gemsEarned: number;
   
-  // Habit tracking
-  habitsCompleted: number
-  totalHabits: number
-  currentStreak: number
-  longestStreak: number
+  // Progress tracking
+  habitsCompleted: number;
+  totalHabits: number;
+  dailiesCompleted: number;
+  totalDailies: number;
+  routinesCompleted: number;
+  totalRoutines: number;
+  focusMinutes: number;
+  focusSessions: number;
   
-  // Daily tasks
-  dailiesCompleted: number
-  totalDailies: number
+  // Streaks & achievements
+  currentStreak: number;
+  longestStreak: number;
+  totalTasksCompleted: number;
   
-  // Routine tracking - ADD THIS
-  routinesCompleted: number
-  totalRoutines: number
-  
-  // Timer/Focus
-  focusSessionsToday: number
-  totalFocusTime: number // in minutes
-  
-  // Social features (for future)
-  friendsCount: number
-  partiesJoined: number
-  
-  // Achievements
-  totalAchievements: number
-  unlockedAchievements: string[]
-  
-  // Weekly stats
-  weeklyCompletionRate: number
-  
-  // Level up message
-  levelMessage?: string
+  // Level up messaging
+  levelMessage?: string;
 }
 
 interface StatsContextType {
-  stats: StatsData
-  // Core actions
-  updateExperience: (amount: number) => void
-  updateHealth: (amount: number) => void
-  updateLevel: () => void
-  
-  // Feature-specific updates
-  updateHabitCompletion: (completed: number, total: number) => void
-  updateDailyCompletion: (completed: number, total: number) => void
-  updateRoutineCompletion: (completed: number, total: number) => void // ADD THIS
-  updateFocusSessions: (sessions: number) => void
-  updateFocusTime: (minutes: number) => void
-  
-  // Rewards
-  addGems: (amount: number) => void
-  addCoins: (amount: number) => void
-  
-  // Achievements
-  unlockAchievement: (achievementId: string) => void
-  
-  // Reset functions
-  resetStats: () => void
-  loadStats: () => void
+  stats: CharacterStats;
+  updateExperience: (amount: number) => void;
+  updateHealth: (amount: number) => void;
+  updateCoins: (amount: number) => void;
+  updateGems: (amount: number) => void;
+  updateHabitCompletion: (completed: number, total: number) => void;
+  updateDailiesCompletion: (completed: number, total: number) => void;
+  updateRoutinesCompletion: (completed: number, total: number) => void;
+  updateFocusTime: (minutes: number) => void;
+  updateFocusSessions: (sessions: number) => void;
+  updateStreak: (streak: number) => void;
+  updateTotalTasks: (tasks: number) => void;
+  resetStats: () => void;
+  loadUserStats: () => Promise<void>;
 }
 
-const defaultStats: StatsData = {
+const defaultStats: CharacterStats = {
   level: 1,
   experience: 0,
   maxExperience: 100,
   health: 100,
   maxHealth: 100,
-  gemsEarned: 0,
   coinsEarned: 0,
+  gemsEarned: 0,
   habitsCompleted: 0,
   totalHabits: 0,
-  currentStreak: 0,
-  longestStreak: 0,
   dailiesCompleted: 0,
   totalDailies: 0,
-  routinesCompleted: 0, // ADD THIS
-  totalRoutines: 0, // ADD THIS
-  focusSessionsToday: 0,
-  totalFocusTime: 0,
-  friendsCount: 0,
-  partiesJoined: 0,
-  totalAchievements: 0,
-  unlockedAchievements: [],
-  weeklyCompletionRate: 0,
-}
+  routinesCompleted: 0,
+  totalRoutines: 0,
+  focusMinutes: 0,
+  focusSessions: 0,
+  currentStreak: 0,
+  longestStreak: 0,
+  totalTasksCompleted: 0,
+};
 
-const StatsContext = createContext<StatsContextType | undefined>(undefined)
+const StatsContext = createContext<StatsContextType | undefined>(undefined);
 
-export const StatsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [stats, setStats] = useState<StatsData>(defaultStats)
+export function StatsProvider({ children }: { children: ReactNode }) {
+  const [stats, setStats] = useState<CharacterStats>({
+    level: 1,
+    experience: 0,
+    health: 100,           // ← FIX: Always start with 100 health
+    maxHealth: 100,        // ← FIX: Max health is always 100
+    coinsEarned: 0,
+    gemsEarned: 0,
+    currentStreak: 0,
+    totalTasksCompleted: 0,
+    focusMinutes: 0,
+    levelMessage: null as string | null,
+  })
 
-  // Load stats on app start
-  useEffect(() => {
-    loadStats()
-  }, [])
+  // Character progression formulas
+  const calculateLevelFromXP = (experience: number): number => {
+    return Math.floor(experience / 100) + 1;
+  };
 
-  const loadStats = async () => {
+  const calculateMaxXPForLevel = (level: number): number => {
+    return level * 100;
+  };
+
+  const calculateMaxHealthForLevel = (level: number): number => {
+    return 100 + ((level - 1) * 10);
+  };
+
+  // Backend sync function
+  const syncStatsToBackend = async (newStats: CharacterStats) => {
     try {
-      const savedStats = await AsyncStorage.getItem("userStats")
-      if (savedStats) {
-        const parsedStats = JSON.parse(savedStats)
-        setStats({ ...defaultStats, ...parsedStats })
+      const token = await AsyncStorage.getItem('userToken');
+      const isGuest = await AsyncStorage.getItem('isGuest');
+
+      if (token && isGuest !== 'true') {
+        console.log('☁️ Syncing stats to backend...');
+        await statsAPI.updateStats(newStats);
+        console.log('✅ Stats synced to backend successfully');
       }
     } catch (error) {
-      console.error("Failed to load stats:", error)
+      console.error('❌ Failed to sync stats to backend:', error);
+      // Continue silently - local storage still works
     }
-  }
+  };
 
-  const saveStats = async (newStats: StatsData) => {
+  // Save stats locally and sync to backend
+  const saveStats = async (newStats: CharacterStats) => {
     try {
-      await AsyncStorage.setItem("userStats", JSON.stringify(newStats))
+      // Always save locally first
+      await AsyncStorage.setItem('characterStats', JSON.stringify(newStats));
+      
+      // Then try to sync to backend
+      await syncStatsToBackend(newStats);
     } catch (error) {
-      console.error("Failed to save stats:", error)
+      console.error('Failed to save character stats:', error);
     }
-  }
+  };
 
+  // Load stats from backend or local storage
+  const loadUserStats = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const isGuest = await AsyncStorage.getItem('isGuest');
+
+      // Try to load from backend first
+      if (token && isGuest !== 'true') {
+        console.log('🔄 Loading stats from backend...');
+        try {
+          const response = await statsAPI.getStats();
+          
+          if (response.success && response.stats) {
+            const backendStats = response.stats;
+            const loadedStats = {
+              level: backendStats.level || 1,
+              experience: backendStats.experience || 0,
+              maxExperience: calculateMaxXPForLevel(backendStats.level || 1),
+              health: backendStats.health || 100,
+              maxHealth: calculateMaxHealthForLevel(backendStats.level || 1),
+              coinsEarned: backendStats.coins_earned || 0,
+              gemsEarned: backendStats.gems_earned || 0,
+              currentStreak: backendStats.current_streak || 0,
+              longestStreak: backendStats.longest_streak || 0,
+              totalTasksCompleted: backendStats.total_tasks_completed || 0,
+              focusMinutes: backendStats.focus_minutes || 0,
+              focusSessions: backendStats.focus_sessions || 0,
+              habitsCompleted: 0, // These are calculated real-time
+              totalHabits: 0,
+              dailiesCompleted: 0,
+              totalDailies: 0,
+              routinesCompleted: 0,
+              totalRoutines: 0,
+            };
+
+            setStats(loadedStats);
+            
+            // Cache locally
+            await AsyncStorage.setItem('characterStats', JSON.stringify(loadedStats));
+            
+            console.log('✅ Stats loaded from backend');
+            return;
+          }
+        } catch (error) {
+          console.log('❌ Backend stats failed, loading from local:', error);
+        }
+      }
+
+      // Load from local storage (guest mode or backup)
+      console.log('📱 Loading stats from local storage...');
+      const savedStats = await AsyncStorage.getItem('characterStats');
+      if (savedStats) {
+        const parsedStats = JSON.parse(savedStats);
+        setStats({ ...defaultStats, ...parsedStats });
+      } else {
+        // First time user - start fresh at level 1
+        console.log('🆕 New user - starting at Level 1');
+        setStats(defaultStats);
+        await AsyncStorage.setItem('characterStats', JSON.stringify(defaultStats));
+        
+        // Create backend stats if logged in
+        if (token && isGuest !== 'true') {
+          await syncStatsToBackend(defaultStats);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load character stats:', error);
+      setStats(defaultStats);
+    }
+  };
+
+  // Level up system
+  const checkLevelUp = (newExperience: number, currentLevel: number) => {
+    const newLevel = calculateLevelFromXP(newExperience);
+    
+    if (newLevel > currentLevel) {
+      return {
+        newLevel,
+        levelMessage: `🎉 LEVEL UP! Welcome to Level ${newLevel}!`
+      };
+    }
+    
+    return { newLevel: currentLevel };
+  };
+
+  // Update experience with level progression
   const updateExperience = (amount: number) => {
     setStats(prevStats => {
-      const newExperience = Math.max(0, prevStats.experience + amount)
-      const newStats = { ...prevStats, experience: newExperience }
+      const newExperience = Math.max(0, prevStats.experience + amount);
+      const { newLevel, levelMessage } = checkLevelUp(newExperience, prevStats.level);
+      const newMaxExperience = calculateMaxXPForLevel(newLevel);
+      const newMaxHealth = calculateMaxHealthForLevel(newLevel);
       
-      // Check for level up
-      if (newExperience >= prevStats.maxExperience && amount > 0) {
-        newStats.level += 1
-        newStats.experience = newExperience - prevStats.maxExperience
-        newStats.maxExperience = Math.floor(prevStats.maxExperience * 1.2) // 20% increase
-        newStats.levelMessage = `🎉 Level Up! You're now level ${newStats.level}!`
-        newStats.gemsEarned += 10 // Level up bonus
-        newStats.coinsEarned += 50
-        
-        // Clear level message after 5 seconds
+      // If leveled up, restore some health as a bonus
+      const healthBonus = newLevel > prevStats.level ? 20 : 0;
+      const newHealth = Math.min(newMaxHealth, prevStats.health + healthBonus);
+      
+      const updatedStats = {
+        ...prevStats,
+        experience: newExperience,
+        level: newLevel,
+        maxExperience: newMaxExperience,
+        health: newHealth,
+        maxHealth: newMaxHealth,
+        levelMessage: levelMessage || prevStats.levelMessage,
+        totalTasksCompleted: amount > 0 ? prevStats.totalTasksCompleted + 1 : prevStats.totalTasksCompleted
+      };
+      
+      saveStats(updatedStats);
+      
+      // Clear level message after 5 seconds
+      if (levelMessage) {
         setTimeout(() => {
-          setStats(current => ({ ...current, levelMessage: undefined }))
-        }, 5000)
+          setStats(current => ({ ...current, levelMessage: undefined }));
+        }, 5000);
       }
       
-      saveStats(newStats)
-      return newStats
-    })
-  }
+      return updatedStats;
+    });
+  };
 
+  // Update health
   const updateHealth = (amount: number) => {
     setStats(prevStats => {
-      const newHealth = Math.max(0, Math.min(prevStats.maxHealth, prevStats.health + amount))
-      const newStats = { ...prevStats, health: newHealth }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+      const newHealth = Math.max(0, Math.min(prevStats.maxHealth, prevStats.health + amount));
+      const updatedStats = { ...prevStats, health: newHealth };
+      saveStats(updatedStats);
+      return updatedStats;
+    });
+  };
 
-  const updateLevel = () => {
+  // Update coins
+  const updateCoins = (amount: number) => {
     setStats(prevStats => {
-      const newStats = { ...prevStats, level: prevStats.level + 1 }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+      const newCoins = Math.max(0, prevStats.coinsEarned + amount);
+      const updatedStats = { ...prevStats, coinsEarned: newCoins };
+      saveStats(updatedStats);
+      return updatedStats;
+    });
+  };
 
+  // Update gems
+  const updateGems = (amount: number) => {
+    setStats(prevStats => {
+      const newGems = Math.max(0, prevStats.gemsEarned + amount);
+      const updatedStats = { ...prevStats, gemsEarned: newGems };
+      saveStats(updatedStats);
+      return updatedStats;
+    });
+  };
+
+  // Update habit completion
   const updateHabitCompletion = (completed: number, total: number) => {
-    setStats(prevStats => {
-      const completionRate = total > 0 ? (completed / total) * 100 : 0
-      const newStats = {
-        ...prevStats,
-        habitsCompleted: completed,
-        totalHabits: total,
-        weeklyCompletionRate: completionRate
-      }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+    setStats(prevStats => ({ ...prevStats, habitsCompleted: completed, totalHabits: total }));
+  };
 
-  const updateDailyCompletion = (completed: number, total: number) => {
-    setStats(prevStats => {
-      const newStats = {
-        ...prevStats,
-        dailiesCompleted: completed,
-        totalDailies: total
-      }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+  // Update dailies completion
+  const updateDailiesCompletion = (completed: number, total: number) => {
+    setStats(prevStats => ({ ...prevStats, dailiesCompleted: completed, totalDailies: total }));
+  };
 
-  // ADD THIS NEW FUNCTION
-  const updateRoutineCompletion = (completed: number, total: number) => {
-    setStats(prevStats => {
-      const newStats = {
-        ...prevStats,
-        routinesCompleted: completed,
-        totalRoutines: total
-      }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+  // Update routines completion
+  const updateRoutinesCompletion = (completed: number, total: number) => {
+    setStats(prevStats => ({ ...prevStats, routinesCompleted: completed, totalRoutines: total }));
+  };
 
-  const updateFocusSessions = (sessions: number) => {
-    setStats(prevStats => {
-      const newStats = { ...prevStats, focusSessionsToday: sessions }
-      saveStats(newStats)
-      return newStats
-    })
-  }
-
+  // Update focus time
   const updateFocusTime = (minutes: number) => {
     setStats(prevStats => {
-      const newStats = { ...prevStats, totalFocusTime: prevStats.totalFocusTime + minutes }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+      const updatedStats = { ...prevStats, focusMinutes: prevStats.focusMinutes + minutes };
+      saveStats(updatedStats);
+      return updatedStats;
+    });
+  };
 
-  const addGems = (amount: number) => {
+  // Update focus sessions
+  const updateFocusSessions = (sessions: number) => {
     setStats(prevStats => {
-      const newStats = { ...prevStats, gemsEarned: prevStats.gemsEarned + amount }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+      const updatedStats = { ...prevStats, focusSessions: sessions };
+      saveStats(updatedStats);
+      return updatedStats;
+    });
+  };
 
-  const addCoins = (amount: number) => {
+  // Update streak
+  const updateStreak = (streak: number) => {
     setStats(prevStats => {
-      const newStats = { ...prevStats, coinsEarned: prevStats.coinsEarned + amount }
-      saveStats(newStats)
-      return newStats
-    })
-  }
+      const newLongestStreak = Math.max(prevStats.longestStreak, streak);
+      const updatedStats = { 
+        ...prevStats, 
+        currentStreak: streak,
+        longestStreak: newLongestStreak 
+      };
+      saveStats(updatedStats);
+      return updatedStats;
+    });
+  };
 
-  const unlockAchievement = (achievementId: string) => {
+  // Update total tasks
+  const updateTotalTasks = (tasks: number) => {
     setStats(prevStats => {
-      if (!prevStats.unlockedAchievements.includes(achievementId)) {
-        const newStats = {
-          ...prevStats,
-          unlockedAchievements: [...prevStats.unlockedAchievements, achievementId],
-          totalAchievements: prevStats.totalAchievements + 1,
-          gemsEarned: prevStats.gemsEarned + 5, // Achievement bonus
-          coinsEarned: prevStats.coinsEarned + 25
-        }
-        saveStats(newStats)
-        return newStats
-      }
-      return prevStats
+      const updatedStats = { ...prevStats, totalTasksCompleted: tasks };
+      saveStats(updatedStats);
+      return updatedStats;
+    });
+  };
+
+  // Reset stats
+  const resetStats = () => {
+    setStats({
+      level: 1,
+      experience: 0,
+      health: 100,
+      maxHealth: 100,
+      coinsEarned: 0,
+      gemsEarned: 0,
+      currentStreak: 0,
+      totalTasksCompleted: 0,
+      focusMinutes: 0,
+      levelMessage: null,
     })
   }
 
-  const resetStats = async () => {
-    setStats(defaultStats)
-    await AsyncStorage.removeItem("userStats")
-  }
+  // Load stats on mount
+  useEffect(() => {
+    loadUserStats();
+  }, []);
 
-  const value: StatsContextType = {
-    stats,
-    updateExperience,
-    updateHealth,
-    updateLevel,
-    updateHabitCompletion,
-    updateDailyCompletion,
-    updateRoutineCompletion, // ADD THIS
-    updateFocusSessions,
-    updateFocusTime,
-    addGems,
-    addCoins,
-    unlockAchievement,
-    resetStats,
-    loadStats,
-  }
-
-  return <StatsContext.Provider value={value}>{children}</StatsContext.Provider>
+  return (
+    <StatsContext.Provider value={{
+      stats,
+      updateExperience,
+      updateHealth,
+      updateCoins,
+      updateGems,
+      updateHabitCompletion,
+      updateDailiesCompletion,
+      updateRoutinesCompletion,
+      updateFocusTime,
+      updateFocusSessions,
+      updateStreak,
+      updateTotalTasks,
+      resetStats,
+      loadUserStats
+    }}>
+      {children}
+    </StatsContext.Provider>
+  );
 }
 
-export const useStats = () => {
-  const context = useContext(StatsContext)
+export function useStats() {
+  const context = useContext(StatsContext);
   if (context === undefined) {
-    throw new Error("useStats must be used within a StatsProvider")
+    throw new Error('useStats must be used within a StatsProvider');
   }
-  return context
+  return context;
 }

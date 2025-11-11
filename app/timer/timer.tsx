@@ -21,6 +21,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
+import { focusAPI } from "../../lib/api"
 
 // Mock data for habits
 const habitsList = [
@@ -84,26 +85,97 @@ export default function Timer() {
       try {
         setLoading(true)
 
-        const savedPreferences = await AsyncStorage.getItem("timerPreferences")
-        if (savedPreferences) {
-          const preferences = JSON.parse(savedPreferences)
-          setWorkTime(preferences.workTime || defaultTimerPreferences.workTime)
-          setBreakTime(preferences.breakTime || defaultTimerPreferences.breakTime)
-          setLongBreakTime(preferences.longBreakTime || defaultTimerPreferences.longBreakTime)
-          setAutoStartEnabled(preferences.autoStartEnabled ?? defaultTimerPreferences.autoStartEnabled)
-          setSoundEnabled(preferences.soundEnabled ?? defaultTimerPreferences.soundEnabled)
-          setVibrationEnabled(preferences.vibrationEnabled ?? defaultTimerPreferences.vibrationEnabled)
+        // Check if user is logged in for backend sync
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
 
-          if (!isRunning) {
-            const initialTime = preferences.workTime || defaultTimerPreferences.workTime
-            setTime(initialTime)
-            setOriginalTime(initialTime)
+        // Try to load preferences from backend first
+        if (token && isGuest !== 'true') {
+          console.log('🔄 Loading timer preferences from backend...')
+          try {
+            const response = await focusAPI.getPreferences()
+            
+            if (response.success && response.preferences) {
+              const prefs = response.preferences
+              setWorkTime(prefs.work_duration || defaultTimerPreferences.workTime)
+              setBreakTime(prefs.short_break || defaultTimerPreferences.breakTime)
+              setLongBreakTime(prefs.long_break || defaultTimerPreferences.longBreakTime)
+              setAutoStartEnabled(prefs.auto_start ?? defaultTimerPreferences.autoStartEnabled)
+              setSoundEnabled(prefs.sound_enabled ?? defaultTimerPreferences.soundEnabled)
+              setVibrationEnabled(prefs.vibration_enabled ?? defaultTimerPreferences.vibrationEnabled)
+
+              if (!isRunning) {
+                const initialTime = prefs.work_duration || defaultTimerPreferences.workTime
+                setTime(initialTime)
+                setOriginalTime(initialTime)
+              }
+
+              console.log('✅ Timer preferences loaded from backend')
+              
+              // Cache preferences locally
+              const preferencesToCache = {
+                workTime: prefs.work_duration || defaultTimerPreferences.workTime,
+                breakTime: prefs.short_break || defaultTimerPreferences.breakTime,
+                longBreakTime: prefs.long_break || defaultTimerPreferences.longBreakTime,
+                autoStartEnabled: prefs.auto_start ?? defaultTimerPreferences.autoStartEnabled,
+                soundEnabled: prefs.sound_enabled ?? defaultTimerPreferences.soundEnabled,
+                vibrationEnabled: prefs.vibration_enabled ?? defaultTimerPreferences.vibrationEnabled
+              }
+              await AsyncStorage.setItem("timerPreferences", JSON.stringify(preferencesToCache))
+              
+            } else {
+              throw new Error('No backend preferences found')
+            }
+          } catch (error) {
+            console.log('❌ Backend preferences failed, loading from local:', error.message)
+            
+            // Fallback to local storage
+            const savedPreferences = await AsyncStorage.getItem("timerPreferences")
+            if (savedPreferences) {
+              const preferences = JSON.parse(savedPreferences)
+              setWorkTime(preferences.workTime || defaultTimerPreferences.workTime)
+              setBreakTime(preferences.breakTime || defaultTimerPreferences.breakTime)
+              setLongBreakTime(preferences.longBreakTime || defaultTimerPreferences.longBreakTime)
+              setAutoStartEnabled(preferences.autoStartEnabled ?? defaultTimerPreferences.autoStartEnabled)
+              setSoundEnabled(preferences.soundEnabled ?? defaultTimerPreferences.soundEnabled)
+              setVibrationEnabled(preferences.vibrationEnabled ?? defaultTimerPreferences.vibrationEnabled)
+
+              if (!isRunning) {
+                const initialTime = preferences.workTime || defaultTimerPreferences.workTime
+                setTime(initialTime)
+                setOriginalTime(initialTime)
+              }
+            } else {
+              // Use defaults
+              setTime(defaultTimerPreferences.workTime)
+              setOriginalTime(defaultTimerPreferences.workTime)
+            }
           }
         } else {
-          setTime(defaultTimerPreferences.workTime)
-          setOriginalTime(defaultTimerPreferences.workTime)
+          // Guest mode - load from local storage only
+          console.log('📱 Loading timer preferences locally (guest mode)')
+          const savedPreferences = await AsyncStorage.getItem("timerPreferences")
+          if (savedPreferences) {
+            const preferences = JSON.parse(savedPreferences)
+            setWorkTime(preferences.workTime || defaultTimerPreferences.workTime)
+            setBreakTime(preferences.breakTime || defaultTimerPreferences.breakTime)
+            setLongBreakTime(preferences.longBreakTime || defaultTimerPreferences.longBreakTime)
+            setAutoStartEnabled(preferences.autoStartEnabled ?? defaultTimerPreferences.autoStartEnabled)
+            setSoundEnabled(preferences.soundEnabled ?? defaultTimerPreferences.soundEnabled)
+            setVibrationEnabled(preferences.vibrationEnabled ?? defaultTimerPreferences.vibrationEnabled)
+
+            if (!isRunning) {
+              const initialTime = preferences.workTime || defaultTimerPreferences.workTime
+              setTime(initialTime)
+              setOriginalTime(initialTime)
+            }
+          } else {
+            setTime(defaultTimerPreferences.workTime)
+            setOriginalTime(defaultTimerPreferences.workTime)
+          }
         }
 
+        // Load session stats (local for now, could be enhanced with backend later)
         const savedStats = await AsyncStorage.getItem("timerStats")
         if (savedStats) {
           const stats = JSON.parse(savedStats)
@@ -113,6 +185,9 @@ export default function Timer() {
         }
       } catch (e) {
         console.error("Failed to load timer settings:", e)
+        // Use defaults if everything fails
+        setTime(defaultTimerPreferences.workTime)
+        setOriginalTime(defaultTimerPreferences.workTime)
       } finally {
         setLoading(false)
       }
@@ -186,7 +261,7 @@ export default function Timer() {
     }
   }, [isRunning])
 
-  // Save preferences
+  // Save preferences (enhanced with backend sync)
   useEffect(() => {
     const saveTimerPreferences = async () => {
       try {
@@ -198,13 +273,35 @@ export default function Timer() {
           soundEnabled,
           vibrationEnabled,
         }
+        
+        // Always save locally first
         await AsyncStorage.setItem("timerPreferences", JSON.stringify(preferences))
+
+        // Try to sync with backend if logged in
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
+
+        if (token && isGuest !== 'true') {
+          console.log('☁️ Syncing timer preferences to backend...')
+          try {
+            const response = await focusAPI.syncPreferences(preferences)
+            if (response.success) {
+              console.log('✅ Timer preferences synced to backend')
+            }
+          } catch (error) {
+            console.error('❌ Failed to sync preferences to backend:', error)
+            // Continue silently - local save already succeeded
+          }
+        }
       } catch (e) {
         console.error("Failed to save timer preferences:", e)
       }
     }
 
-    saveTimerPreferences()
+    // Only save if we have actual values (not initial state)
+    if (workTime > 0) {
+      saveTimerPreferences()
+    }
   }, [workTime, breakTime, longBreakTime, autoStartEnabled, soundEnabled, vibrationEnabled])
 
   // Save stats
@@ -222,7 +319,7 @@ export default function Timer() {
     saveTimerStats()
   }, [totalSessionsToday, streak])
 
-  const handleSessionEnd = () => {
+  const handleSessionEnd = async () => {
     setIsRunning(false)
     setIsPaused(false)
 
@@ -232,17 +329,49 @@ export default function Timer() {
     }
 
     if (isWorkSession) {
-      // Work session completed - award XP and update stats
+      // Work session completed - calculate rewards
       const sessionMinutes = Math.ceil(originalTime / 60)
-      const xpGain = sessionMinutes * 2 // 2 XP per minute
+      const actualMinutes = Math.ceil((originalTime - time) / 60)
+      const xpGain = actualMinutes * 2 // 2 XP per minute
+      const coinsGain = Math.floor(actualMinutes / 5) + 1 // 1 coin per 5 minutes + 1 base
       
+      // Update local stats immediately
       updateExperience(xpGain)
-      updateFocusTime(sessionMinutes)
+      updateFocusTime(actualMinutes)
       
       const newTotalSessions = totalSessionsToday + 1
       setTotalSessionsToday(newTotalSessions)
       setStreak((prev) => prev + 1)
       setSessionCount((prevCount) => prevCount + 1)
+
+      // Try to record session in backend
+      try {
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
+
+        if (token && isGuest !== 'true') {
+          console.log('📊 Recording focus session to backend...')
+          
+          const sessionData = {
+            session_type: 'work',
+            duration_planned: originalTime,
+            duration_actual: originalTime - time,
+            habit_id: selectedHabit?.id || null,
+            focus_topic: selectedHabit?.title || 'Focus Session',
+            completed: true,
+            experience_gained: xpGain,
+            coins_gained: coinsGain
+          }
+
+          const response = await focusAPI.recordSession(sessionData)
+          
+          if (response.success) {
+            console.log('✅ Focus session recorded successfully')
+          }
+        }
+      } catch (error) {
+        console.error('❌ Failed to record session, continuing offline:', error)
+      }
 
       // Determine next break type
       if ((sessionCount + 1) % 4 === 0) {
@@ -254,6 +383,27 @@ export default function Timer() {
       }
     } else {
       // Break session completed
+      try {
+        const token = await AsyncStorage.getItem('userToken')
+        const isGuest = await AsyncStorage.getItem('isGuest')
+
+        if (token && isGuest !== 'true') {
+          const breakData = {
+            session_type: 'break',
+            duration_planned: originalTime,
+            duration_actual: originalTime - time,
+            completed: true,
+            experience_gained: 5, // Small XP for completing breaks
+            coins_gained: 1
+          }
+
+          await focusAPI.recordSession(breakData)
+          console.log('✅ Break session recorded')
+        }
+      } catch (error) {
+        console.error('❌ Failed to record break session:', error)
+      }
+
       setTime(workTime)
       setOriginalTime(workTime)
       setSelectedHabit(null)
