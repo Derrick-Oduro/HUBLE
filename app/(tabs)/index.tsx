@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, ActivityIndicator, Alert } from "react-native"
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, ActivityIndicator, Alert, FlatList } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import HabitItem from "../../components/HabitItem"
@@ -12,6 +12,7 @@ import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 import { habitsAPI } from "../../lib/api"
+import CharacterPanel from "../../components/CharacterPanel"
 
 // Enhanced habit interface with streak tracking
 interface EnhancedHabit {
@@ -539,189 +540,113 @@ export default function HabitsScreen() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
-      <View style={tw`flex-1 px-5 pt-3`}>
-        
-        
-        <View style={[
-          tw`rounded-xl p-4 mb-4 flex-row items-center justify-between`,
-          { backgroundColor: colors.card }
-        ]}>
-          {/* Left side - User info */}
-          <View style={tw`flex-row items-center flex-1`}>
-            <View style={[
-              tw`w-10 h-10 rounded-full items-center justify-center mr-3`,
-              { backgroundColor: colors.accent + '20' }
-            ]}>
-              <Text style={tw`text-lg`}>🧙‍♂️</Text>
-            </View>
-            <View style={tw`flex-1`}>
-              <Text style={[tw`font-bold text-base`, { color: colors.text }]}>
-                Level {stats.level} Hero
-              </Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                {completedToday}/{totalHabits} habits today
-              </Text>
-            </View>
-          </View>
-
-          {/* Right side - Currency & Streak */}
-          <View style={tw`items-end`}>
-            <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
-              💎 {stats.gemsEarned}  🪙 {stats.coinsEarned}
-            </Text>
-            <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-              🔥 {stats.currentStreak} streak
-            </Text>
-          </View>
-        </View>
-
-        {/* Simple Progress Bars - FIXED */}
-        <View style={[
-          tw`rounded-xl p-4 mb-4`,
-          { backgroundColor: colors.card }
-        ]}>
-          {/* Health Bar - FIXED */}
-          <View style={tw`mb-3`}>
-            <View style={tw`flex-row justify-between items-center mb-1`}>
-              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
-                ❤️ Health
-              </Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                {stats.health || 100}/{stats.maxHealth || 100}
-              </Text>
-            </View>
-            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
-              <View
-                style={[
-                  tw`h-2 rounded-full`,
-                  {
-                    width: `${Math.min(((stats.health || 100) / (stats.maxHealth || 100)) * 100, 100)}%`,
-                    backgroundColor: '#ef4444',
-                  }
-                ]}
-              />
-            </View>
-          </View>
-
-          {/* Experience Bar - FIXED */}
+      
+      {/* Use FlatList instead of ScrollView for better integration */}
+      <FlatList
+        style={tw`flex-1 px-5 pt-3`}
+        data={habits}
+        keyExtractor={(item) => item.id.toString()}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={tw`pb-20`} // Bottom padding for floating button
+        ListHeaderComponent={() => (
           <View>
-            <View style={tw`flex-row justify-between items-center mb-1`}>
-              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
-                ⚡ Experience
-              </Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                {(stats.experience || 0) % 100}/100
-              </Text>
-            </View>
-            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
-              <View
-                style={[
-                  tw`h-2 rounded-full`,
-                  {
-                    width: `${((stats.experience || 0) % 100)}%`,
-                    backgroundColor: '#eab308',
-                  }
-                ]}
-              />
-            </View>
-          </View>
-        </View>
+            {/* Character Panel Component */}
+            <CharacterPanel 
+              completedCount={completedToday}
+              totalCount={totalHabits}
+              taskType="habits"
+            />
 
-        {/* Level Up Message (if exists) */}
-        {stats.levelMessage && (
-          <View style={[
-            tw`px-4 py-3 rounded-xl mb-4`,
-            { backgroundColor: colors.success + '20' }
-          ]}>
-            <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
-              {stats.levelMessage}
+            {/* Level Up Message (if exists) */}
+            {stats.levelMessage && (
+              <View style={[
+                tw`px-4 py-3 rounded-xl mb-4`,
+                { backgroundColor: colors.success + '20' }
+              ]}>
+                <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
+                  {stats.levelMessage}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+        ListEmptyComponent={() => (
+          <View style={tw`items-center py-8`}>
+            <Ionicons name="leaf-outline" size={48} color={colors.textSecondary} />
+            <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No habits yet</Text>
+            <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
+              Add your first habit to get started
             </Text>
           </View>
         )}
-
-        {/* Cool Habit List - Added bottom padding for floating button */}
-        <ScrollView showsVerticalScrollIndicator={false} style={tw`flex-1`} contentContainerStyle={tw`pb-20`}>
-          {habits.length === 0 ? (
-            <View style={tw`items-center py-8`}>
-              <Ionicons name="leaf-outline" size={48} color={colors.textSecondary} />
-              <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No habits yet</Text>
-              <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
-                Add your first habit to get started
-              </Text>
-            </View>
-          ) : (
-            habits.map((habit) => (
-              <View key={habit.id}>
-                <HabitItem
-                  id={habit.id}
-                  title={habit.title}
-                  color={habit.color}
-                  subtext={`${habit.description}${habit.streak > 0 ? ` • 🔥 ${habit.streak} day streak` : ""}`}
-                  completed={habit.completed}
-                  streak={habit.streak}
-                  difficulty={habit.difficulty}
-                  onEdit={editHabit}
-                  onDelete={deleteHabit}
-                  onComplete={handleHabitComplete}
-                  onFail={handleHabitFail}
-                />
-              </View>
-            ))
-          )}
-        </ScrollView>
-
-        {/* Floating Add Button - ON TOP of tab bar, perfectly centered */}
-        <View style={[
-          tw`absolute w-full`, 
-          { 
-            bottom: 25, 
-            left: 0, 
-            right: 0,
-            zIndex: 1000,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }
-        ]}>
-          <TouchableOpacity 
-            style={[
-              tw`w-16 h-16 rounded-full items-center justify-center shadow-lg`,
-              {
-                backgroundColor: colors.accent,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-                elevation: 8,
-                borderWidth: 4,
-                borderColor: colors.background,
-                marginLeft: 42, // Fine adjustment - move slightly right
-              }
-            ]}
-            onPress={() => setIsAddModalVisible(true)}
-          >
-            <Ionicons name="add" size={32} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Modal */}
-        {editingHabit ? (
-          <AddHabitModal
-            isVisible={isAddModalVisible}
-            onClose={() => {
-              setIsAddModalVisible(false)
-              setEditingHabit(null)
-            }}
-            onAdd={updateHabit}
-            initialValues={editingHabit}
-          />
-        ) : (
-          <AddHabitModal 
-            isVisible={isAddModalVisible} 
-            onClose={() => setIsAddModalVisible(false)} 
-            onAdd={addHabit} 
+        renderItem={({ item }) => (
+          <HabitItem
+            id={item.id}
+            title={item.title}
+            color={item.color}
+            subtext={`${item.description}${item.streak > 0 ? ` • 🔥 ${item.streak} day streak` : ""}`}
+            completed={item.completed}
+            streak={item.streak}
+            difficulty={item.difficulty}
+            onEdit={editHabit}
+            onDelete={deleteHabit}
+            onComplete={handleHabitComplete}
+            onFail={handleHabitFail}
           />
         )}
+      />
+
+      {/* Floating Add Button - Bottom Center */}
+      <View style={[
+        tw`absolute w-full`, 
+        { 
+          bottom: 25, 
+          left: 0, 
+          right: 0,
+          zIndex: 1000,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }
+      ]}>
+        <TouchableOpacity 
+          style={[
+            tw`w-16 h-16 rounded-full items-center justify-center shadow-lg`,
+            {
+              backgroundColor: colors.accent,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 6,
+              elevation: 8,
+              borderWidth: 4,
+              borderColor: colors.background,
+              marginLeft: 2,
+            }
+          ]}
+          onPress={() => setIsAddModalVisible(true)}
+        >
+          <Ionicons name="add" size={32} color="white" />
+        </TouchableOpacity>
       </View>
+
+      {/* Modal */}
+      {editingHabit ? (
+        <AddHabitModal
+          isVisible={isAddModalVisible}
+          onClose={() => {
+            setIsAddModalVisible(false)
+            setEditingHabit(null)
+          }}
+          onAdd={updateHabit}
+          initialValues={editingHabit}
+        />
+      ) : (
+        <AddHabitModal 
+          isVisible={isAddModalVisible} 
+          onClose={() => setIsAddModalVisible(false)} 
+          onAdd={addHabit} 
+        />
+      )}
     </SafeAreaView>
   )
 }

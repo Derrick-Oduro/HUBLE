@@ -13,9 +13,11 @@ import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 import { routinesAPI } from "../../lib/api"
+import CharacterPanel from "../../components/CharacterPanel"
 
 export default function Routines() {
   const { colors, currentTheme } = useTheme()
+  
   const defaultRoutines = [
     { 
       id: "1", 
@@ -556,7 +558,7 @@ export default function Routines() {
       <ScrollView 
         style={tw`flex-1 px-5 pt-2`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={tw`pb-20`} // Add bottom padding for floating button
+        contentContainerStyle={tw`pb-20`}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -567,90 +569,12 @@ export default function Routines() {
         }
       >
         
-        <View style={[
-          tw`rounded-xl p-4 mb-4 flex-row items-center justify-between`,
-          { backgroundColor: colors.card }
-        ]}>
-          {/* Left side - User info */}
-          <View style={tw`flex-row items-center flex-1`}>
-            <View style={[
-              tw`w-10 h-10 rounded-full items-center justify-center mr-3`,
-              { backgroundColor: colors.accent + '20' }
-            ]}>
-              <Text style={tw`text-lg`}>🧙‍♂️</Text>
-            </View>
-            <View style={tw`flex-1`}>
-              <Text style={[tw`font-bold text-base`, { color: colors.text }]}>
-                Level {stats.level} Hero
-              </Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                {routineStats.completed}/{routineStats.total} routines done
-              </Text>
-            </View>
-          </View>
-
-          {/* Right side - Currency & Streak */}
-          <View style={tw`items-end`}>
-            <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
-              💎 {stats.gemsEarned}  🪙 {stats.coinsEarned}
-            </Text>
-            <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-              🔥 {stats.currentStreak} streak
-            </Text>
-          </View>
-        </View>
-
-        {/* Simple Progress Bars - FIXED */}
-        <View style={[
-          tw`rounded-xl p-4 mb-4`,
-          { backgroundColor: colors.card }
-        ]}>
-          {/* Health Bar - FIXED */}
-          <View style={tw`mb-3`}>
-            <View style={tw`flex-row justify-between items-center mb-1`}>
-              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
-                ❤️ Health
-              </Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                {stats.health || 100}/{stats.maxHealth || 100}
-              </Text>
-            </View>
-            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
-              <View
-                style={[
-                  tw`h-2 rounded-full`,
-                  {
-                    width: `${Math.min(((stats.health || 100) / (stats.maxHealth || 100)) * 100, 100)}%`,
-                    backgroundColor: '#ef4444',
-                  }
-                ]}
-              />
-            </View>
-          </View>
-
-          {/* Experience Bar - FIXED */}
-          <View>
-            <View style={tw`flex-row justify-between items-center mb-1`}>
-              <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
-                ⚡ Experience
-              </Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                {(stats.experience || 0) % 100}/100
-              </Text>
-            </View>
-            <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
-              <View
-                style={[
-                  tw`h-2 rounded-full`,
-                  {
-                    width: `${((stats.experience || 0) % 100)}%`,
-                    backgroundColor: '#eab308',
-                  }
-                ]}
-              />
-            </View>
-          </View>
-        </View>
+        {/* Character Panel Component */}
+        <CharacterPanel 
+          completedCount={routineStats.completed}
+          totalCount={routineStats.total}
+          taskType="routines"
+        />
 
         {/* Level Up Message (if exists) */}
         {stats.levelMessage && (
@@ -664,56 +588,6 @@ export default function Routines() {
           </View>
         )}
 
-        {/* Keep the existing Enhanced Routines Progress section */}
-        <View style={[
-          tw`rounded-2xl p-5 mb-6`,
-          {
-            backgroundColor: colors.card,
-            shadowColor: colors.success,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            elevation: 6,
-          }
-        ]}>
-          {/* This existing routine progress section can stay as it shows routine-specific info */}
-          <View style={tw`flex-row justify-between items-center mb-4`}>
-            <View>
-              <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Today's Progress</Text>
-              <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>
-                {routineStats.percentage === 100 && routineStats.total > 0 ? "Perfect day! 🎉" : "Keep going!"}
-              </Text>
-            </View>
-            <View style={tw`items-end`}>
-              <Text style={[tw`text-2xl font-bold`, { color: colors.success }]}>
-                {routineStats.percentage}%
-              </Text>
-              <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
-                {routineStats.completed}/{routineStats.total}
-              </Text>
-            </View>
-          </View>
-
-          <View style={[tw`h-3 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
-            <View
-              style={[
-                tw`h-full rounded-full`,
-                {
-                  width: `${routineStats.percentage}%`,
-                  backgroundColor: routineStats.percentage === 100 ? colors.success : colors.accent,
-                },
-              ]}
-            />
-          </View>
-
-          <Text style={[tw`text-sm mt-3`, { color: colors.textSecondary }]}>
-            {routineStats.percentage === 100 && routineStats.total > 0
-              ? "🌟 Outstanding! All routines completed today!"
-              : `${routineStats.total - routineStats.completed} routine${routineStats.total - routineStats.completed !== 1 ? 's' : ''} remaining for today`}
-          </Text>
-        </View>
-
-        {/* Enhanced Routine Cards section continues as normal... */}
         {/* Enhanced Routine Cards */}
         <View style={tw`mb-8`}>
           <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>

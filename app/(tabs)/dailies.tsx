@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert, ScrollView } from "react-native"
+import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import AddDailyModal from "../../components/AddDailyModal"
@@ -10,6 +10,7 @@ import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 import { dailiesAPI } from "../../lib/api"
+import CharacterPanel from "../../components/CharacterPanel"
 
 // Enhanced daily task interface
 interface DailyTask {
@@ -32,8 +33,8 @@ interface DailyTask {
 
 export default function DailiesScreen() {
   const { colors, currentTheme } = useTheme()
-  // ← FIX: Use the correct function names from StatsProvider
   const { stats, addExperience, addHealth, updateCoins } = useStats()
+  
   const [dailies, setDailies] = useState<DailyTask[]>([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
 
@@ -342,133 +343,20 @@ export default function DailiesScreen() {
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
       
-      {/* Use FlatList with ListHeaderComponent instead of ScrollView */}
       <FlatList
         style={tw`flex-1 px-5 pt-2`}
         data={dailies}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={tw`pb-20`} // Add bottom padding for floating button
+        contentContainerStyle={tw`pb-20`}
         ListHeaderComponent={() => (
           <View>
             
-            <View style={[
-              tw`rounded-xl p-4 mb-4 flex-row items-center justify-between`,
-              { backgroundColor: colors.card }
-            ]}>
-              {/* Left side - User info */}
-              <View style={tw`flex-row items-center flex-1`}>
-                <View style={[
-                  tw`w-10 h-10 rounded-full items-center justify-center mr-3`,
-                  { backgroundColor: colors.accent + '20' }
-                ]}>
-                  <Text style={tw`text-lg`}>🧙‍♂️</Text>
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`font-bold text-base`, { color: colors.text }]}>
-                    Level {stats.level || 1} Hero
-                  </Text>
-                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                    {completedDailies}/{totalDailies} dailies done
-                  </Text>
-                </View>
-              </View>
-
-              {/* Right side - Currency & Streak */}
-              <View style={tw`items-end`}>
-                <Text style={[tw`text-sm font-medium`, { color: colors.textSecondary }]}>
-                  💎 {stats.gemsEarned || 0}  🪙 {stats.coinsEarned || 0}
-                </Text>
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                  🔥 {stats.currentStreak || 0} streak
-                </Text>
-              </View>
-            </View>
-
-            {/* Simple Progress Bars - Same as Habits */}
-            <View style={[
-              tw`rounded-xl p-4 mb-4`,
-              { backgroundColor: colors.card }
-            ]}>
-              {/* Health Bar - FIXED to always show 100/100 */}
-              <View style={tw`mb-3`}>
-                <View style={tw`flex-row justify-between items-center mb-1`}>
-                  <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
-                    ❤️ Health
-                  </Text>
-                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                    {stats.health || 100}/{stats.maxHealth || 100}
-                  </Text>
-                </View>
-                <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
-                  <View
-                    style={[
-                      tw`h-2 rounded-full`,
-                      {
-                        width: `${Math.min(((stats.health || 100) / (stats.maxHealth || 100)) * 100, 100)}%`,
-                        backgroundColor: '#ef4444', // red-500
-                      }
-                    ]}
-                  />
-                </View>
-              </View>
-
-              {/* Experience Bar - FIXED to show current level progress */}
-              <View>
-                <View style={tw`flex-row justify-between items-center mb-1`}>
-                  <Text style={[tw`text-sm font-medium`, { color: colors.text }]}>
-                    ⚡ Experience
-                  </Text>
-                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                    {(stats.experience || 0) % 100}/100
-                  </Text>
-                </View>
-                <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
-                  <View
-                    style={[
-                      tw`h-2 rounded-full`,
-                      {
-                        width: `${((stats.experience || 0) % 100)}%`,
-                        backgroundColor: '#eab308', // yellow-500
-                      }
-                    ]}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Compact Today's Progress section */}
-            <View style={[
-              tw`rounded-xl p-4 mb-4`,
-              { backgroundColor: colors.card }
-            ]}>
-              <View style={tw`flex-row justify-between items-center mb-2`}>
-                <Text style={[tw`text-base font-bold`, { color: colors.text }]}>
-                  Today's Progress
-                </Text>
-                <Text style={[tw`text-lg font-bold`, { color: colors.success }]}>
-                  {totalDailies > 0 ? Math.round((completedDailies / totalDailies) * 100) : 0}%
-                </Text>
-              </View>
-
-              <View style={[tw`h-2 rounded-full overflow-hidden mb-2`, { backgroundColor: colors.cardSecondary }]}>
-                <View
-                  style={[
-                    tw`h-full rounded-full`,
-                    {
-                      width: `${totalDailies > 0 ? (completedDailies / totalDailies) * 100 : 0}%`,
-                      backgroundColor: completedDailies === totalDailies && totalDailies > 0 ? colors.success : colors.accent,
-                    },
-                  ]}
-                />
-              </View>
-
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                {completedDailies === totalDailies && totalDailies > 0
-                  ? "🌟 All dailies completed!"
-                  : `${totalDailies - completedDailies} task${totalDailies - completedDailies !== 1 ? 's' : ''} remaining`}
-              </Text>
-            </View>
+            <CharacterPanel 
+              completedCount={completedDailies}
+              totalCount={totalDailies}
+              taskType="dailies"
+            />
 
             {/* Level Up Message (if exists) */}
             {stats.levelMessage && (
