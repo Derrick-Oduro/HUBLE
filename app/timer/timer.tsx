@@ -23,7 +23,7 @@ import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 import { focusAPI } from "../../lib/api"
 
-// Mock data for habits
+// Keep your existing habits list exactly as is
 const habitsList = [
   { id: 1, title: "📚 Deep Work", duration: 50 * 60, color: "#3B82F6", emoji: "📚" },
   { id: 2, title: "📖 Reading", duration: 30 * 60, color: "#10B981", emoji: "📖" },
@@ -34,9 +34,12 @@ const habitsList = [
 ]
 
 export default function Timer() {
-  const { colors } = useTheme()
+  const { colors, currentTheme } = useTheme()
   
-  // Timer states
+  // Add this state to track the current preset
+  const [currentPreset, setCurrentPreset] = useState(null)
+  
+  // Keep ALL your existing state exactly as is
   const [time, setTime] = useState(25 * 60)
   const [originalTime, setOriginalTime] = useState(25 * 60)
   const [isRunning, setIsRunning] = useState(false)
@@ -46,30 +49,26 @@ export default function Timer() {
   const [totalSessionsToday, setTotalSessionsToday] = useState(0)
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
-
-  // Settings
   const [workTime, setWorkTime] = useState(25 * 60)
   const [breakTime, setBreakTime] = useState(5 * 60)
   const [longBreakTime, setLongBreakTime] = useState(15 * 60)
   const [autoStartEnabled, setAutoStartEnabled] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [vibrationEnabled, setVibrationEnabled] = useState(true)
-
-  // UI states
   const [showSettings, setShowSettings] = useState(false)
   const [showHabitSelector, setShowHabitSelector] = useState(false)
   const [showTimeEditor, setShowTimeEditor] = useState(false)
   const [selectedHabit, setSelectedHabit] = useState(null)
   const [countdownToStart, setCountdownToStart] = useState(0)
 
-  // Animation values
+  // Keep your animation refs
   const pulseAnim = useRef(new Animated.Value(1)).current
   const progressAnim = useRef(new Animated.Value(0)).current
 
-  // Stats context
+  // Keep your stats context
   const { stats, updateFocusSessions, updateFocusTime, updateExperience } = useStats()
 
-  // Default preferences
+  // Keep ALL your existing functions and useEffects EXACTLY the same
   const defaultTimerPreferences = {
     workTime: 25 * 60,
     breakTime: 5 * 60,
@@ -79,17 +78,14 @@ export default function Timer() {
     vibrationEnabled: true,
   }
 
-  // Load timer settings
+  // Keep ALL your useEffects exactly as they are...
   useEffect(() => {
     const loadTimerSettings = async () => {
       try {
         setLoading(true)
-
-        // Check if user is logged in for backend sync
         const token = await AsyncStorage.getItem('userToken')
         const isGuest = await AsyncStorage.getItem('isGuest')
 
-        // Try to load preferences from backend first
         if (token && isGuest !== 'true') {
           console.log('🔄 Loading timer preferences from backend...')
           try {
@@ -112,7 +108,6 @@ export default function Timer() {
 
               console.log('✅ Timer preferences loaded from backend')
               
-              // Cache preferences locally
               const preferencesToCache = {
                 workTime: prefs.work_duration || defaultTimerPreferences.workTime,
                 breakTime: prefs.short_break || defaultTimerPreferences.breakTime,
@@ -129,7 +124,6 @@ export default function Timer() {
           } catch (error) {
             console.log('❌ Backend preferences failed, loading from local:', error.message)
             
-            // Fallback to local storage
             const savedPreferences = await AsyncStorage.getItem("timerPreferences")
             if (savedPreferences) {
               const preferences = JSON.parse(savedPreferences)
@@ -146,13 +140,11 @@ export default function Timer() {
                 setOriginalTime(initialTime)
               }
             } else {
-              // Use defaults
               setTime(defaultTimerPreferences.workTime)
               setOriginalTime(defaultTimerPreferences.workTime)
             }
           }
         } else {
-          // Guest mode - load from local storage only
           console.log('📱 Loading timer preferences locally (guest mode)')
           const savedPreferences = await AsyncStorage.getItem("timerPreferences")
           if (savedPreferences) {
@@ -175,7 +167,6 @@ export default function Timer() {
           }
         }
 
-        // Load session stats (local for now, could be enhanced with backend later)
         const savedStats = await AsyncStorage.getItem("timerStats")
         if (savedStats) {
           const stats = JSON.parse(savedStats)
@@ -185,7 +176,6 @@ export default function Timer() {
         }
       } catch (e) {
         console.error("Failed to load timer settings:", e)
-        // Use defaults if everything fails
         setTime(defaultTimerPreferences.workTime)
         setOriginalTime(defaultTimerPreferences.workTime)
       } finally {
@@ -196,10 +186,8 @@ export default function Timer() {
     loadTimerSettings()
   }, [])
 
-  // Timer countdown effect
   useEffect(() => {
     let interval
-
     if (isRunning && time > 0) {
       interval = setInterval(() => {
         setTime((prevTime) => prevTime - 1)
@@ -207,14 +195,11 @@ export default function Timer() {
     } else if (time === 0 && isRunning) {
       handleSessionEnd()
     }
-
     return () => clearInterval(interval)
   }, [isRunning, time])
 
-  // Auto-start countdown
   useEffect(() => {
     let countdownInterval
-
     if (countdownToStart > 0) {
       countdownInterval = setInterval(() => {
         setCountdownToStart((prev) => {
@@ -227,11 +212,9 @@ export default function Timer() {
         })
       }, 1000)
     }
-
     return () => clearInterval(countdownInterval)
   }, [countdownToStart])
 
-  // Pulse animation when running
   useEffect(() => {
     if (isRunning) {
       const pulse = Animated.loop(
@@ -261,7 +244,6 @@ export default function Timer() {
     }
   }, [isRunning])
 
-  // Save preferences (enhanced with backend sync)
   useEffect(() => {
     const saveTimerPreferences = async () => {
       try {
@@ -274,10 +256,8 @@ export default function Timer() {
           vibrationEnabled,
         }
         
-        // Always save locally first
         await AsyncStorage.setItem("timerPreferences", JSON.stringify(preferences))
 
-        // Try to sync with backend if logged in
         const token = await AsyncStorage.getItem('userToken')
         const isGuest = await AsyncStorage.getItem('isGuest')
 
@@ -290,7 +270,6 @@ export default function Timer() {
             }
           } catch (error) {
             console.error('❌ Failed to sync preferences to backend:', error)
-            // Continue silently - local save already succeeded
           }
         }
       } catch (e) {
@@ -298,13 +277,11 @@ export default function Timer() {
       }
     }
 
-    // Only save if we have actual values (not initial state)
     if (workTime > 0) {
       saveTimerPreferences()
     }
   }, [workTime, breakTime, longBreakTime, autoStartEnabled, soundEnabled, vibrationEnabled])
 
-  // Save stats
   useEffect(() => {
     const saveTimerStats = async () => {
       try {
@@ -319,23 +296,21 @@ export default function Timer() {
     saveTimerStats()
   }, [totalSessionsToday, streak])
 
+  // Keep ALL your existing functions exactly the same
   const handleSessionEnd = async () => {
     setIsRunning(false)
     setIsPaused(false)
 
-    // Haptic feedback
     if (vibrationEnabled) {
       Vibration.vibrate([0, 500, 200, 500])
     }
 
     if (isWorkSession) {
-      // Work session completed - calculate rewards
       const sessionMinutes = Math.ceil(originalTime / 60)
       const actualMinutes = Math.ceil((originalTime - time) / 60)
-      const xpGain = actualMinutes * 2 // 2 XP per minute
-      const coinsGain = Math.floor(actualMinutes / 5) + 1 // 1 coin per 5 minutes + 1 base
+      const xpGain = actualMinutes * 2
+      const coinsGain = Math.floor(actualMinutes / 5) + 1
       
-      // Update local stats immediately
       updateExperience(xpGain)
       updateFocusTime(actualMinutes)
       
@@ -344,7 +319,6 @@ export default function Timer() {
       setStreak((prev) => prev + 1)
       setSessionCount((prevCount) => prevCount + 1)
 
-      // Try to record session in backend
       try {
         const token = await AsyncStorage.getItem('userToken')
         const isGuest = await AsyncStorage.getItem('isGuest')
@@ -373,7 +347,6 @@ export default function Timer() {
         console.error('❌ Failed to record session, continuing offline:', error)
       }
 
-      // Determine next break type
       if ((sessionCount + 1) % 4 === 0) {
         setTime(longBreakTime)
         setOriginalTime(longBreakTime)
@@ -382,7 +355,6 @@ export default function Timer() {
         setOriginalTime(breakTime)
       }
     } else {
-      // Break session completed
       try {
         const token = await AsyncStorage.getItem('userToken')
         const isGuest = await AsyncStorage.getItem('isGuest')
@@ -393,7 +365,7 @@ export default function Timer() {
             duration_planned: originalTime,
             duration_actual: originalTime - time,
             completed: true,
-            experience_gained: 5, // Small XP for completing breaks
+            experience_gained: 5,
             coins_gained: 1
           }
 
@@ -411,7 +383,6 @@ export default function Timer() {
 
     setIsWorkSession(!isWorkSession)
 
-    // Auto-start if enabled
     if (autoStartEnabled) {
       setCountdownToStart(3)
     }
@@ -443,6 +414,7 @@ export default function Timer() {
     setIsWorkSession(true)
     setSessionCount(0)
     setCountdownToStart(0)
+    // Don't clear currentPreset here so it shows after reset
   }
 
   const selectHabit = (habit) => {
@@ -450,17 +422,16 @@ export default function Timer() {
     setTime(habit.duration)
     setOriginalTime(habit.duration)
     setWorkTime(habit.duration)
+    setCurrentPreset(null) // Clear preset when selecting a habit
     setShowHabitSelector(false)
   }
 
-  // Handle timer tap for editing
   const handleTimerTap = () => {
     if (!isRunning) {
       setShowTimeEditor(true)
     }
   }
 
-  // Update time from editor
   const updateTimeFromEditor = (newTimeInMinutes) => {
     const newTimeInSeconds = newTimeInMinutes * 60
     setTime(newTimeInSeconds)
@@ -473,18 +444,15 @@ export default function Timer() {
     setShowTimeEditor(false)
   }
 
-  // Calculate progress
   const progressPercentage = originalTime > 0 ? ((originalTime - time) / originalTime) * 100 : 0
-  const circumference = 2 * Math.PI * 120 // radius of 120
-  const strokeDashoffset = circumference - (progressPercentage / 100) * circumference
 
   if (loading) {
     return (
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={colors.isDark ? "light-content" : "dark-content"} />
+        <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
         <View style={tw`flex-1 justify-center items-center`}>
           <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading timer...</Text>
+          <Text style={[tw`mt-4 text-base`, { color: colors.textSecondary }]}>Loading timer...</Text>
         </View>
       </SafeAreaView>
     )
@@ -492,22 +460,32 @@ export default function Timer() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.isDark ? "light-content" : "dark-content"} />
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 pt-6 pb-4`}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      
+      <ScrollView 
+        style={tw`flex-1`} 
+        contentContainerStyle={tw`px-5 pt-6 pb-4`}
+        showsVerticalScrollIndicator={false}
+      >
         
-        {/* Modern Header */}
+        {/* Clean Header - Updated to show focus activity + preset */}
         <View style={tw`flex-row justify-between items-center mb-8`}>
           <View style={tw`flex-1`}>
             <Text style={[tw`text-3xl font-bold mb-1`, { color: colors.text }]}>
-              {selectedHabit ? selectedHabit.title : isWorkSession ? "🎯 Focus Time" : "☕ Break Time"}
+              {selectedHabit ? selectedHabit.title : 
+               isWorkSession ? "🎯 Focus Time" : "☕ Break Time"}
             </Text>
             <Text style={[tw`text-base`, { color: colors.textSecondary }]}>
-              {isWorkSession ? `Session ${sessionCount + 1}` : "Recharge & relax"}
+              {selectedHabit && currentPreset ? 
+                `${currentPreset.time} minute ${currentPreset.title.toLowerCase()} session` :
+               currentPreset && !selectedHabit ? 
+                `${currentPreset.time} minute ${currentPreset.title.toLowerCase()} session` :
+               isWorkSession ? `Session ${sessionCount + 1}` : "Time to recharge"}
             </Text>
           </View>
           <TouchableOpacity 
             style={[
-              tw`p-3 rounded-xl`,
+              tw`p-3 rounded-2xl`,
               { backgroundColor: colors.card }
             ]} 
             onPress={() => setShowSettings(true)}
@@ -516,22 +494,18 @@ export default function Timer() {
           </TouchableOpacity>
         </View>
 
-        {/* Stats Cards */}
-        <View style={tw`flex-row mb-8`}>
-          <View style={[tw`flex-1 rounded-2xl p-4 mr-2`, { backgroundColor: colors.card }]}>
-            <View style={tw`flex-row items-center mb-2`}>
-              <Text style={tw`text-2xl mr-2`}>🔥</Text>
-              <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Streak</Text>
-            </View>
+        {/* Stats Row */}
+        <View style={tw`flex-row justify-between mb-8`}>
+          <View style={[tw`flex-1 rounded-2xl p-4 mr-3`, { backgroundColor: colors.card }]}>
+            <Text style={tw`text-2xl mb-1`}>🔥</Text>
             <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{streak}</Text>
+            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Streak</Text>
           </View>
           
-          <View style={[tw`flex-1 rounded-2xl p-4 ml-2`, { backgroundColor: colors.card }]}>
-            <View style={tw`flex-row items-center mb-2`}>
-              <Text style={tw`text-2xl mr-2`}>⏱️</Text>
-              <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Today</Text>
-            </View>
+          <View style={[tw`flex-1 rounded-2xl p-4 ml-3`, { backgroundColor: colors.card }]}>
+            <Text style={tw`text-2xl mb-1`}>⏱️</Text>
             <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{totalSessionsToday}</Text>
+            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Sessions Today</Text>
           </View>
         </View>
 
@@ -539,34 +513,32 @@ export default function Timer() {
         <View style={tw`items-center mb-8`}>
           <TouchableOpacity 
             onPress={handleTimerTap}
-            style={tw`items-center justify-center`}
             disabled={isRunning}
             activeOpacity={0.8}
           >
             <Animated.View
               style={[
-                tw`w-80 h-80 rounded-full items-center justify-center relative`,
+                tw`w-80 h-80 rounded-full items-center justify-center`,
                 {
                   backgroundColor: colors.card,
                   transform: [{ scale: pulseAnim }],
                   shadowColor: selectedHabit?.color || colors.accent,
                   shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: isRunning ? 0.3 : 0.1,
+                  shadowOpacity: 0.2,
                   shadowRadius: 20,
                   elevation: 10,
                 }
               ]}
             >
-              {/* Progress Circle */}
+              {/* Simple Progress Ring */}
               <View style={tw`absolute inset-4`}>
                 <View
                   style={{
                     width: 288,
                     height: 288,
                     borderRadius: 144,
-                    borderWidth: 8,
+                    borderWidth: 6,
                     borderColor: colors.cardSecondary,
-                    position: 'absolute',
                   }}
                 />
                 {progressPercentage > 0 && (
@@ -575,7 +547,7 @@ export default function Timer() {
                       width: 288,
                       height: 288,
                       borderRadius: 144,
-                      borderWidth: 8,
+                      borderWidth: 6,
                       borderColor: 'transparent',
                       borderTopColor: selectedHabit?.color || colors.accent,
                       position: 'absolute',
@@ -588,38 +560,40 @@ export default function Timer() {
                 )}
               </View>
 
-              {/* Timer Content */}
-              <View style={tw`items-center justify-center`}>
+              {/* Timer Display */}
+              <View style={tw`items-center`}>
+                {/* Show focus activity emoji if selected */}
+                {selectedHabit && (
+                  <Text style={tw`text-4xl mb-2`}>{selectedHabit.emoji}</Text>
+                )}
+                
                 <Text style={[
                   tw`text-6xl font-bold mb-2`,
-                  { color: selectedHabit?.color || colors.text }
+                  { 
+                    color: selectedHabit?.color || colors.text,
+                    fontFamily: 'monospace',
+                  }
                 ]}>
                   {formatTime(time)}
                 </Text>
                 
+                {/* Show preset name under timer */}
+                {currentPreset && !isRunning && (
+                  <Text style={[tw`text-lg font-semibold mb-1`, { color: colors.accent }]}>
+                    {currentPreset.title}
+                  </Text>
+                )}
+                
                 {!isRunning && (
-                  <Text style={[tw`text-base mb-2`, { color: colors.textSecondary }]}>
+                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
                     Tap to edit time
                   </Text>
                 )}
                 
-                {selectedHabit && (
-                  <View style={tw`items-center`}>
-                    <Text style={[tw`text-lg font-semibold`, { color: colors.text }]}>
-                      {selectedHabit.title}
-                    </Text>
-                  </View>
-                )}
-                
                 {countdownToStart > 0 && (
-                  <View style={[
-                    tw`absolute -bottom-8 px-4 py-2 rounded-xl`,
-                    { backgroundColor: selectedHabit?.color || colors.accent }
-                  ]}>
-                    <Text style={tw`text-white font-bold`}>
-                      Starting in {countdownToStart}...
-                    </Text>
-                  </View>
+                  <Text style={[tw`text-lg font-bold mt-2`, { color: colors.accent }]}>
+                    Starting in {countdownToStart}...
+                  </Text>
                 )}
               </View>
             </Animated.View>
@@ -653,7 +627,7 @@ export default function Timer() {
             onPress={toggleTimer}
           >
             <Ionicons 
-              name={isRunning ? "pause" : isPaused ? "play" : "play"} 
+              name={isRunning ? "pause" : "play"} 
               size={32} 
               color="white" 
             />
@@ -670,67 +644,55 @@ export default function Timer() {
           </TouchableOpacity>
         </View>
 
-        {/* Quick Action Cards */}
+        {/* Quick Presets - Keep as the main selection */}
         {!isRunning && (
-          <View style={tw`mb-6`}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Quick Start</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-1`}>
+          <View>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+              {selectedHabit ? `${selectedHabit.title} Sessions` : 'Quick Start'}
+            </Text>
+            <View style={tw`flex-row flex-wrap justify-between`}>
               {[
-                { title: "Pomodoro", time: 25, color: "#EF4444", emoji: "🍅" },
-                { title: "Short Focus", time: 15, color: "#F59E0B", emoji: "⚡" },
-                { title: "Deep Work", time: 50, color: "#3B82F6", emoji: "🎯" },
-                { title: "Quick Task", time: 10, color: "#10B981", emoji: "⚡" },
+                { title: "Pomodoro", time: 25, emoji: "🍅" },
+                { title: "Short", time: 15, emoji: "⚡" },
+                { title: "Deep Work", time: 50, emoji: "🎯" },
+                { title: "Quick", time: 10, emoji: "⏰" },
               ].map((preset, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
-                    tw`rounded-xl p-4 mx-1 items-center`,
-                    { backgroundColor: colors.card, minWidth: 100 }
+                    tw`rounded-2xl p-4 items-center mb-3`,
+                    { 
+                      backgroundColor: currentPreset?.title === preset.title ? colors.accent + '20' : colors.card, 
+                      width: '48%',
+                      borderWidth: currentPreset?.title === preset.title ? 2 : 0,
+                      borderColor: currentPreset?.title === preset.title ? colors.accent : 'transparent'
+                    }
                   ]}
                   onPress={() => {
                     const newTime = preset.time * 60
                     setTime(newTime)
                     setOriginalTime(newTime)
                     setWorkTime(newTime)
-                    setSelectedHabit({ 
-                      title: preset.title, 
-                      duration: newTime, 
-                      color: preset.color, 
-                      emoji: preset.emoji 
-                    })
+                    setCurrentPreset(preset)
                   }}
                 >
-                  <Text style={tw`text-2xl mb-1`}>{preset.emoji}</Text>
-                  <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>{preset.title}</Text>
-                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>{preset.time}m</Text>
+                  <Text style={tw`text-2xl mb-2`}>{preset.emoji}</Text>
+                  <Text style={[
+                    tw`font-semibold`, 
+                    { color: currentPreset?.title === preset.title ? colors.accent : colors.text }
+                  ]}>
+                    {preset.title}
+                  </Text>
+                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{preset.time}m</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
           </View>
         )}
 
-        {/* Stats Integration */}
-        <View style={[tw`rounded-2xl p-4`, { backgroundColor: colors.card }]}>
-          <Text style={[tw`text-lg font-bold mb-3`, { color: colors.text }]}>Progress Today</Text>
-          
-          <View style={tw`flex-row justify-between items-center mb-2`}>
-            <Text style={[tw``, { color: colors.textSecondary }]}>Focus Sessions</Text>
-            <Text style={[tw`font-semibold`, { color: colors.text }]}>{stats.focusSessionsToday}</Text>
-          </View>
-          
-          <View style={tw`flex-row justify-between items-center mb-2`}>
-            <Text style={[tw``, { color: colors.textSecondary }]}>Total Focus Time</Text>
-            <Text style={[tw`font-semibold`, { color: colors.text }]}>{stats.totalFocusTime}m</Text>
-          </View>
-          
-          <View style={tw`flex-row justify-between items-center`}>
-            <Text style={[tw``, { color: colors.textSecondary }]}>XP Earned</Text>
-            <Text style={[tw`font-semibold`, { color: colors.accent }]}>+{stats.totalFocusTime * 2} XP</Text>
-          </View>
-        </View>
-
       </ScrollView>
 
+      {/* Keep ALL your existing modals exactly the same */}
       {/* Time Editor Modal */}
       <Modal
         animationType="slide"
@@ -779,7 +741,6 @@ export default function Timer() {
               </View>
             </View>
 
-            {/* Quick time presets */}
             <View style={tw`flex-row flex-wrap justify-center mb-6`}>
               {[5, 10, 15, 25, 30, 45, 50, 60].map((minutes) => (
                 <TouchableOpacity
@@ -831,14 +792,13 @@ export default function Timer() {
         <View style={tw`flex-1 bg-black bg-opacity-50 justify-end`}>
           <View style={[tw`rounded-t-3xl p-6`, { backgroundColor: colors.card }]}>
             <View style={tw`flex-row justify-between items-center mb-6`}>
-              <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Timer Settings</Text>
+              <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Settings</Text>
               <TouchableOpacity onPress={() => setShowSettings(false)}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={tw`mb-4 max-h-80`}>
-              {/* Default Times */}
               <View style={tw`mb-6`}>
                 <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Default Times</Text>
                 
@@ -870,7 +830,6 @@ export default function Timer() {
                 ))}
               </View>
 
-              {/* Preferences */}
               <View style={tw`mb-6`}>
                 <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Preferences</Text>
                 
@@ -926,7 +885,7 @@ export default function Timer() {
         </View>
       </Modal>
 
-      {/* Habit Selector Modal */}
+      {/* Habit Selector Modal - Keep this for the list button */}
       <Modal
         animationType="slide"
         transparent={true}
