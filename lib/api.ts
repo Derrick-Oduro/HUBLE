@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = __DEV__ 
-  ? 'http://10.30.28.124:3000/api'
+  ? 'http://10.4.62.46:3000/api'
   : 'https://your-production-api.com/api';
 
 // Helper function to get auth headers

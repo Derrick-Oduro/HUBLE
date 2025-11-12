@@ -556,6 +556,7 @@ export default function Routines() {
       <ScrollView 
         style={tw`flex-1 px-5 pt-2`}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={tw`pb-20`} // Add bottom padding for floating button
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -565,34 +566,7 @@ export default function Routines() {
           />
         }
       >
-        {/* Enhanced Header */}
-        <View style={tw`flex-row justify-between items-center mb-6 mt-2`}>
-          <View>
-            <Text style={[tw`text-3xl font-bold`, { color: colors.text }]}>Daily Routines</Text>
-            <Text style={[tw`text-base mt-1`, { color: colors.textSecondary }]}>
-              {routines.length} routine{routines.length !== 1 ? 's' : ''} • {routineStats.completed} completed today
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              tw`rounded-2xl p-4`,
-              {
-                backgroundColor: colors.accent,
-                shadowColor: colors.accent,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 6,
-              },
-            ]}
-            onPress={() => setIsAddModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        {/* REPLACE: Simple Character Stats Header - Same as Habits */}
+        
         <View style={[
           tw`rounded-xl p-4 mb-4 flex-row items-center justify-between`,
           { backgroundColor: colors.card }
@@ -917,6 +891,39 @@ export default function Routines() {
           )}
         </View>
       </ScrollView>
+
+      {/* Floating Add Button - ON TOP of tab bar, perfectly centered */}
+      <View style={[
+        tw`absolute w-full`, 
+        { 
+          bottom: 25, 
+          left: 0, 
+          right: 0,
+          zIndex: 1000,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }
+      ]}>
+        <TouchableOpacity 
+          style={[
+            tw`w-16 h-16 rounded-full items-center justify-center shadow-lg`,
+            {
+              backgroundColor: colors.accent,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 6,
+              elevation: 8,
+              borderWidth: 4,
+              borderColor: colors.background,
+              marginLeft: 2, // Fine adjustment for centering
+            }
+          ]}
+          onPress={() => setIsAddModalVisible(true)}
+        >
+          <Ionicons name="add" size={32} color="white" />
+        </TouchableOpacity>
+      </View>
 
       {/* Modals */}
       <AddRoutineModal 
