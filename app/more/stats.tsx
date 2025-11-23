@@ -1,27 +1,47 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, RefreshControl } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, RefreshControl, Dimensions } from "react-native"
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
-import { useTheme } from "../../contexts/ThemeProvider" // ← ONLY ADDITION: Theme import
+import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
 import { useStats } from "../../contexts/StatsProvider"
 import React from "react"
 
-// Enhanced Progress Bar Component
-const StatProgressBar = ({ value, max, color, label, showPercentage = true, colors }) => { // ← Add colors prop
+const { width } = Dimensions.get('window')
+
+// Gamified Progress Bar with XP-style animation
+const GameProgressBar = ({ value, max, color, label, icon, showLevel = false, colors }) => {
   const percentage = Math.min(100, Math.max(0, (value / max) * 100))
 
   return (
     <View style={tw`mb-4`}>
-      <View style={tw`flex-row justify-between items-center mb-2`}>
-        <Text style={[tw`font-medium`, { color: colors.text }]}>{label}</Text> {/* ← Use theme color */}
-        <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
-          {showPercentage ? `${Math.round(percentage)}%` : `${value}/${max}`}
-        </Text>
+      <View style={tw`flex-row items-center mb-2`}>
+        <View style={[
+          tw`w-8 h-8 rounded-lg items-center justify-center mr-3`,
+          { backgroundColor: color + '20' }
+        ]}>
+          <Ionicons name={icon} size={16} color={color} />
+        </View>
+        <View style={tw`flex-1`}>
+          <View style={tw`flex-row justify-between items-center`}>
+            <Text style={[tw`font-bold text-sm`, { color: colors.text }]}>{label}</Text>
+            <Text style={[tw`text-xs font-bold`, { color: color }]}>
+              {showLevel ? `LVL ${Math.floor(value / 100) + 1}` : `${value}/${max}`}
+            </Text>
+          </View>
+        </View>
       </View>
-      <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}> {/* ← Use theme color */}
+      
+      <View style={[
+        tw`h-3 rounded-full overflow-hidden ml-11`,
+        { 
+          backgroundColor: colors.cardSecondary,
+          borderWidth: 1,
+          borderColor: color + '30'
+        }
+      ]}>
         <View
           style={[
             tw`h-full rounded-full`,
@@ -29,10 +49,10 @@ const StatProgressBar = ({ value, max, color, label, showPercentage = true, colo
               width: `${percentage}%`,
               backgroundColor: color,
               shadowColor: color,
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.6,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.8,
               shadowRadius: 4,
-              elevation: 3,
+              elevation: 8,
             }
           ]}
         />
@@ -41,236 +61,370 @@ const StatProgressBar = ({ value, max, color, label, showPercentage = true, colo
   )
 }
 
+// Stat Card Component
+const StatCard = ({ icon, label, value, color, subtitle, colors }) => (
+  <View style={[
+    tw`flex-1 rounded-xl p-3 mr-2 items-center`,
+    {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: color + '30',
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
+    }
+  ]}>
+    <View style={[
+      tw`w-12 h-12 rounded-full items-center justify-center mb-2`,
+      { 
+        backgroundColor: color + '20',
+        borderWidth: 2,
+        borderColor: color + '50'
+      }
+    ]}>
+      <MaterialCommunityIcons name={icon} size={24} color={color} />
+    </View>
+    <Text style={[tw`text-xl font-black`, { color: colors.text }]}>{value}</Text>
+    <Text style={[tw`text-xs font-bold`, { color: color }]}>{label}</Text>
+    {subtitle && (
+      <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>{subtitle}</Text>
+    )}
+  </View>
+)
+
+// Achievement Badge Component
+const AchievementBadge = ({ icon, title, progress, max, color, colors, unlocked = false }) => (
+  <TouchableOpacity style={[
+    tw`rounded-xl p-3 flex-row items-center mb-2`,
+    {
+      backgroundColor: unlocked ? color + '20' : colors.cardSecondary,
+      borderWidth: 2,
+      borderColor: unlocked ? color : colors.cardSecondary,
+      opacity: unlocked ? 1 : 0.6,
+    }
+  ]}>
+    <View style={[
+      tw`w-12 h-12 rounded-full items-center justify-center mr-3`,
+      { 
+        backgroundColor: unlocked ? color : colors.textSecondary,
+      }
+    ]}>
+      <MaterialCommunityIcons 
+        name={icon} 
+        size={24} 
+        color={unlocked ? "white" : colors.text} 
+      />
+    </View>
+    <View style={tw`flex-1`}>
+      <Text style={[tw`font-bold`, { color: colors.text }]}>{title}</Text>
+      <View style={[
+        tw`h-1.5 rounded-full mt-1 overflow-hidden`,
+        { backgroundColor: colors.cardSecondary }
+      ]}>
+        <View style={[
+          tw`h-full rounded-full`,
+          {
+            width: `${(progress / max) * 100}%`,
+            backgroundColor: unlocked ? color : colors.textSecondary,
+          }
+        ]} />
+      </View>
+      <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>
+        {progress}/{max}
+      </Text>
+    </View>
+    {unlocked && (
+      <MaterialCommunityIcons name="check-circle" size={20} color={color} />
+    )}
+  </TouchableOpacity>
+)
+
 export default function Stats() {
   const router = useRouter()
-  const { colors, currentTheme } = useTheme() // ← ONLY ADDITION: Theme hook
+  const { colors, currentTheme } = useTheme()
   const [refreshing, setRefreshing] = useState(false)
-  const { stats, refreshStats } = useStats()
+  const { stats } = useStats()
+
+  // Add debug logging to see what stats we actually have
+  console.log('🔍 Debug Stats:', {
+    habitsCompleted: stats.habitsCompleted,
+    totalHabits: stats.totalHabits,
+    dailiesCompleted: stats.dailiesCompleted,
+    totalDailies: stats.totalDailies,
+    routinesCompleted: stats.routinesCompleted,
+    totalRoutines: stats.totalRoutines,
+    allStats: stats
+  })
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await refreshStats()
-    setRefreshing(false)
-  }, [refreshStats])
+    setTimeout(() => {
+      setRefreshing(false)
+    }, 1000)
+  }, [])
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}> {/* ← Use theme color */}
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} /> {/* ← Theme status bar */}
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
-        {/* Header */}
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
-          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} /> {/* ← Use theme color */}
-          </TouchableOpacity>
-          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Stats & Analytics</Text> {/* ← Use theme color */}
-        </View>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      
+      {/* Header */}
+      <View style={tw`flex-row items-center px-5 pt-2 pb-4`}>
+        <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[tw`text-2xl font-black`, { color: colors.text }]}>⚔️ Player Stats</Text>
+      </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} colors={[colors.accent]} />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.accent} 
+            colors={[colors.accent]} 
+          />
+        }
+        contentContainerStyle={tw`pb-6`}
+      >
+        {/* Character Level Card */}
+        <View style={[
+          tw`mx-5 mb-6 rounded-2xl p-6`,
+          {
+            backgroundColor: colors.card,
+            borderWidth: 3,
+            borderColor: '#8B5CF6',
+            shadowColor: '#8B5CF6',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 16,
+            elevation: 12,
           }
-        >
-          {/* Level & XP Card */}
-          <View style={[
-            tw`rounded-2xl p-6 mb-6`,
-            {
-              backgroundColor: colors.card, // ← Use theme color
-              shadowColor: '#8B5CF6',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
-              shadowRadius: 12,
-              elevation: 8,
-            }
-          ]}>
-            <View style={tw`flex-row items-center mb-4`}>
+        ]}>
+          <View style={tw`flex-row items-center mb-4`}>
+            <View style={[
+              tw`w-20 h-20 rounded-2xl items-center justify-center mr-4`,
+              {
+                backgroundColor: '#8B5CF620',
+                borderWidth: 3,
+                borderColor: '#8B5CF6',
+              }
+            ]}>
+              <FontAwesome5 name="user-ninja" size={32} color="#8B5CF6" />
+            </View>
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-3xl font-black`, { color: colors.text }]}>LEVEL {stats.level}</Text>
+              <Text style={[tw`text-lg font-bold`, { color: '#8B5CF6' }]}>HABIT MASTER</Text>
+              <View style={tw`flex-row items-center mt-2`}>
+                <MaterialCommunityIcons name="star" size={16} color="#FFD700" />
+                <Text style={[tw`text-sm font-bold ml-1`, { color: colors.textSecondary }]}>
+                  {stats.experience} / {stats.maxExperience} XP
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* XP Progress Bar */}
+          <View style={tw`mb-4`}>
+            <View style={[
+              tw`h-4 rounded-full overflow-hidden`,
+              { 
+                backgroundColor: colors.cardSecondary,
+                borderWidth: 2,
+                borderColor: '#8B5CF650'
+              }
+            ]}>
               <View style={[
-                tw`w-16 h-16 rounded-2xl items-center justify-center mr-4`,
+                tw`h-full rounded-full`,
                 {
-                  backgroundColor: '#8B5CF620',
-                  borderWidth: 2,
-                  borderColor: '#8B5CF6',
+                  width: `${(stats.experience / stats.maxExperience) * 100}%`,
+                  background: 'linear-gradient(90deg, #8B5CF6, #A855F7)',
+                  backgroundColor: '#8B5CF6',
+                  shadowColor: '#8B5CF6',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 1,
+                  shadowRadius: 8,
+                  elevation: 8,
                 }
               ]}>
-                <Text style={tw`text-violet-400 text-xl font-bold`}>{stats.level}</Text>
-              </View>
-              <View style={tw`flex-1`}>
-                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Level {stats.level}</Text> {/* ← Use theme color */}
-                <Text style={[{ color: colors.textSecondary }]}>
-                  {stats.experience}/{stats.maxExperience} XP
-                </Text>
-              </View>
-            </View>
-
-            <View style={tw`mb-3`}>
-              <View style={tw`flex-row justify-between items-center mb-2`}>
-                <Text style={[tw`font-medium`, { color: colors.text }]}>Experience Progress</Text> {/* ← Use theme color */}
-                <Text style={tw`text-violet-400 font-bold`}>
-                  {Math.round((stats.experience / stats.maxExperience) * 100)}%
-                </Text>
-              </View>
-              <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}> {/* ← Use theme color */}
-                <View
-                  style={[
-                    tw`h-full bg-violet-500 rounded-full`,
-                    {
-                      width: `${(stats.experience / stats.maxExperience) * 100}%`,
-                      shadowColor: '#8B5CF6',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.6,
-                      shadowRadius: 4,
-                      elevation: 3,
-                    }
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View style={[tw`flex-row justify-between pt-3 border-t`, { borderColor: colors.cardSecondary }]}> {/* ← Use theme color */}
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.gemsEarned}</Text> {/* ← Use theme color */}
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>💎 Gems</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.coinsEarned}</Text> {/* ← Use theme color */}
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>🪙 Coins</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.health}</Text> {/* ← Use theme color */}
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>❤️ Health</Text>
+                <View style={[
+                  tw`h-full w-full rounded-full opacity-50`,
+                  { backgroundColor: '#FFFFFF' }
+                ]} />
               </View>
             </View>
           </View>
 
-          {/* Activity Overview */}
-          <View style={[
-            tw`rounded-2xl p-5 mb-6`,
-            { backgroundColor: colors.card } // ← Use theme color
-          ]}>
-            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Today's Activity</Text> {/* ← Use theme color */}
-            
-            <StatProgressBar
-              value={stats.habitsCompleted}
-              max={stats.totalHabits}
-              color="#10B981"
-              label="Habits Completed"
-              showPercentage={false}
-              colors={colors} // ← Pass colors
-            />
+          {/* Currency Row */}
+          <View style={tw`flex-row justify-between`}>
+            <View style={tw`items-center`}>
+              <Text style={[tw`text-2xl font-black`, { color: '#FFD700' }]}>{stats.gemsEarned}</Text>
+              <Text style={[tw`text-xs font-bold`, { color: '#FFD700' }]}>💎 GEMS</Text>
+            </View>
+            <View style={tw`items-center`}>
+              <Text style={[tw`text-2xl font-black`, { color: '#F59E0B' }]}>{stats.coinsEarned}</Text>
+              <Text style={[tw`text-xs font-bold`, { color: '#F59E0B' }]}>🪙 COINS</Text>
+            </View>
+            <View style={tw`items-center`}>
+              <Text style={[tw`text-2xl font-black`, { color: '#EF4444' }]}>{stats.health}</Text>
+              <Text style={[tw`text-xs font-bold`, { color: '#EF4444' }]}>❤️ HP</Text>
+            </View>
+          </View>
+        </View>
 
-            <StatProgressBar
-              value={stats.dailiesCompleted}
-              max={stats.totalDailies}
-              color="#3B82F6"
-              label="Daily Tasks"
-              showPercentage={false}
-              colors={colors} // ← Pass colors
-            />
+        {/* Daily Quest Progress */}
+        <View style={[
+          tw`mx-5 mb-6 rounded-2xl p-5`,
+          { 
+            backgroundColor: colors.card,
+            borderWidth: 2,
+            borderColor: colors.accent + '50'
+          }
+        ]}>
+          <View style={tw`flex-row items-center mb-4`}>
+            <MaterialCommunityIcons name="sword-cross" size={24} color={colors.accent} />
+            <Text style={[tw`text-xl font-black ml-2`, { color: colors.text }]}>DAILY QUESTS</Text>
+          </View>
+          
+          <GameProgressBar
+            value={stats.habitsCompleted}
+            max={stats.totalHabits}
+            color="#10B981"
+            label="Habits Quest"
+            icon="checkmark-circle"
+            colors={colors}
+          />
 
-            <StatProgressBar
-              value={stats.routinesCompleted}
-              max={stats.totalRoutines}
-              color="#8B5CF6"
-              label="Routines Completed"
-              showPercentage={false}
-              colors={colors} // ← Pass colors
-            />
+          <GameProgressBar
+            value={stats.dailiesCompleted}
+            max={stats.totalDailies}
+            color="#3B82F6"
+            label="Daily Tasks"
+            icon="list"
+            colors={colors}
+          />
 
-            <StatProgressBar
-              value={stats.health}
-              max={stats.maxHealth}
+          <GameProgressBar
+            value={stats.routinesCompleted}
+            max={stats.totalRoutines}
+            color="#8B5CF6"
+            label="Routine Mastery"
+            icon="repeat"
+            colors={colors}
+          />
+        </View>
+
+        {/* Combat Stats */}
+        <View style={[
+          tw`mx-5 mb-6 rounded-2xl p-5`,
+          { 
+            backgroundColor: colors.card,
+            borderWidth: 2,
+            borderColor: '#F59E0B50'
+          }
+        ]}>
+          <View style={tw`flex-row items-center mb-4`}>
+            <MaterialCommunityIcons name="fire" size={24} color="#F59E0B" />
+            <Text style={[tw`text-xl font-black ml-2`, { color: colors.text }]}>BATTLE STATS</Text>
+          </View>
+
+          <View style={tw`flex-row mb-4`}>
+            <StatCard
+              icon="fire"
+              label="STREAK"
+              value={stats.currentStreak}
               color="#EF4444"
-              label="Health Level"
-              colors={colors} // ← Pass colors
+              subtitle="days"
+              colors={colors}
+            />
+            <StatCard
+              icon="target"
+              label="ACCURACY"
+              value={`${stats.weeklyCompletionRate}%`}
+              color="#10B981"
+              subtitle="weekly"
+              colors={colors}
             />
           </View>
 
-          {/* Focus & Productivity */}
-          <View style={[
-            tw`rounded-2xl p-5 mb-6`,
-            { backgroundColor: colors.card } // ← Use theme color
-          ]}>
-            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Focus & Productivity</Text> {/* ← Use theme color */}
-            
-            <View style={tw`flex-row justify-between mb-4`}>
-              <View style={tw`flex-1 items-center`}>
-                <View style={[
-                  tw`w-16 h-16 rounded-2xl items-center justify-center mb-2`,
-                  { backgroundColor: '#F59E0B20' }
-                ]}>
-                  <Ionicons name="timer-outline" size={24} color="#F59E0B" />
-                </View>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.focusSessionsToday}</Text> {/* ← Use theme color */}
-                <Text style={[tw`text-sm text-center`, { color: colors.textSecondary }]}>Focus Sessions</Text>
-              </View>
-              
-              <View style={tw`flex-1 items-center`}>
-                <View style={[
-                  tw`w-16 h-16 rounded-2xl items-center justify-center mb-2`,
-                  { backgroundColor: '#EC489920' }
-                ]}>
-                  <Ionicons name="time-outline" size={24} color="#EC4899" />
-                </View>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.totalFocusTime}m</Text> {/* ← Use theme color */}
-                <Text style={[tw`text-sm text-center`, { color: colors.textSecondary }]}>Focus Time</Text>
-              </View>
-            </View>
+          <View style={tw`flex-row`}>
+            <StatCard
+              icon="timer"
+              label="FOCUS"
+              value={stats.focusSessionsToday}
+              color="#8B5CF6"
+              subtitle="sessions"
+              colors={colors}
+            />
+            <StatCard
+              icon="clock"
+              label="TIME"
+              value={`${stats.totalFocusTime}m`}
+              color="#F59E0B"
+              subtitle="focused"
+              colors={colors}
+            />
           </View>
+        </View>
 
-          {/* Weekly Summary */}
-          <View style={[
-            tw`rounded-2xl p-5 mb-6`,
-            { backgroundColor: colors.card } // ← Use theme color
-          ]}>
-            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Weekly Summary</Text> {/* ← Use theme color */}
-            
-            <View style={tw`flex-row justify-between items-center mb-3`}>
-              <Text style={[{ color: colors.textSecondary }]}>Completion Rate</Text>
-              <Text style={[tw`font-bold`, { color: colors.text }]}>{stats.weeklyCompletionRate}%</Text> {/* ← Use theme color */}
+        {/* Achievement Unlocks */}
+        <View style={[
+          tw`mx-5 rounded-2xl p-5`,
+          { 
+            backgroundColor: colors.card,
+            borderWidth: 2,
+            borderColor: '#FFD70050'
+          }
+        ]}>
+          <View style={tw`flex-row items-center justify-between mb-4`}>
+            <View style={tw`flex-row items-center`}>
+              <MaterialCommunityIcons name="trophy" size={24} color="#FFD700" />
+              <Text style={[tw`text-xl font-black ml-2`, { color: colors.text }]}>ACHIEVEMENTS</Text>
             </View>
-            
-            <View style={tw`flex-row justify-between items-center mb-3`}>
-              <Text style={[{ color: colors.textSecondary }]}>Current Streak</Text>
-              <Text style={[tw`font-bold`, { color: colors.text }]}>{stats.currentStreak} days</Text> {/* ← Use theme color */}
-            </View>
-            
-            <View style={tw`flex-row justify-between items-center`}>
-              <Text style={[{ color: colors.textSecondary }]}>Longest Streak</Text>
-              <Text style={[tw`font-bold`, { color: colors.text }]}>{stats.longestStreak} days</Text> {/* ← Use theme color */}
-            </View>
-          </View>
-
-          {/* Achievement Progress */}
-          <View style={[
-            tw`rounded-2xl p-5`,
-            { backgroundColor: colors.card } // ← Use theme color
-          ]}>
-            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Achievements</Text> {/* ← Use theme color */}
-            
-            <View style={tw`flex-row justify-between items-center mb-3`}>
-              <Text style={[{ color: colors.textSecondary }]}>Unlocked Achievements</Text>
-              <Text style={[tw`font-bold`, { color: colors.text }]}>{stats.totalAchievements}</Text> {/* ← Use theme color */}
-            </View>
-            
             <TouchableOpacity 
               style={[
-                tw`bg-violet-600 rounded-xl p-3 flex-row items-center justify-center`,
-                {
-                  shadowColor: '#8B5CF6',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 4,
-                  elevation: 4,
-                }
+                tw`px-3 py-2 rounded-lg`,
+                { backgroundColor: colors.accent }
               ]}
               onPress={() => router.push('/more/achievements')}
             >
-              <Ionicons name="trophy-outline" size={20} color="white" style={tw`mr-2`} />
-              <Text style={tw`text-white font-bold`}>View All Achievements</Text>
+              <Text style={tw`text-white font-bold text-xs`}>VIEW ALL</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </View>
+
+          <AchievementBadge
+            icon="target"
+            title="First Steps"
+            progress={stats.habitsCompleted}
+            max={10}
+            color="#10B981"
+            colors={colors}
+            unlocked={stats.habitsCompleted >= 10}
+          />
+
+          <AchievementBadge
+            icon="fire"
+            title="Streak Master"
+            progress={stats.currentStreak}
+            max={7}
+            color="#EF4444"
+            colors={colors}
+            unlocked={stats.currentStreak >= 7}
+          />
+
+          <AchievementBadge
+            icon="brain"
+            title="Focus Warrior"
+            progress={stats.focusSessionsToday}
+            max={5}
+            color="#8B5CF6"
+            colors={colors}
+            unlocked={stats.focusSessionsToday >= 5}
+          />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }

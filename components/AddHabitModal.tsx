@@ -25,20 +25,37 @@ interface AddHabitModalProps {
 
 export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues }: AddHabitModalProps) {
   const { colors } = useTheme()
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
-  const [color, setColor] = useState("blue-500")
-  const [targetDays, setTargetDays] = useState([1, 2, 3, 4, 5, 6, 0]) // 0 = Sunday
-
-  const colorOptions = [
-    { name: "blue-500", color: "#3B82F6", label: "Blue" },
-    { name: "green-500", color: colors.success, label: "Green" },
-    { name: "yellow-500", color: colors.warning, label: "Yellow" },
-    { name: "red-500", color: colors.error, label: "Red" },
-    { name: "purple-500", color: "#8B5CF6", label: "Purple" },
-    { name: "pink-500", color: "#EC4899", label: "Pink" },
+  
+  const habitColors = [
+    colors.accent,
+    colors.success, 
+    colors.warning,
+    colors.error
   ]
+  
+  const [title, setTitle] = useState(initialValues?.title || "")
+  const [description, setDescription] = useState(initialValues?.description || "")
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>(initialValues?.difficulty || 'medium')
+  const [selectedColor, setSelectedColor] = useState(habitColors[0])
+  
+  // Debug: Log when colors change
+  useEffect(() => {
+    console.log('Theme colors:', habitColors)
+    console.log('Selected color:', selectedColor)
+  }, [habitColors, selectedColor])
+  
+  // Fix: Reset selectedColor when modal opens or theme changes
+  useEffect(() => {
+    if (isVisible) {
+      if (initialValues?.color) {
+        setSelectedColor(initialValues.color)
+      } else {
+        setSelectedColor(habitColors[0]) // Always use theme's accent as default
+      }
+    }
+  }, [isVisible, initialValues])
+  
+  const [targetDays, setTargetDays] = useState([1, 2, 3, 4, 5, 6, 0]) // 0 = Sunday
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -47,7 +64,7 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
       setTitle(initialValues.title || "")
       setDescription(initialValues.description || "")
       setDifficulty(initialValues.difficulty || 'medium')
-      setColor(initialValues.color || "blue-500")
+      setSelectedColor(initialValues.color || habitColors[0])
       setTargetDays(initialValues.targetDays || [1, 2, 3, 4, 5, 6, 0])
     }
   }, [initialValues])
@@ -56,7 +73,7 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
     setTitle("")
     setDescription("")
     setDifficulty('medium')
-    setColor("blue-500")
+    setSelectedColor(habitColors[0])
     setTargetDays([1, 2, 3, 4, 5, 6, 0])
   }
 
@@ -67,27 +84,29 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
     onClose()
   }
 
+  const isFormValid = title.trim() !== "" && targetDays.length > 0
+
   const handleSubmit = () => {
-    if (!title.trim()) {
-      Alert.alert("Error", "Please enter a habit title")
-      return
-    }
+    if (!isFormValid) return
 
-    if (targetDays.length === 0) {
-      Alert.alert("Error", "Please select at least one day for this habit")
-      return
-    }
-
-    const habit = {
+    console.log('🔥 SUBMITTING HABIT:')
+    console.log('Selected color state:', selectedColor)
+    console.log('Title:', title.trim())
+    
+    const habitData = {
+      id: initialValues?.id || Date.now(),
       title: title.trim(),
       description: description.trim(),
       difficulty,
-      color,
-      targetDays
+      color: selectedColor, // Make sure this line is here
+      targetDays,
+      completed: false,
+      streak: initialValues?.streak || 0,
     }
-
-    onAdd(habit)
-    handleClose()
+    
+    console.log('Final habit data:', habitData)
+    onAdd(habitData)
+    onClose()
   }
 
   const toggleDay = (dayIndex: number) => {
@@ -258,41 +277,36 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
           </View>
 
           {/* Color Selection */}
-          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-              Color Theme
+          <View style={tw`mb-6`}>
+            <Text style={[tw`text-lg font-semibold mb-3`, { color: colors.text }]}>
+              Color (Current: {selectedColor})
             </Text>
-            
-            <View style={tw`flex-row flex-wrap`}>
-              {colorOptions.map((colorOption) => (
+            <View style={tw`flex-row justify-between`}>
+              {habitColors.map((color, index) => (
                 <TouchableOpacity
-                  key={colorOption.name}
+                  key={index}
                   style={[
-                    tw`rounded-xl p-3 mr-3 mb-3 flex-row items-center`,
+                    tw`w-16 h-16 rounded-2xl items-center justify-center`,
                     {
-                      backgroundColor: color === colorOption.name ? colorOption.color : colors.cardSecondary,
-                      minWidth: 90,
+                      backgroundColor: color,
+                      borderWidth: selectedColor === color ? 3 : 0,
+                      borderColor: colors.text,
                     }
                   ]}
-                  onPress={() => setColor(colorOption.name)}
+                  onPress={() => {
+                    console.log('🎨 Color clicked:', color)
+                    console.log('Previous selected:', selectedColor)
+                    setSelectedColor(color)
+                  }}
                 >
-                  <View
-                    style={[
-                      tw`w-4 h-4 rounded-full mr-2`,
-                      { backgroundColor: colorOption.color }
-                    ]}
-                  />
-                  <Text style={[
-                    tw`font-medium text-sm`,
-                    { color: color === colorOption.name ? "white" : colors.text }
-                  ]}>
-                    {colorOption.label}
-                  </Text>
+                  {selectedColor === color && (
+                    <Ionicons name="checkmark" size={24} color="white" />
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-
+          
           {/* Target Days */}
           <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>

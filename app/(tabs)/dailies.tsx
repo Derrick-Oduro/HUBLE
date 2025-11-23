@@ -33,7 +33,7 @@ interface DailyTask {
 
 export default function DailiesScreen() {
   const { colors, currentTheme } = useTheme()
-  const { stats, addExperience, addHealth, updateCoins } = useStats()
+  const { stats, updateExperience, updateHealth, updateCoins } = useStats()
   
   const [dailies, setDailies] = useState<DailyTask[]>([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
@@ -207,9 +207,8 @@ export default function DailiesScreen() {
                 case 'high': xpGain += 5; break
               }
 
-              // ← FIX: Use correct function names
-              addExperience(xpGain)
-              addHealth(1)
+              updateExperience(xpGain)
+              updateHealth(1)
               updateCoins(2) // Give 2 coins for completing a daily
               
               Alert.alert(
@@ -243,9 +242,8 @@ export default function DailiesScreen() {
           case 'high': xpGain += 5; break
         }
         
-        // ← FIX: Use correct function names
-        addExperience(xpGain)
-        addHealth(1)
+        updateExperience(xpGain)
+        updateHealth(1)
         updateCoins(2) // Give 2 coins for completing a daily
         
         Alert.alert(
@@ -323,10 +321,10 @@ export default function DailiesScreen() {
 
   const getDifficultyIcon = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return "⭐"
-      case 'medium': return "⭐⭐"
-      case 'hard': return "⭐⭐⭐"
-      default: return "⭐"
+      case 'easy':
+      case 'medium':
+      case 'hard':
+      default: 
     }
   }
 
@@ -384,91 +382,84 @@ export default function DailiesScreen() {
           const priorityColor = getPriorityColor(item.priority)
           
           return (
-            <View style={[
-              tw`rounded-xl p-3 mb-2`,
-              { 
-                backgroundColor: colors.card,
-                borderLeftWidth: 3,
-                borderLeftColor: priorityColor,
-                shadowColor: colors.accent,
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 2,
-                elevation: 1,
-              }
-            ]}>
-              <View style={tw`flex-row items-start justify-between`}>
+            <TouchableOpacity
+              onPress={() => {
+                // Add edit functionality here later
+                console.log('Edit daily:', item.title)
+              }}
+              activeOpacity={0.7}
+              style={[
+                tw`rounded-xl p-2 mb-2`, // Changed from p-3 to p-2 (smaller height)
+                { 
+                  backgroundColor: colors.card,
+                  borderLeftWidth: 6,
+                  borderLeftColor: priorityColor,
+                  shadowColor: colors.accent,
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1,
+                }
+              ]}
+            >
+              <View style={tw`flex-row items-center justify-between`}> {/* Changed from items-start */}
                 <View style={tw`flex-1 mr-2`}>
-                  <View style={tw`flex-row items-center mb-1`}>
-                    <Text style={[
-                      tw`text-base font-semibold flex-1`,
-                      { 
-                        color: item.completed ? colors.textSecondary : colors.text,
-                        textDecorationLine: item.completed ? 'line-through' : 'none'
-                      }
-                    ]}>
-                      {item.title}
-                    </Text>
-                    <Text style={tw`text-xs ml-1`}>{getDifficultyIcon(item.difficulty)}</Text>
-                  </View>
+                  <Text style={[
+                    tw`text-base font-semibold`,
+                    { 
+                      color: item.completed ? colors.textSecondary : colors.text,
+                      textDecorationLine: item.completed ? 'line-through' : 'none'
+                    }
+                  ]} numberOfLines={1}>
+                    {item.title}
+                  </Text>
                   
                   {item.description && (
                     <Text style={[
-                      tw`text-xs mb-1`,
+                      tw`text-xs mt-1`,
                       { color: colors.textSecondary }
-                    ]}>
+                    ]} numberOfLines={1}>
                       {item.description}
                     </Text>
                   )}
                   
-                  <View style={tw`flex-row items-center justify-between`}>
-                    <View style={tw`flex-row items-center`}>
-                      <View style={[
-                        tw`px-2 py-0.5 rounded-full mr-1`,
-                        { backgroundColor: priorityColor + '20' }
-                      ]}>
-                        <Text style={[tw`text-xs font-medium capitalize`, { color: priorityColor }]}>
-                          {item.priority}
-                        </Text>
-                      </View>
-                      
-                      {item.category && (
-                        <View style={[
-                          tw`px-2 py-0.5 rounded-full`,
-                          { backgroundColor: colors.cardSecondary }
-                        ]}>
-                          <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-                            {item.category}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    
-                    <View style={tw`flex-row items-center`}>
-                      <TouchableOpacity
-                        style={[
-                          tw`w-7 h-7 rounded-full items-center justify-center mr-1`,
-                          { 
-                            backgroundColor: item.completed ? colors.success : colors.cardSecondary,
-                            borderWidth: 1.5,
-                            borderColor: item.completed ? colors.success : colors.textSecondary,
-                          }
-                        ]}
-                        onPress={() => toggleDaily(item.id)}
-                      >
-                        {item.completed && (
-                          <Ionicons name="checkmark" size={14} color="white" />
-                        )}
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity onPress={() => deleteDaily(item.id)}>
-                        <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
-                      </TouchableOpacity>
+                  {/* Simplified bottom row - removed category */}
+                  <View style={tw`flex-row items-center mt-1`}>
+                    <View style={[
+                      tw`px-2 py-0.5 rounded-full`,
+                      { backgroundColor: priorityColor + '20' }
+                    ]}>
+                      <Text style={[tw`text-xs font-medium capitalize`, { color: priorityColor }]}>
+                        {item.priority}
+                      </Text>
                     </View>
                   </View>
                 </View>
+                
+                {/* Right side buttons */}
+                <View style={tw`flex-row items-center`}>
+                  <TouchableOpacity
+                    style={[
+                      tw`w-7 h-7 rounded-full items-center justify-center mr-2`,
+                      { 
+                        backgroundColor: item.completed ? colors.success : colors.cardSecondary,
+                        borderWidth: 1.5,
+                        borderColor: item.completed ? colors.success : colors.textSecondary,
+                      }
+                    ]}
+                    onPress={() => toggleDaily(item.id)}
+                  >
+                    {item.completed && (
+                      <Ionicons name="checkmark" size={14} color="white" />
+                    )}
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity onPress={() => deleteDaily(item.id)}>
+                    <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
           )
         }}
       />

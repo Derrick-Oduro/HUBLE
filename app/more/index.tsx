@@ -159,38 +159,32 @@ export default function More() {
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-6`}>
         
-        {/* Enhanced Header */}
-        <View style={tw`px-5 pt-4 mb-6`}>
-          <Text style={[tw`text-3xl font-bold mb-2`, { color: colors.text }]}>Profile</Text>
-          <Text style={[tw`text-base`, { color: colors.textSecondary }]}>Manage your account and preferences</Text>
-        </View>
-
-        {/* Enhanced User Profile Card */}
+        {/* Profile Card - slightly more compact */}
         <View style={[
-          tw`mx-5 mb-6 rounded-2xl p-6`,
+          tw`mx-5 mb-6 rounded-2xl p-5`, // p-6 → p-5
           {
             backgroundColor: colors.card,
             shadowColor: colors.accent,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            elevation: 8,
+            shadowOffset: { width: 0, height: 2 }, // reduced from height: 4
+            shadowOpacity: 0.08, // reduced from 0.1
+            shadowRadius: 8, // reduced from 12
+            elevation: 4, // reduced from 8
           }
         ]}>
           <View style={tw`flex-row items-center mb-4`}>
             <View style={[
-              tw`w-16 h-16 rounded-2xl mr-4 items-center justify-center`,
+              tw`w-14 h-14 rounded-2xl mr-4 items-center justify-center`, // w-16 h-16 → w-14 h-14
               {
                 backgroundColor: colors.accent + '20',
                 borderWidth: 2,
                 borderColor: colors.accent,
               }
             ]}>
-              <FontAwesome5 name="user-astronaut" size={24} color={colors.accent} />
+              <FontAwesome5 name="user-astronaut" size={22} color={colors.accent} /> {/* size 24 → 22 */}
             </View>
             <View style={tw`flex-1`}>
               <View style={tw`flex-row items-center mb-1`}>
-                <Text style={[tw`text-2xl font-bold mr-2`, { color: colors.text }]}>{displayName}</Text>
+                <Text style={[tw`text-xl font-bold mr-2`, { color: colors.text }]}>{displayName}</Text> {/* text-2xl → text-xl */}
                 {isGuest && (
                   <View style={[
                     tw`px-2 py-1 rounded-full`,
@@ -200,8 +194,8 @@ export default function More() {
                   </View>
                 )}
               </View>
-              <Text style={[tw`text-base mb-1`, { color: colors.textSecondary }]}>{userHandle}</Text>
-              <Text style={[tw`text-sm mb-2`, { color: colors.textSecondary }]}>{displayEmail}</Text>
+              <Text style={[tw`text-sm mb-1`, { color: colors.textSecondary }]}>{userHandle}</Text> {/* text-base → text-sm */}
+              <Text style={[tw`text-xs mb-2`, { color: colors.textSecondary }]}>{displayEmail}</Text> {/* text-sm → text-xs */}
               <View style={tw`flex-row items-center`}>
                 <View style={[
                   tw`px-3 py-1 rounded-full mr-2`,
@@ -209,7 +203,7 @@ export default function More() {
                 ]}>
                   <Text style={[tw`text-sm font-bold`, { color: colors.accent }]}>Level {stats.level}</Text>
                 </View>
-                <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}> {/* text-sm → text-xs */}
                   {stats.experience}/{stats.maxExperience} XP
                 </Text>
               </View>
@@ -217,18 +211,18 @@ export default function More() {
             
             <TouchableOpacity 
               style={[
-                tw`p-3 rounded-xl`,
+                tw`p-2 rounded-xl`, // p-3 → p-2
                 { backgroundColor: colors.cardSecondary }
               ]}
               onPress={() => navigateTo('avatar')}
             >
-              <Ionicons name="create-outline" size={20} color={colors.text} />
+              <Ionicons name="create-outline" size={18} color={colors.text} /> {/* size 20 → 18 */}
             </TouchableOpacity>
           </View>
 
-          {/* User ID & Join Date (if available) */}
+          {/* User ID & Join Date - more compact */}
           {userData?.id && (
-            <View style={[tw`mb-4 p-3 rounded-lg`, { backgroundColor: colors.cardSecondary }]}>
+            <View style={[tw`mb-3 p-3 rounded-lg`, { backgroundColor: colors.cardSecondary }]}> {/* mb-4 → mb-3 */}
               <Text style={[tw`text-xs font-bold mb-1`, { color: colors.textSecondary }]}>USER ID</Text>
               <Text style={[tw`text-sm font-mono`, { color: colors.text }]}>#{userData.id}</Text>
               {userData.createdAt && (
@@ -246,7 +240,7 @@ export default function More() {
             </View>
           )}
 
-          {/* Quick Stats */}
+          {/* Quick Stats - unchanged */}
           <View style={[tw`flex-row justify-between pt-4 border-t`, { borderColor: colors.cardSecondary }]}>
             <View style={tw`items-center`}>
               <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.habitsCompleted}</Text>
@@ -267,47 +261,47 @@ export default function More() {
           </View>
         </View>
 
-        {/* Account Section */}
-        <View style={tw`px-5 mb-6`}>
-          <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Account</Text>
-          <View style={tw`space-y-3`}>
+        {/* Account Section - slightly more compact */}
+        <View style={tw`px-5 mb-5`}> {/* mb-6 → mb-5 */}
+          <Text style={[tw`text-xl font-bold mb-3`, { color: colors.text }]}>Account</Text> {/* mb-4 → mb-3 */}
+          <View style={tw`space-y-2`}> {/* space-y-3 → space-y-2 */}
             {accountItems.map((item, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
-                  tw`rounded-2xl p-4 flex-row items-center`,
+                  tw`rounded-xl p-4 flex-row items-center`, // rounded-2xl → rounded-xl
                   {
                     backgroundColor: colors.card,
                     shadowColor: item.color,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    elevation: 4,
+                    shadowOffset: { width: 0, height: 1 }, // reduced from height: 2
+                    shadowOpacity: 0.08, // reduced from 0.1
+                    shadowRadius: 4, // reduced from 8
+                    elevation: 2, // reduced from 4
                   }
                 ]}
                 onPress={() => navigateTo(item.path)}
                 activeOpacity={0.8}
               >
                 <View style={[
-                  tw`w-12 h-12 rounded-xl items-center justify-center mr-4`,
+                  tw`w-11 h-11 rounded-xl items-center justify-center mr-4`, // w-12 h-12 → w-11 h-11
                   { backgroundColor: `${item.color}20` }
                 ]}>
-                  {item.icon}
+                  {React.cloneElement(item.icon, { size: 22 })} {/* size 24 → 22 */}
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-lg font-semibold`, { color: colors.text }]}>{item.label}</Text>
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{item.description}</Text>
+                  <Text style={[tw`text-base font-semibold`, { color: colors.text }]}>{item.label}</Text> {/* text-lg → text-base */}
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>{item.description}</Text> {/* text-sm → text-xs */}
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} /> {/* size 20 → 18 */}
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* App Settings Section */}
-        <View style={tw`px-5 mb-6`}>
-          <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>App Settings</Text>
-          <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: colors.card }]}>
+        {/* App Settings Section - slightly more compact */}
+        <View style={tw`px-5 mb-5`}> {/* mb-6 → mb-5 */}
+          <Text style={[tw`text-xl font-bold mb-3`, { color: colors.text }]}>App Settings</Text> {/* mb-4 → mb-3 */}
+          <View style={[tw`rounded-xl overflow-hidden`, { backgroundColor: colors.card }]}> {/* rounded-2xl → rounded-xl */}
             {appItems.map((item, index) => (
               <TouchableOpacity
                 key={index}
@@ -319,22 +313,22 @@ export default function More() {
                 activeOpacity={0.8}
               >
                 <View style={[
-                  tw`w-10 h-10 rounded-lg items-center justify-center mr-4`,
+                  tw`w-9 h-9 rounded-lg items-center justify-center mr-4`, // w-10 h-10 → w-9 h-9
                   { backgroundColor: `${item.color}20` }
                 ]}>
-                  {item.icon}
+                  {React.cloneElement(item.icon, { size: 20 })} {/* size 24 → 20 */}
                 </View>
                 <View style={tw`flex-1`}>
                   <Text style={[tw`font-semibold`, { color: colors.text }]}>{item.label}</Text>
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{item.description}</Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>{item.description}</Text> {/* text-sm → text-xs */}
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} /> {/* size 18 → 16 */}
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Enhanced Logout Section */}
+        {/* Logout Section - keep the same */}
         <View style={tw`px-5`}>
           <TouchableOpacity 
             style={[

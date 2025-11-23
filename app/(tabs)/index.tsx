@@ -537,6 +537,18 @@ export default function HabitsScreen() {
     )
   }
 
+  const handleAddHabit = (habitData: any) => {
+    console.log('Received habit data:', habitData) // Debug log
+    const newHabit = {
+      ...habitData,
+      id: habitData.id || Date.now(),
+    }
+    
+    setHabits(prevHabits => [...prevHabits, newHabit])
+    // Make sure to save to storage with the correct color
+    saveHabitsToStorage([...habits, newHabit])
+  }
+
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
@@ -610,14 +622,9 @@ export default function HabitsScreen() {
       ]}>
         <TouchableOpacity 
           style={[
-            tw`w-16 h-16 rounded-full items-center justify-center shadow-lg`,
+            tw`w-16 h-16 rounded-full items-center justify-center`,
             {
               backgroundColor: colors.accent,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 6,
-              elevation: 8,
               borderWidth: 4,
               borderColor: colors.background,
               marginLeft: 2,

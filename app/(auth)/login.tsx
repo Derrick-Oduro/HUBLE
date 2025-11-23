@@ -25,7 +25,7 @@ import React from "react"
 
 // API Configuration
 const API_BASE_URL = __DEV__ 
-  ? 'http://10.4.62.46:3000/api'
+  ? 'http://10.21.48.60:3000/api'
   : 'https://your-production-api.com/api';
 
 export default function LoginScreen() {

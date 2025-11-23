@@ -46,18 +46,23 @@ export default function HabitItem({
   const [scaleAnim] = useState(new Animated.Value(1))
   const [slideAnim] = useState(new Animated.Value(0))
 
-  const getColorValue = (colorName: string) => {
-    const colorMap: { [key: string]: string } = {
-      'green-500': colors.success,
-      'blue-500': '#3B82F6',
-      'yellow-500': colors.warning,
-      'purple-500': '#8B5CF6',
-      'red-500': colors.error,
-      'pink-500': '#EC4899',
-      'indigo-500': '#6366F1',
-      'teal-500': '#14B8A6',
+  const getColorValue = (colorInput: string) => {
+    // If it's already a hex color, return it
+    if (colorInput?.startsWith('#')) {
+      return colorInput
     }
-    return colorMap[colorName] || colors.accent
+    
+    // Handle old Tailwind colors for backward compatibility
+    const colorMap: { [key: string]: string } = {
+      'green-500': '#10B981',
+      'blue-500': '#3B82F6', 
+      'yellow-500': '#F59E0B',
+      'purple-500': '#8B5CF6',
+      'red-500': '#EF4444',
+      'pink-500': '#EC4899',
+    }
+    
+    return colorMap[colorInput] || colors.accent
   }
 
   const getDifficultyInfo = (diff: string) => {
@@ -73,8 +78,69 @@ export default function HabitItem({
     }
   }
 
+  const getThemeColor = (savedColor: string) => {
+    // Current theme palette
+    const currentPalette = [colors.accent, colors.success, colors.warning, colors.error]
+    
+    // All possible theme color palettes - UPDATED with all themes
+    const allThemePalettes = [
+      // Light theme
+      ["#8B5CF6", "#059669", "#D97706", "#DC2626"],
+      // Dark theme  
+      ["#8B5CF6", "#10B981", "#F59E0B", "#EF4444"],
+      // Christmas theme
+      ["#B91C1C", "#047857", "#92400E", "#7C2D12"],
+      // Solo Leveling theme - ADD THIS
+      ["#6C5CE7", "#00D9FF", "#FFD700", "#FF6B6B"],
+      // Ocean theme
+      ["#06B6D4", "#10B981", "#F59E0B", "#EF4444"],
+      // Forest theme
+      ["#10B981", "#059669", "#F59E0B", "#EF4444"],
+      // Sunset theme
+      ["#F59E0B", "#10B981", "#F59E0B", "#EF4444"],
+      // Royal theme
+      ["#A855F7", "#10B981", "#F59E0B", "#EF4444"],
+      // Cyber theme
+      ["#00FF88", "#00FF88", "#FFD700", "#FF0040"],
+      // Rose theme
+      ["#EC4899", "#059669", "#D97706", "#DC2626"],
+      // Paper theme
+      ["#2C2C2E", "#4A5D23", "#8B4513", "#8B1A1A"],
+      // Vintage Paper theme
+      ["#1F1F1F", "#355C2B", "#A0620E", "#7A1A1A"],
+      // Notebook theme
+      ["#1E3A8A", "#166534", "#B45309", "#DC2626"],
+    ]
+    
+    // Check which position the saved color was in ANY theme palette
+    for (const palette of allThemePalettes) {
+      const position = palette.indexOf(savedColor)
+      if (position !== -1) {
+        // Return the color at the SAME POSITION in current theme
+        return currentPalette[position]
+      }
+    }
+    
+    // Handle legacy colors by position
+    const legacyColorPositions: { [key: string]: number } = {
+      'purple-500': 0, // accent position
+      'green-500': 1,  // success position  
+      'yellow-500': 2, // warning position
+      'red-500': 3,    // error position
+      'blue-500': 0,   // accent position
+      'pink-500': 3,   // error position
+    }
+    
+    if (legacyColorPositions[savedColor] !== undefined) {
+      return currentPalette[legacyColorPositions[savedColor]]
+    }
+    
+    // If no match found, return the saved color or default to accent
+    return savedColor || colors.accent
+  }
+
   const difficultyInfo = getDifficultyInfo(difficulty)
-  const habitColor = getColorValue(color)
+  const habitColor = getThemeColor(color)
 
   const handlePress = () => {
     // Animate scale
@@ -147,17 +213,17 @@ export default function HabitItem({
       <Pressable
         onPress={handlePress}
         style={[
-          tw`rounded-2xl p-3 shadow-lg`,
+          tw`rounded-2xl p-2`,
           {
+            borderLeftWidth: 8,
+            borderLeftColor: habitColor,
+            backgroundColor: completed ? colors.cardSecondary : colors.card,
+            opacity: completed ? 0.7 : 1.0,
             shadowColor: habitColor,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: completed ? 0.1 : 0.25,
             shadowRadius: 6,
             elevation: 6,
-            borderLeftWidth: 4,
-            borderLeftColor: habitColor,
-            backgroundColor: completed ? colors.cardSecondary : colors.card,
-            opacity: completed ? 0.7 : 1.0, // Lighten when completed, darker when not
           }
         ]}
       >
@@ -228,7 +294,7 @@ export default function HabitItem({
             <TouchableOpacity onPress={handleComplete} style={tw`mr-2`}>
               <View
                 style={[
-                  tw`w-8 h-8 rounded-xl border-2 items-center justify-center`,
+                  tw`w-7 h-7 rounded-xl border-2 items-center justify-center`,
                   {
                     backgroundColor: completed ? habitColor : 'transparent',
                     borderColor: habitColor,
@@ -264,10 +330,6 @@ export default function HabitItem({
                 {
                   backgroundColor: habitColor,
                   width: completed ? '100%' : '0%',
-                  shadowColor: habitColor,
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: completed ? 0.5 : 0,
-                  shadowRadius: 2,
                 }
               ]}
             />

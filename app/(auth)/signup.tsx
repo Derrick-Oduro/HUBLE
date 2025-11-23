@@ -32,7 +32,7 @@ const getAPIBaseURL = () => {
   return 'https://your-production-api.com/api';
 };
 
-const API_BASE_URL = 'http://10.4.62.46:3000/api';
+const API_BASE_URL = 'http://10.21.48.60:3000/api';
 
 export default function SignupScreen() {
   const router = useRouter()

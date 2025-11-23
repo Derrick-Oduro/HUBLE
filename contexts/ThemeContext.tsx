@@ -249,6 +249,44 @@ const themes: Theme[] = [
     unlocked: true,
     icon: "book"
   },
+  {
+    id: "christmas",
+    name: "Christmas Theme",
+    description: "Festive red, white and green",
+    category: "Default",
+    colors: {
+      background: "#FFFFFF",   // Pure white (snow)
+      card: "#FEFEFE",         // Off-white cards
+      cardSecondary: "#F8F9FA", // Very light gray
+      accent: "#B91C1C",       // Deep Christmas red
+      text: "#1F2937",         // Dark text
+      textSecondary: "#6B7280", // Medium gray
+      success: "#047857",      // Deep Christmas green
+      warning: "#92400E",      // Bronze/copper (Christmas ornaments)
+      error: "#7C2D12"         // Dark burgundy red
+    },
+    unlocked: true,
+    icon: "sunny"
+  },
+  {
+    id: "solo-leveling",
+    name: "Solo Leveling",
+    description: "Rise from the weakest to the strongest",
+    category: "Special",
+    colors: {
+      background: "#0A0A0F",   // Deep shadow black
+      card: "#1A1A2E",        // Dark purple-black (like dungeons)
+      cardSecondary: "#16213E", // Slightly lighter dungeon color
+      accent: "#6C5CE7",      // Jin-Woo's purple power
+      text: "#E6E6FA",        // Light lavender (system text)
+      textSecondary: "#9CA3AF", // Gray (like system notifications)
+      success: "#00D9FF",     // Bright cyan (mana/power)
+      warning: "#FFD700",     // Gold (like level up effects)
+      error: "#FF6B6B"        // Red (danger/boss warning)
+    },
+    unlocked: true,
+    icon: "flash"
+  },
 ]
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)

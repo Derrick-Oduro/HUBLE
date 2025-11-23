@@ -3,13 +3,13 @@
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, FlatList } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
-import { useTheme } from "../../contexts/ThemeProvider" // ← ONLY ADDITION: Theme import
+import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
 import React from "react"
 
 export default function Achievements() {
   const router = useRouter()
-  const { colors, currentTheme } = useTheme() // ← ONLY ADDITION: Theme hook
+  const { colors, currentTheme } = useTheme()
 
   // Mock achievements data with better structure
   const achievementCategories = [
@@ -59,15 +59,15 @@ export default function Achievements() {
   )
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}> {/* ← Use theme color */}
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} /> {/* ← Theme status bar */}
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} /> {/* ← Use theme color */}
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Achievements</Text> {/* ← Use theme color */}
+          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Achievements</Text>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -75,7 +75,7 @@ export default function Achievements() {
           <View style={[
             tw`rounded-2xl p-6 mb-6`,
             {
-              backgroundColor: colors.card, // ← Use theme color
+              backgroundColor: colors.card,
               shadowColor: '#F59E0B',
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.2,
@@ -95,7 +95,7 @@ export default function Achievements() {
                 <Ionicons name="trophy" size={28} color="#F59E0B" />
               </View>
               <View style={tw`flex-1`}>
-                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Achievement Hunter</Text> {/* ← Use theme color */}
+                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Achievement Hunter</Text>
                 <Text style={[{ color: colors.textSecondary }]}>
                   {unlockedAchievements}/{totalAchievements} unlocked
                 </Text>
@@ -104,12 +104,12 @@ export default function Achievements() {
 
             <View style={tw`mb-3`}>
               <View style={tw`flex-row justify-between items-center mb-2`}>
-                <Text style={[tw`font-medium`, { color: colors.text }]}>Overall Progress</Text> {/* ← Use theme color */}
+                <Text style={[tw`font-medium`, { color: colors.text }]}>Overall Progress</Text>
                 <Text style={tw`text-yellow-400 font-bold`}>
                   {Math.round((unlockedAchievements / totalAchievements) * 100)}%
                 </Text>
               </View>
-              <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}> {/* ← Use theme color */}
+              <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
                 <View
                   style={[
                     tw`h-full bg-yellow-500 rounded-full`,
@@ -131,7 +131,7 @@ export default function Achievements() {
           {achievementCategories.map((category) => (
             <View key={category.id} style={[
               tw`rounded-2xl p-5 mb-6`,
-              { backgroundColor: colors.card } // ← Use theme color
+              { backgroundColor: colors.card }
             ]}>
               <View style={tw`flex-row items-center mb-4`}>
                 <View style={[
@@ -141,7 +141,7 @@ export default function Achievements() {
                   <Ionicons name={category.icon} size={24} color={category.color} />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{category.title}</Text> {/* ← Use theme color */}
+                  <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{category.title}</Text>
                   <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
                     {category.achievements.filter(a => a.unlocked).length}/{category.achievements.length} completed
                   </Text>
@@ -154,7 +154,7 @@ export default function Achievements() {
                   style={[
                     tw`p-4 rounded-xl mb-3`,
                     {
-                      backgroundColor: achievement.unlocked ? `${category.color}10` : colors.cardSecondary, // ← Use theme color
+                      backgroundColor: achievement.unlocked ? `${category.color}10` : colors.cardSecondary,
                       borderWidth: achievement.unlocked ? 1 : 0,
                       borderColor: achievement.unlocked ? category.color : 'transparent',
                     }
@@ -164,11 +164,11 @@ export default function Achievements() {
                     <View style={tw`flex-1 mr-3`}>
                       <Text style={[
                         tw`font-bold text-base`,
-                        { color: achievement.unlocked ? category.color : colors.text } // ← Use theme color
+                        { color: achievement.unlocked ? category.color : colors.text }
                       ]}>
                         {achievement.title}
                       </Text>
-                      <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}> {/* ← Use theme color */}
+                      <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>
                         {achievement.description}
                       </Text>
                     </View>
@@ -182,9 +182,9 @@ export default function Achievements() {
                     ) : (
                       <View style={[
                         tw`w-10 h-10 rounded-full border-2 items-center justify-center`,
-                        { borderColor: colors.textSecondary } // ← Use theme color
+                        { borderColor: colors.textSecondary }
                       ]}>
-                        <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}> {/* ← Use theme color */}
+                        <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>
                           {Math.round(getProgressPercentage(achievement.progress, achievement.total))}%
                         </Text>
                       </View>
@@ -193,7 +193,7 @@ export default function Achievements() {
 
                   {!achievement.unlocked && (
                     <View>
-                      <View style={[tw`h-1.5 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}> {/* ← Use theme color */}
+                      <View style={[tw`h-1.5 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
                         <View
                           style={[
                             tw`h-full rounded-full`,
@@ -204,7 +204,7 @@ export default function Achievements() {
                           ]}
                         />
                       </View>
-                      <Text style={[tw`text-xs mt-1 text-right`, { color: colors.textSecondary }]}> {/* ← Use theme color */}
+                      <Text style={[tw`text-xs mt-1 text-right`, { color: colors.textSecondary }]}>
                         {achievement.progress}/{achievement.total}
                       </Text>
                     </View>
