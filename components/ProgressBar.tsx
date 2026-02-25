@@ -2,6 +2,7 @@
 
 import React from "react"
 import { View, Text } from "react-native"
+import { Ionicons } from '@expo/vector-icons'
 import tw from "../lib/tailwind"
 import { useTheme } from "../contexts/ThemeProvider"
 
@@ -43,11 +44,11 @@ export default function ProgressBar({
 
   const getLabelIcon = () => {
     switch (label.toLowerCase()) {
-      case 'health': return '❤️'
-      case 'experience': return '⭐'
-      case 'mana': return '💙'
-      case 'energy': return '⚡'
-      default: return '📊'
+      case 'health': return 'heart'
+      case 'experience': return 'star'
+      case 'mana': return 'water'
+      case 'energy': return 'flash'
+      default: return 'stats-chart'
     }
   }
 
@@ -60,7 +61,7 @@ export default function ProgressBar({
               tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
               { backgroundColor: getBarColor() + '20' }
             ]}>
-              <Text style={tw`text-sm`}>{getLabelIcon()}</Text>
+              <Ionicons name={getLabelIcon()} size={18} color={getBarColor()} />
             </View>
           )}
           <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>

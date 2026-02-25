@@ -754,7 +754,7 @@ export default function Routines() {
                     {progress.totalTasks === 0 && (
                       <View style={[tw`p-3 rounded-xl`, { backgroundColor: colors.cardSecondary }]}>
                         <Text style={[tw`text-sm text-center`, { color: colors.textSecondary }]}>
-                          📝 Tap to add tasks to this routine
+                          Tap to add tasks to this routine
                         </Text>
                       </View>
                     )}

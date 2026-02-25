@@ -4,11 +4,13 @@ import { useState } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
+import { useTheme } from "../../../contexts/ThemeProvider"
 import tw from "../../../lib/tailwind"
 import React from "react"
 
 export default function GroupBadges() {
   const router = useRouter()
+  const { colors, currentTheme } = useTheme()
 
   // Mock group badges data
   const [earnedBadges] = useState([

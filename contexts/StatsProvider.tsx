@@ -210,7 +210,7 @@ export function StatsProvider({ children }: { children: ReactNode }) {
     if (newLevel > currentLevel) {
       return {
         newLevel,
-        levelMessage: `🎉 LEVEL UP! Welcome to Level ${newLevel}!`
+        levelMessage: `LEVEL UP! Welcome to Level ${newLevel}!`
       };
     }
     

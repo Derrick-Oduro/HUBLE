@@ -68,13 +68,13 @@ export default function HabitItem({
   const getDifficultyInfo = (diff: string) => {
     switch (diff) {
       case 'easy':
-        return { icon: 'leaf', color: colors.success, label: 'Easy', emoji: '🌱' }
+        return { icon: 'leaf', color: colors.success, label: 'Easy' }
       case 'medium':
-        return { icon: 'flash', color: colors.warning, label: 'Medium', emoji: '⚡' }
+        return { icon: 'flash', color: colors.warning, label: 'Medium' }
       case 'hard':
-        return { icon: 'diamond', color: colors.error, label: 'Hard', emoji: '💎' }
+        return { icon: 'diamond', color: colors.error, label: 'Hard' }
       default:
-        return { icon: 'leaf', color: colors.success, label: 'Easy', emoji: '🌱' }
+        return { icon: 'leaf', color: colors.success, label: 'Easy' }
     }
   }
 
@@ -238,7 +238,7 @@ export default function HabitItem({
                   { backgroundColor: `${habitColor}20` }
                 ]}
               >
-                <Text style={tw`text-lg`}>{difficultyInfo.emoji}</Text>
+                <Ionicons name={difficultyInfo.icon} size={18} color={difficultyInfo.color} />
               </View>
               
               <View style={tw`flex-1`}>
@@ -285,7 +285,10 @@ export default function HabitItem({
                     { color: habitColor }
                   ]}
                 >
-                  🔥{streak}
+                  <View style={tw`flex-row items-center`}>
+                    <Ionicons name="flame" size={14} color={habitColor} style={tw`mr-1`} />
+                    <Text style={[tw`text-xs font-bold`, { color: habitColor }]}>{streak}</Text>
+                  </View>
                 </Text>
               </View>
             )}

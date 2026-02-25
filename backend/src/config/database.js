@@ -84,12 +84,12 @@ class Database {
 
       // Check if level column exists
       const hasLevelColumn = tableInfo.some(
-        (column) => column.name === "level"
+        (column) => column.name === "level",
       );
 
       if (!hasLevelColumn) {
         console.log(
-          "❌ user_stats table missing required columns, recreating..."
+          "❌ user_stats table missing required columns, recreating...",
         );
 
         // Drop the existing table
@@ -272,13 +272,97 @@ class Database {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )`,
+
+      // Friends table
+      `CREATE TABLE IF NOT EXISTS friends (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        friend_id INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending', 'accepted', 'blocked')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, friend_id)
+      )`,
+
+      // Parties table
+      `CREATE TABLE IF NOT EXISTS parties (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        goal TEXT,
+        privacy TEXT NOT NULL DEFAULT 'public' CHECK(privacy IN ('public', 'private')),
+        max_members INTEGER DEFAULT 10,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )`,
+
+      // Party members table
+      `CREATE TABLE IF NOT EXISTS party_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        party_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('admin', 'member')),
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(party_id, user_id)
+      )`,
+
+      // Party invitations table
+      `CREATE TABLE IF NOT EXISTS party_invitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        party_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        invited_by INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'declined')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(party_id, user_id)
+      )`,
+
+      // Challenges table
+      `CREATE TABLE IF NOT EXISTS challenges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        type TEXT NOT NULL CHECK(type IN ('streak', 'total', 'speed')),
+        target_value INTEGER,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        reward_xp INTEGER DEFAULT 0,
+        reward_coins INTEGER DEFAULT 0,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      )`,
+
+      // Challenge participants table
+      `CREATE TABLE IF NOT EXISTS challenge_participants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        challenge_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        progress INTEGER DEFAULT 0,
+        completed BOOLEAN DEFAULT 0,
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        FOREIGN KEY (challenge_id) REFERENCES challenges(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(challenge_id, user_id)
+      )`,
     ];
 
     for (const tableSQL of tables) {
       try {
         await this.run(tableSQL);
         const tableName = tableSQL.match(
-          /CREATE TABLE IF NOT EXISTS (\w+)/
+          /CREATE TABLE IF NOT EXISTS (\w+)/,
         )?.[1];
         console.log(`✅ Table created/verified (${tableName})`);
       } catch (error) {

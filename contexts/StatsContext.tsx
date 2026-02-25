@@ -260,7 +260,7 @@ export function StatsProvider({ children }: { children: ReactNode }) {
         newLevel = prev.level + 1
         newExperience = LEVEL_UP_BONUS // Start with 15 XP after level up
         requiredXP = calculateRequiredXP(newLevel) // Calculate new XP requirement
-        setLevelMessage("Level Up! 🎉")
+        setLevelMessage("Level Up!")
       }
 
       // Check for level down (only if experience is very low and we're not at level 1)
@@ -268,7 +268,7 @@ export function StatsProvider({ children }: { children: ReactNode }) {
         newLevel = prev.level - 1
         requiredXP = calculateRequiredXP(newLevel) // Calculate new XP requirement
         newExperience = Math.round(requiredXP * 0.8) // Set to 80% after level down
-        setLevelMessage("Level Down! 😢")
+        setLevelMessage("Level Down!")
       }
 
       // Save to AsyncStorage
@@ -301,7 +301,7 @@ export function StatsProvider({ children }: { children: ReactNode }) {
       if (newHealth <= 0 && prev.level > 1) {
         newLevel = prev.level - 1
         newHealth = prev.maxHealth // Reset health to full
-        setLevelMessage("Health depleted! Level Down! 😢")
+        setLevelMessage("Health depleted! Level Down!")
         healthCausedLevelDown = true
       }
 

@@ -1,5 +1,6 @@
 import React from 'react'
 import { View, Text } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import tw from '../lib/tailwind'
 import { useStats } from '../contexts/StatsProvider'
 import { useTheme } from '../contexts/ThemeProvider'
@@ -92,7 +93,7 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
         {/* Currency Display */}
         <View style={tw`items-end`}>
           <View style={tw`flex-row items-center mb-1`}>
-            <Text style={tw`text-lg mr-1`}>💎</Text>
+            <Ionicons name="diamond" size={16} color="#A78BFA" style={tw`mr-1`} />
             <Text style={[tw`text-sm font-bold`, { color: colors.text }]}>
               {stats.gemsEarned}
             </Text>
@@ -118,16 +119,17 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
               borderColor: colors.accent + '40',
             }
           ]}>
-            <Text style={tw`text-2xl`}>🧙‍♂️</Text>
+            <Ionicons name="happy" size={32} color={colors.accent} />
           </View>
           
           {/* Streak indicator under avatar */}
           <View style={[
-            tw`mt-2 px-2 py-1 rounded-full items-center`,
+            tw`mt-2 px-2 py-1 rounded-full items-center flex-row`,
             { backgroundColor: colors.accent + '20' }
           ]}>
+            <Ionicons name="flame" size={12} color={colors.accent} style={tw`mr-1`} />
             <Text style={[tw`text-xs font-bold`, { color: colors.accent }]}>
-              🔥 {stats.currentStreak}
+              {stats.currentStreak}
             </Text>
           </View>
         </View>
@@ -138,7 +140,7 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
           <View style={tw`mb-3`}>
             <View style={tw`flex-row justify-between items-center mb-1`}>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-base mr-1`}>❤️</Text>
+                <Ionicons name="heart" size={14} color="#EF4444" style={tw`mr-1`} />
                 <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>
                   Health
                 </Text>
@@ -168,7 +170,7 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
           <View>
             <View style={tw`flex-row justify-between items-center mb-1`}>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-base mr-1`}>⚡</Text>
+                <Ionicons name="flash" size={14} color="#F59E0B" style={tw`mr-1`} />
                 <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>
                   Experience
                 </Text>
@@ -228,7 +230,7 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
           
           <Text style={[tw`text-xs text-center`, { color: colors.textSecondary }]}>
             {completedCount === totalCount && totalCount > 0
-              ? "🎉 Perfect day! All tasks completed!"
+              ? "Perfect day! All tasks completed!"
               : `${totalCount - completedCount} ${getTaskTypeText()}${totalCount - completedCount !== 1 ? (taskType === 'dailies' ? '' : 's') : ''} remaining`
             }
           </Text>

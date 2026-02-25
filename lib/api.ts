@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = __DEV__ 
-  ? 'http://10.21.48.60:3000/api'
+  ? 'http://10.0.72.74:3000/api'
   : 'https://your-production-api.com/api';
 
 // Helper function to get auth headers
@@ -246,4 +246,145 @@ export const statsAPI = {
   resetStats: () => apiCall('/stats/reset', {
     method: 'POST',
   }),
+};
+
+// ========== SOCIAL API ==========
+
+// Friends API
+export const friendsAPI = {
+  // Search for users
+  searchUsers: (query: string) => apiCall(`/social/friends/search?query=${encodeURIComponent(query)}`),
+
+  // Send friend request
+  sendFriendRequest: (friendId: number) => apiCall('/social/friends/request', {
+    method: 'POST',
+    body: JSON.stringify({ friendId }),
+  }),
+
+  // Accept friend request
+  acceptFriendRequest: (friendshipId: number) => apiCall(`/social/friends/accept/${friendshipId}`, {
+    method: 'PUT',
+  }),
+
+  // Remove friend
+  removeFriend: (friendshipId: number) => apiCall(`/social/friends/${friendshipId}`, {
+    method: 'DELETE',
+  }),
+
+  // Get friends list
+  getFriends: () => apiCall('/social/friends'),
+
+  // Get pending requests
+  getPendingRequests: () => apiCall('/social/friends/pending'),
+
+  // Get sent requests
+  getSentRequests: () => apiCall('/social/friends/sent'),
+
+  // Block user
+  blockUser: (friendshipId: number) => apiCall(`/social/friends/block/${friendshipId}`, {
+    method: 'PUT',
+  }),
+};
+
+// Parties API
+export const partiesAPI = {
+  // Create party
+  createParty: (partyData: {
+    name: string;
+    description?: string;
+    goal?: string;
+    privacy?: string;
+    maxMembers?: number;
+  }) => apiCall('/social/parties', {
+    method: 'POST',
+    body: JSON.stringify(partyData),
+  }),
+
+  // Get user's parties
+  getUserParties: () => apiCall('/social/parties/my'),
+
+  // Get available parties
+  getAvailableParties: () => apiCall('/social/parties'),
+
+  // Get party details
+  getParty: (partyId: number) => apiCall(`/social/parties/${partyId}`),
+
+  // Join party
+  joinParty: (partyId: number) => apiCall(`/social/parties/${partyId}/join`, {
+    method: 'POST',
+  }),
+
+  // Leave party
+  leaveParty: (partyId: number) => apiCall(`/social/parties/${partyId}/leave`, {
+    method: 'DELETE',
+  }),
+
+  // Invite to party
+  inviteToParty: (partyId: number, userId: number) => apiCall(`/social/parties/${partyId}/invite`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  }),
+
+  // Accept party invitation
+  acceptPartyInvitation: (invitationId: number) => apiCall(`/social/parties/invitations/${invitationId}/accept`, {
+    method: 'PUT',
+  }),
+
+  // Decline party invitation
+  declinePartyInvitation: (invitationId: number) => apiCall(`/social/parties/invitations/${invitationId}/decline`, {
+    method: 'PUT',
+  }),
+
+  // Get party invitations
+  getPartyInvitations: () => apiCall('/social/parties/invitations'),
+
+  // Get party members
+  getPartyMembers: (partyId: number) => apiCall(`/social/parties/${partyId}/members`),
+};
+
+// Challenges API
+export const challengesAPI = {
+  // Get active challenges
+  getActiveChallenges: () => apiCall('/social/challenges'),
+
+  // Get user's challenges
+  getUserChallenges: () => apiCall('/social/challenges/my'),
+
+  // Get challenge details
+  getChallenge: (challengeId: number) => apiCall(`/social/challenges/${challengeId}`),
+
+  // Join challenge
+  joinChallenge: (challengeId: number) => apiCall(`/social/challenges/${challengeId}/join`, {
+    method: 'POST',
+  }),
+
+  // Update challenge progress
+  updateChallengeProgress: (challengeId: number, progress: number) => apiCall(`/social/challenges/${challengeId}/progress`, {
+    method: 'PUT',
+    body: JSON.stringify({ progress }),
+  }),
+
+  // Get challenge leaderboard
+  getChallengeLeaderboard: (challengeId: number) => apiCall(`/social/challenges/${challengeId}/leaderboard`),
+
+  // Create challenge
+  createChallenge: (challengeData: {
+    title: string;
+    description?: string;
+    type: string;
+    targetValue?: number;
+    startDate: string;
+    endDate: string;
+    rewardXp?: number;
+    rewardCoins?: number;
+  }) => apiCall('/social/challenges', {
+    method: 'POST',
+    body: JSON.stringify(challengeData),
+  }),
+};
+
+// Social Stats API
+export const socialAPI = {
+  // Get social stats overview
+  getStats: () => apiCall('/social/stats'),
 };

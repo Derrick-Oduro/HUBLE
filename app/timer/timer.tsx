@@ -25,12 +25,12 @@ import { focusAPI } from "../../lib/api"
 
 // Keep your existing habits list exactly as is
 const habitsList = [
-  { id: 1, title: "📚 Deep Work", duration: 50 * 60, color: "#3B82F6", emoji: "📚" },
-  { id: 2, title: "📖 Reading", duration: 30 * 60, color: "#10B981", emoji: "📖" },
-  { id: 3, title: "🧘 Meditation", duration: 15 * 60, color: "#8B5CF6", emoji: "🧘" },
-  { id: 4, title: "💪 Exercise", duration: 25 * 60, color: "#EF4444", emoji: "💪" },
-  { id: 5, title: "🎨 Creative Work", duration: 45 * 60, color: "#F59E0B", emoji: "🎨" },
-  { id: 6, title: "📝 Writing", duration: 40 * 60, color: "#EC4899", emoji: "📝" },
+  { id: 1, title: "Deep Work", duration: 50 * 60, color: "#3B82F6", icon: "book" },
+  { id: 2, title: "Reading", duration: 30 * 60, color: "#10B981", icon: "book-outline" },
+  { id: 3, title: "Meditation", duration: 15 * 60, color: "#8B5CF6", icon: "flower" },
+  { id: 4, title: "Exercise", duration: 25 * 60, color: "#EF4444", icon: "fitness" },
+  { id: 5, title: "Creative Work", duration: 45 * 60, color: "#F59E0B", icon: "color-palette" },
+  { id: 6, title: "Writing", duration: 40 * 60, color: "#EC4899", icon: "create" },
 ]
 
 export default function Timer() {
@@ -471,10 +471,23 @@ export default function Timer() {
         {/* Clean Header - Updated to show focus activity + preset */}
         <View style={tw`flex-row justify-between items-center mb-8`}>
           <View style={tw`flex-1`}>
-            <Text style={[tw`text-3xl font-bold mb-1`, { color: colors.text }]}>
-              {selectedHabit ? selectedHabit.title : 
-               isWorkSession ? "🎯 Focus Time" : "☕ Break Time"}
-            </Text>
+            {selectedHabit ? (
+              <Text style={[tw`text-3xl font-bold mb-1`, { color: colors.text }]}>
+                {selectedHabit.title}
+              </Text>
+            ) : (
+              <View style={tw`flex-row items-center mb-1`}>
+                <Ionicons 
+                  name={isWorkSession ? "target" : "cafe"} 
+                  size={28} 
+                  color={colors.accent} 
+                  style={tw`mr-2`} 
+                />
+                <Text style={[tw`text-3xl font-bold`, { color: colors.text }]}>
+                  {isWorkSession ? "Focus Time" : "Break Time"}
+                </Text>
+              </View>
+            )}
             <Text style={[tw`text-base`, { color: colors.textSecondary }]}>
               {selectedHabit && currentPreset ? 
                 `${currentPreset.time} minute ${currentPreset.title.toLowerCase()} session` :
@@ -497,7 +510,7 @@ export default function Timer() {
         {/* Stats Row */}
         <View style={tw`flex-row justify-between mb-8`}>
           <View style={[tw`flex-1 rounded-2xl p-4 mr-3`, { backgroundColor: colors.card }]}>
-            <Text style={tw`text-2xl mb-1`}>🔥</Text>
+            <Ionicons name="flame" size={24} color="#F59E0B" style={tw`mb-1`} />
             <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{streak}</Text>
             <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Streak</Text>
           </View>
@@ -562,9 +575,9 @@ export default function Timer() {
 
               {/* Timer Display */}
               <View style={tw`items-center`}>
-                {/* Show focus activity emoji if selected */}
+                {/* Show focus activity icon if selected */}
                 {selectedHabit && (
-                  <Text style={tw`text-4xl mb-2`}>{selectedHabit.emoji}</Text>
+                  <Ionicons name={selectedHabit.icon} size={48} color={selectedHabit.color} style={tw`mb-2`} />
                 )}
                 
                 <Text style={[
@@ -652,10 +665,10 @@ export default function Timer() {
             </Text>
             <View style={tw`flex-row flex-wrap justify-between`}>
               {[
-                { title: "Pomodoro", time: 25, emoji: "🍅" },
-                { title: "Short", time: 15, emoji: "⚡" },
-                { title: "Deep Work", time: 50, emoji: "🎯" },
-                { title: "Quick", time: 10, emoji: "⏰" },
+                { title: "Pomodoro", time: 25, icon: "timer" },
+                { title: "Short", time: 15, icon: "flash" },
+                { title: "Deep Work", time: 50, icon: "target" },
+                { title: "Quick", time: 10, icon: "time" },
               ].map((preset, index) => (
                 <TouchableOpacity
                   key={index}
@@ -676,7 +689,12 @@ export default function Timer() {
                     setCurrentPreset(preset)
                   }}
                 >
-                  <Text style={tw`text-2xl mb-2`}>{preset.emoji}</Text>
+                  <Ionicons 
+                    name={preset.icon} 
+                    size={28} 
+                    color={currentPreset?.title === preset.title ? colors.accent : colors.text} 
+                    style={tw`mb-2`} 
+                  />
                   <Text style={[
                     tw`font-semibold`, 
                     { color: currentPreset?.title === preset.title ? colors.accent : colors.text }
@@ -915,7 +933,7 @@ export default function Timer() {
                   ]}
                   onPress={() => selectHabit(habit)}
                 >
-                  <Text style={tw`text-4xl mr-4`}>{habit.emoji}</Text>
+                  <Ionicons name={habit.icon} size={40} color={habit.color} style={tw`mr-4`} />
                   <View style={tw`flex-1`}>
                     <Text style={[tw`font-bold text-lg`, { color: colors.text }]}>{habit.title}</Text>
                     <Text style={[tw``, { color: colors.textSecondary }]}>{Math.floor(habit.duration / 60)} minutes</Text>

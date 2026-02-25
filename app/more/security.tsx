@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Switch, Alert, TextInput } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
@@ -19,6 +19,47 @@ export default function Security() {
   const [autoLogout, setAutoLogout] = useState(true)
   const [dataEncryption, setDataEncryption] = useState(true)
   const [privacyMode, setPrivacyMode] = useState(false)
+
+  // Load security settings on mount
+  useEffect(() => {
+    loadSecuritySettings()
+  }, [])
+
+  // Save settings whenever they change
+  useEffect(() => {
+    saveSecuritySettings()
+  }, [biometricAuth, twoFactorAuth, autoLogout, dataEncryption, privacyMode])
+
+  const loadSecuritySettings = async () => {
+    try {
+      const savedSettings = await AsyncStorage.getItem('securitySettings')
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings)
+        setBiometricAuth(settings.biometricAuth ?? false)
+        setTwoFactorAuth(settings.twoFactorAuth ?? false)
+        setAutoLogout(settings.autoLogout ?? true)
+        setDataEncryption(settings.dataEncryption ?? true)
+        setPrivacyMode(settings.privacyMode ?? false)
+      }
+    } catch (error) {
+      console.error('Error loading security settings:', error)
+    }
+  }
+
+  const saveSecuritySettings = async () => {
+    try {
+      const settings = {
+        biometricAuth,
+        twoFactorAuth,
+        autoLogout,
+        dataEncryption,
+        privacyMode
+      }
+      await AsyncStorage.setItem('securitySettings', JSON.stringify(settings))
+    } catch (error) {
+      console.error('Error saving security settings:', error)
+    }
+  }
 
   const handleChangePassword = () => {
     Alert.alert(

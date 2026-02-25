@@ -261,15 +261,24 @@ export default function Stats() {
           <View style={tw`flex-row justify-between`}>
             <View style={tw`items-center`}>
               <Text style={[tw`text-2xl font-black`, { color: '#FFD700' }]}>{stats.gemsEarned}</Text>
-              <Text style={[tw`text-xs font-bold`, { color: '#FFD700' }]}>💎 GEMS</Text>
+              <View style={tw`flex-row items-center mt-1`}>
+                <Ionicons name="diamond" size={12} color="#FFD700" style={tw`mr-1`} />
+                <Text style={[tw`text-xs font-bold`, { color: '#FFD700' }]}>GEMS</Text>
+              </View>
             </View>
             <View style={tw`items-center`}>
               <Text style={[tw`text-2xl font-black`, { color: '#F59E0B' }]}>{stats.coinsEarned}</Text>
-              <Text style={[tw`text-xs font-bold`, { color: '#F59E0B' }]}>🪙 COINS</Text>
+              <View style={tw`flex-row items-center mt-1`}>
+                <Ionicons name="cash" size={12} color="#F59E0B" style={tw`mr-1`} />
+                <Text style={[tw`text-xs font-bold`, { color: '#F59E0B' }]}>COINS</Text>
+              </View>
             </View>
             <View style={tw`items-center`}>
               <Text style={[tw`text-2xl font-black`, { color: '#EF4444' }]}>{stats.health}</Text>
-              <Text style={[tw`text-xs font-bold`, { color: '#EF4444' }]}>❤️ HP</Text>
+              <View style={tw`flex-row items-center mt-1`}>
+                <Ionicons name="heart" size={12} color="#EF4444" style={tw`mr-1`} />
+                <Text style={[tw`text-xs font-bold`, { color: '#EF4444' }]}>HP</Text>
+              </View>
             </View>
           </View>
         </View>

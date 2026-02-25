@@ -29,7 +29,7 @@ export default function Themes() {
 
     await setTheme(previewTheme)
     Alert.alert(
-      "Theme Applied! 🎨",
+      "Theme Applied!",
       `"${selectedTheme.name}" is now active across the entire app.`,
       [{ text: "Great!", onPress: () => router.back() }]
     )
@@ -165,9 +165,12 @@ export default function Themes() {
         </View>
         
         {!theme.unlocked && (
-          <Text style={[tw`text-xs`, { color: theme.colors.textSecondary }]}>
-            🔒 {theme.requirement}
-          </Text>
+          <View style={tw`flex-row items-center`}>
+            <Ionicons name="lock-closed" size={12} color={theme.colors.textSecondary} style={tw`mr-1`} />
+            <Text style={[tw`text-xs`, { color: theme.colors.textSecondary }]}>
+              {theme.requirement}
+            </Text>
+          </View>
         )}
       </View>
     </TouchableOpacity>
@@ -266,19 +269,19 @@ export default function Themes() {
             
             <View style={tw`space-y-3`}>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-yellow-400 mr-3`}>📊</Text>
+                <Ionicons name="stats-chart" size={20} color="#F59E0B" style={tw`mr-3`} />
                 <Text style={[tw`text-sm flex-1`, { color: colors.textSecondary }]}>Level up to unlock premium themes</Text>
               </View>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-green-400 mr-3`}>✅</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={tw`mr-3`} />
                 <Text style={[tw`text-sm flex-1`, { color: colors.textSecondary }]}>Complete tasks and build streaks</Text>
               </View>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-blue-400 mr-3`}>🏆</Text>
+                <Ionicons name="trophy" size={20} color="#3B82F6" style={tw`mr-3`} />
                 <Text style={[tw`text-sm flex-1`, { color: colors.textSecondary }]}>Participate in challenges and earn badges</Text>
               </View>
               <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-purple-400 mr-3`}>👥</Text>
+                <Ionicons name="people" size={20} color="#A855F7" style={tw`mr-3`} />
                 <Text style={[tw`text-sm flex-1`, { color: colors.textSecondary }]}>Join parties and earn group achievements</Text>
               </View>
             </View>
@@ -300,12 +303,12 @@ export default function Themes() {
             
             <View style={tw`flex-row flex-wrap`}>
               {[
-                { name: "Christmas", emoji: "🎄" },
-                { name: "Neon City", emoji: "🌃" },
-                { name: "Minimal", emoji: "⚪" },
-                { name: "Galaxy", emoji: "🌌" },
-                { name: "Retro", emoji: "📼" },
-                { name: "Pastel", emoji: "🌸" }
+                { name: "Christmas", icon: "snow" },
+                { name: "Neon City", icon: "city" },
+                { name: "Minimal", icon: "ellipse-outline" },
+                { name: "Galaxy", icon: "planet" },
+                { name: "Retro", icon: "radio" },
+                { name: "Pastel", icon: "flower" }
               ].map((theme, index) => (
                 <View
                   key={index}
@@ -314,7 +317,7 @@ export default function Themes() {
                     { backgroundColor: colors.cardSecondary }
                   ]}
                 >
-                  <Text style={tw`mr-1`}>{theme.emoji}</Text>
+                  <Ionicons name={theme.icon} size={16} color={colors.textSecondary} style={tw`mr-1`} />
                   <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{theme.name}</Text>
                 </View>
               ))}

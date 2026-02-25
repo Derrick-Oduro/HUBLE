@@ -346,27 +346,30 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
 
           {/* Tips */}
           <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-              💡 Habit Building Tips
-            </Text>
+            <View style={tw`flex-row items-center mb-4`}>
+              <Ionicons name="bulb" size={22} color={colors.accent} style={tw`mr-2`} />
+              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>
+                Habit Building Tips
+              </Text>
+            </View>
             
             <View style={tw`space-y-3`}>
               <View style={tw`flex-row items-start`}>
-                <Text style={tw`text-lg mr-3`}>🎯</Text>
+                <Ionicons name="target" size={20} color="#10B981" style={tw`mr-3`} />
                 <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
                   Start small and be consistent rather than ambitious and inconsistent
                 </Text>
               </View>
               
               <View style={tw`flex-row items-start`}>
-                <Text style={tw`text-lg mr-3`}>⏰</Text>
+                <Ionicons name="time" size={20} color="#3B82F6" style={tw`mr-3`} />
                 <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
                   Link new habits to existing routines for better success
                 </Text>
               </View>
               
               <View style={tw`flex-row items-start`}>
-                <Text style={tw`text-lg mr-3`}>🔥</Text>
+                <Ionicons name="flame" size={20} color="#F59E0B" style={tw`mr-3`} />
                 <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
                   Track your streaks to stay motivated and build momentum
                 </Text>

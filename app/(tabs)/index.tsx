@@ -31,7 +31,6 @@ interface EnhancedHabit {
 export default function HabitsScreen() {
   const { colors, currentTheme } = useTheme()
   
-  // Enhanced default habits with streak data
   const defaultHabits: EnhancedHabit[] = [
     { 
       id: 1, 
@@ -81,10 +80,8 @@ export default function HabitsScreen() {
   const [editingHabit, setEditingHabit] = useState<EnhancedHabit | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Get today's date string
   const getTodayString = () => new Date().toISOString().split('T')[0]
 
-  // Calculate streak for a habit
   const calculateStreak = (completedDates: string[]): number => {
     if (!completedDates || completedDates.length === 0) return 0
     
@@ -108,7 +105,6 @@ export default function HabitsScreen() {
     return streak
   }
 
-  // Reset function with enhanced data
   const resetToHabitsDefaults = async () => {
     try {
       await AsyncStorage.setItem("habitsData", JSON.stringify(defaultHabits))
@@ -120,24 +116,20 @@ export default function HabitsScreen() {
     }
   }
 
-  // Enhanced load habits with streak calculation
   useEffect(() => {
     const loadHabits = async () => {
       try {
         setLoading(true)
         
-        // Check if user is logged in
         const token = await AsyncStorage.getItem('userToken')
         const isGuest = await AsyncStorage.getItem('isGuest')
         
         if (token && isGuest !== 'true') {
           console.log('🔄 Loading habits from backend...')
           try {
-            // Load from backend
             const response = await habitsAPI.getHabits()
             
             if (response.success && response.habits) {
-              // Convert backend format to your frontend format
               const convertedHabits = response.habits.map((backendHabit: any) => ({
                 id: backendHabit.id,
                 title: backendHabit.title,
@@ -146,7 +138,7 @@ export default function HabitsScreen() {
                 color: backendHabit.color,
                 completed: backendHabit.is_completed_today,
                 streak: backendHabit.streak || 0,
-                completedDates: [], // Will be populated if needed
+                completedDates: [],
                 targetDays: typeof backendHabit.target_days === 'string' 
                   ? JSON.parse(backendHabit.target_days) 
                   : (backendHabit.target_days || [1, 2, 3, 4, 5, 6, 0])
@@ -154,7 +146,6 @@ export default function HabitsScreen() {
               
               setHabits(convertedHabits)
               
-              // Cache for offline use
               await AsyncStorage.setItem("habitsData", JSON.stringify(convertedHabits))
               
               const completedCount = convertedHabits.filter((h: any) => h.completed).length
@@ -168,7 +159,6 @@ export default function HabitsScreen() {
           }
         }
 
-        // Load from local storage (guest mode or backup)
         console.log('📱 Loading habits from local storage...')
         const savedData = await AsyncStorage.getItem("habitsData")
 
@@ -176,7 +166,6 @@ export default function HabitsScreen() {
           const habitsData: EnhancedHabit[] = JSON.parse(savedData)
 
           if (habitsData.length > 0) {
-            // Update streaks for all habits
             const habitsWithStreaks = habitsData.map(habit => ({
               ...habit,
               streak: calculateStreak(habit.completedDates || []),
@@ -217,7 +206,6 @@ export default function HabitsScreen() {
           const response = await habitsAPI.createHabit(newHabit)
           
           if (response.success) {
-            // Convert backend habit to frontend format
             const newBackendHabit = {
               id: response.habit.id,
               title: response.habit.title,
@@ -235,7 +223,6 @@ export default function HabitsScreen() {
             const updatedHabits = [...habits, newBackendHabit]
             setHabits(updatedHabits)
             
-            // Cache locally
             await AsyncStorage.setItem("habitsData", JSON.stringify(updatedHabits))
             updateHabitCompletion(0, updatedHabits.length)
             
@@ -247,7 +234,6 @@ export default function HabitsScreen() {
         }
       }
 
-      // Guest mode or backend failed - save locally
       console.log('📱 Adding habit locally:', newHabit)
       const habitToAdd: EnhancedHabit = { 
         ...newHabit, 
@@ -320,7 +306,6 @@ export default function HabitsScreen() {
                 }
               }
 
-              // Delete locally (always do this)
               const updatedHabits = habits.filter((habit) => habit.id !== id)
               setHabits(updatedHabits)
 
@@ -336,7 +321,6 @@ export default function HabitsScreen() {
     )
   }
 
-  // Enhanced habit completion with streak tracking
   const handleHabitComplete = async (id: number) => {
     const habit = habits.find((h) => h.id === id)
     if (!habit) return
@@ -360,7 +344,6 @@ export default function HabitsScreen() {
           const response = await habitsAPI.completeHabit(id)
           
           if (response.success) {
-            // Update local state with backend response
             const updatedHabits = habits.map((h) => 
               h.id === id 
                 ? { 
@@ -377,7 +360,6 @@ export default function HabitsScreen() {
             const completedCount = updatedHabits.filter((habit) => habit.completed).length
             updateHabitCompletion(completedCount, updatedHabits.length)
 
-            // Calculate XP based on difficulty
             let expIncrease = 0
             switch (habit.difficulty) {
               case "easy":
@@ -397,7 +379,7 @@ export default function HabitsScreen() {
             updateHealth(2)
 
             Alert.alert(
-              "Great Job! 🎉",
+              "Great Job!",
               `${response.message || 'Habit completed!'}\n+${expIncrease} XP earned!`,
               [{ text: "Awesome!", style: "default" }]
             )
@@ -410,7 +392,6 @@ export default function HabitsScreen() {
         }
       }
 
-      // Guest mode or backend failed - handle locally
       console.log('📱 Completing habit locally:', id)
       
       let expIncrease = 0
@@ -430,28 +411,23 @@ export default function HabitsScreen() {
           expIncrease = 5
       }
 
-      // Calculate new streak
       const newCompletedDates = [...(habit.completedDates || []), today]
       const newStreak = calculateStreak(newCompletedDates)
       
-      // Streak bonus
       if (newStreak >= 7) streakBonus = Math.floor(newStreak / 7) * 2
-      if (newStreak >= 30) streakBonus += 10 // Monthly bonus
+      if (newStreak >= 30) streakBonus += 10
 
       const totalExp = expIncrease + streakBonus
       
-      // Update experience and health
       updateExperience(totalExp)
       updateHealth(2)
 
-      // Show completion feedback
       Alert.alert(
-        "Great Job! 🎉",
-        `+${totalExp} XP earned!\n${newStreak > 1 ? `🔥 ${newStreak} day streak!` : ""}${streakBonus > 0 ? `\n🌟 Streak bonus: +${streakBonus} XP` : ""}`,
+        "Great Job!",
+        `+${totalExp} XP earned!\n${newStreak > 1 ? `${newStreak} day streak!` : ""}${streakBonus > 0 ? `\nStreak bonus: +${streakBonus} XP` : ""}`,
         [{ text: "Awesome!", style: "default" }]
       )
 
-      // Update habit with completion
       const updatedHabits = habits.map((h) => 
         h.id === id 
           ? { 
@@ -502,7 +478,6 @@ export default function HabitsScreen() {
     updateExperience(expDecrease)
     updateHealth(-5)
 
-    // Reset streak if failed
     const updatedHabits = habits.map((h) => 
       h.id === id 
         ? { ...h, completed: false, streak: 0 }
@@ -520,7 +495,6 @@ export default function HabitsScreen() {
     }
   }
 
-  // Calculate completion stats
   const completedToday = habits.filter(h => h.completed).length
   const totalHabits = habits.length
   const completionPercentage = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0
@@ -530,52 +504,38 @@ export default function HabitsScreen() {
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
         <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading...</Text>
+          <ActivityIndicator size="small" color={colors.accent} />
         </View>
       </SafeAreaView>
     )
-  }
-
-  const handleAddHabit = (habitData: any) => {
-    console.log('Received habit data:', habitData) // Debug log
-    const newHabit = {
-      ...habitData,
-      id: habitData.id || Date.now(),
-    }
-    
-    setHabits(prevHabits => [...prevHabits, newHabit])
-    // Make sure to save to storage with the correct color
-    saveHabitsToStorage([...habits, newHabit])
   }
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
       
-      {/* Use FlatList instead of ScrollView for better integration */}
       <FlatList
-        style={tw`flex-1 px-5 pt-3`}
+        style={tw`flex-1 px-4 pt-2`}
         data={habits}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={tw`pb-20`} // Bottom padding for floating button
+        contentContainerStyle={tw`pb-20`}
         ListHeaderComponent={() => (
           <View>
-            {/* Character Panel Component */}
+            {/* Character Panel Component - Keep as is */}
             <CharacterPanel 
               completedCount={completedToday}
               totalCount={totalHabits}
               taskType="habits"
             />
 
-            {/* Level Up Message (if exists) */}
+            {/* Level Up Message */}
             {stats.levelMessage && (
               <View style={[
-                tw`px-4 py-3 rounded-xl mb-4`,
+                tw`px-3 py-2 rounded-lg mb-3`,
                 { backgroundColor: colors.success + '20' }
               ]}>
-                <Text style={[tw`text-sm font-bold text-center`, { color: colors.success }]}>
+                <Text style={[tw`text-sm font-medium text-center`, { color: colors.success }]}>
                   {stats.levelMessage}
                 </Text>
               </View>
@@ -584,9 +544,9 @@ export default function HabitsScreen() {
         )}
         ListEmptyComponent={() => (
           <View style={tw`items-center py-8`}>
-            <Ionicons name="leaf-outline" size={48} color={colors.textSecondary} />
-            <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No habits yet</Text>
-            <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
+            <Ionicons name="leaf-outline" size={40} color={colors.textSecondary} />
+            <Text style={[tw`text-sm font-medium mt-3`, { color: colors.text }]}>No habits yet</Text>
+            <Text style={[tw`text-sm text-center mt-1`, { color: colors.textSecondary }]}>
               Add your first habit to get started
             </Text>
           </View>
@@ -596,7 +556,7 @@ export default function HabitsScreen() {
             id={item.id}
             title={item.title}
             color={item.color}
-            subtext={`${item.description}${item.streak > 0 ? ` • 🔥 ${item.streak} day streak` : ""}`}
+            subtext={`${item.description}${item.streak > 0 ? ` \u2022 ${item.streak} day streak` : ""}`}
             completed={item.completed}
             streak={item.streak}
             difficulty={item.difficulty}
@@ -622,21 +582,20 @@ export default function HabitsScreen() {
       ]}>
         <TouchableOpacity 
           style={[
-            tw`w-16 h-16 rounded-full items-center justify-center`,
+            tw`w-14 h-14 rounded-full items-center justify-center`,
             {
               backgroundColor: colors.accent,
-              borderWidth: 4,
+              borderWidth: 3,
               borderColor: colors.background,
               marginLeft: 2,
             }
           ]}
           onPress={() => setIsAddModalVisible(true)}
         >
-          <Ionicons name="add" size={32} color="white" />
+          <Ionicons name="add" size={26} color="white" />
         </TouchableOpacity>
       </View>
 
-      {/* Modal */}
       {editingHabit ? (
         <AddHabitModal
           isVisible={isAddModalVisible}

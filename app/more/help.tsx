@@ -220,7 +220,7 @@ export default function Help() {
 
             <View style={tw`space-y-3`}>
               <View style={tw`flex-row items-start`}>
-                <Text style={tw`text-yellow-400 text-lg mr-3`}>💡</Text>
+                <Ionicons name="bulb" size={20} color="#F59E0B" style={tw`mr-3 mt-1`} />
                 <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
                   Set realistic goals and build habits gradually for long-term
                   success.
@@ -228,14 +228,14 @@ export default function Help() {
               </View>
 
               <View style={tw`flex-row items-start`}>
-                <Text style={tw`text-green-400 text-lg mr-3`}>🎯</Text>
+                <Ionicons name="target" size={20} color="#10B981" style={tw`mr-3 mt-1`} />
                 <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
                   Use focus sessions to improve concentration and earn more XP.
                 </Text>
               </View>
 
               <View style={tw`flex-row items-start`}>
-                <Text style={tw`text-blue-400 text-lg mr-3`}>📊</Text>
+                <Ionicons name="stats-chart" size={20} color="#3B82F6" style={tw`mr-3 mt-1`} />
                 <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
                   Check your stats regularly to track progress and stay motivated.
                 </Text>

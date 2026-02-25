@@ -1,81 +1,86 @@
 "use client"
 
-import { useState } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, TextInput, Alert } from "react-native"
+import { useState, useEffect } from "react"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Alert, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
+import { useTheme } from "../../../contexts/ThemeProvider"
 import tw from "../../../lib/tailwind"
+import { friendsAPI } from "../../../lib/api"
 import React from "react"
 
 export default function Friends() {
   const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState("")
+  const { colors, currentTheme } = useTheme()
   const [activeTab, setActiveTab] = useState("friends")
+  const [friends, setFriends] = useState([])
+  const [friendRequests, setFriendRequests] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock friends data
-  const [friends] = useState([
-    { 
-      id: 1, 
-      username: "CodeMaster", 
-      level: 12, 
-      status: "online", 
-      lastActivity: "2 hours ago",
-      streak: 15,
-      todayXP: 240,
-      avatar: "👨‍💻",
-      isPublic: true
-    },
-    { 
-      id: 2, 
-      username: "FitnessFan", 
-      level: 8, 
-      status: "offline", 
-      lastActivity: "1 day ago",
-      streak: 8,
-      todayXP: 180,
-      avatar: "💪",
-      isPublic: true
-    },
-    { 
-      id: 3, 
-      username: "StudyBuddy", 
-      level: 15, 
-      status: "online", 
-      lastActivity: "30 minutes ago",
-      streak: 22,
-      todayXP: 320,
-      avatar: "📚",
-      isPublic: false
+  useEffect(() => {
+    loadData()
+  }, [activeTab])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      if (activeTab === 'friends') {
+        const data = await friendsAPI.getFriends()
+        setFriends(data.friends || [])
+      } else {
+        const data = await friendsAPI.getPendingRequests()
+        setFriendRequests(data.requests || [])
+      }
+    } catch (error) {
+      console.error("Error loading data:", error)
+      Alert.alert("Error", "Failed to load data. Please try again.")
+    } finally {
+      setLoading(false)
     }
-  ])
-
-  // Mock friend requests
-  const [friendRequests] = useState([
-    {
-      id: 4,
-      username: "NewUser123",
-      level: 3,
-      avatar: "🌟",
-      mutualFriends: 1,
-      sentAt: "2 hours ago"
-    }
-  ])
-
-  const handleAcceptRequest = (userId: number) => {
-    Alert.alert("Friend Request Accepted", "You are now friends!")
   }
 
-  const handleRejectRequest = (userId: number) => {
-    Alert.alert("Friend Request Rejected")
+  const handleAcceptRequest = async (friendshipId: number) => {
+    try {
+      await friendsAPI.acceptFriendRequest(friendshipId)
+      Alert.alert("Friend Request Accepted", "You are now friends!")
+      loadData()
+    } catch (error) {
+      console.error("Error accepting request:", error)
+      Alert.alert("Error", "Failed to accept friend request")
+    }
   }
 
-  const handleRemoveFriend = (userId: number, username: string) => {
+  const handleRejectRequest = async (friendshipId: number) => {
+    try {
+      await friendsAPI.removeFriend(friendshipId)
+      Alert.alert("Friend Request Rejected")
+      loadData()
+    } catch (error) {
+      console.error("Error rejecting request:", error)
+      Alert.alert("Error", "Failed to reject friend request")
+    }
+  }
+
+  const handleRemoveFriend = (friendshipId: number, username: string) => {
     Alert.alert(
       "Remove Friend",
       `Are you sure you want to remove ${username} from your friends?`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Remove", style: "destructive", onPress: () => {} }
+        { 
+          text: "Remove", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              await friendsAPI.removeFriend(friendshipId)
+              Alert.alert("Friend Removed")
+              loadData()
+            } catch (error) {
+              console.error("Error removing friend:", error)
+              Alert.alert("Error", "Failed to remove friend")
+            }
+          } 
+        }
       ]
     )
   }
@@ -83,63 +88,57 @@ export default function Friends() {
   const FriendCard = ({ friend }) => (
     <TouchableOpacity 
       style={[
-        tw`bg-gray-800 rounded-2xl p-4 mb-3`,
-        { backgroundColor: '#1F2937' }
+        tw`rounded-2xl p-4 mb-3`,
+        { backgroundColor: colors.card }
       ]}
-      onPress={() => router.push(`/more/social/profile/${friend.id}`)}
+      onPress={() => router.push(`/more/social/profile/${friend.friend_id}`)}
     >
       <View style={tw`flex-row items-center`}>
         <View style={[
           tw`w-12 h-12 rounded-xl items-center justify-center mr-3`,
           { 
-            backgroundColor: friend.status === 'online' ? '#10B98120' : '#6B728020',
+            backgroundColor: colors.cardSecondary,
             borderWidth: 2,
-            borderColor: friend.status === 'online' ? '#10B981' : '#6B7280'
+            borderColor: colors.textSecondary
           }
         ]}>
-          <Text style={tw`text-lg`}>{friend.avatar}</Text>
+          {friend.avatar ? (
+            <Text style={tw`text-lg`}>{friend.avatar}</Text>
+          ) : (
+            <Ionicons name="person" size={24} color={colors.textSecondary} />
+          )}
         </View>
         
         <View style={tw`flex-1`}>
           <View style={tw`flex-row items-center mb-1`}>
-            <Text style={tw`text-white font-bold text-base mr-2`}>{friend.username}</Text>
-            <View style={[
-              tw`w-2 h-2 rounded-full`,
-              { backgroundColor: friend.status === 'online' ? '#10B981' : '#6B7280' }
-            ]} />
-            {!friend.isPublic && (
-              <Ionicons name="lock-closed" size={14} color="#6B7280" style={tw`ml-2`} />
+            <Text style={[tw`font-bold text-base mr-2`, { color: colors.text }]}>{friend.username}</Text>
+            {friend.level && (
+              <View style={[
+                tw`px-2 py-1 rounded`,
+                { backgroundColor: colors.accent + '30' }
+              ]}>
+                <Text style={[tw`text-xs font-semibold`, { color: colors.accent }]}>Lvl {friend.level}</Text>
+              </View>
             )}
           </View>
-          <Text style={tw`text-gray-400 text-sm`}>Level {friend.level} • {friend.lastActivity}</Text>
-          
-          {friend.isPublic && (
-            <View style={tw`flex-row items-center mt-2`}>
-              <View style={tw`flex-row items-center mr-4`}>
-                <Text style={tw`text-orange-400 mr-1`}>🔥</Text>
-                <Text style={tw`text-gray-300 text-sm`}>{friend.streak}</Text>
-              </View>
-              <View style={tw`flex-row items-center`}>
-                <Text style={tw`text-violet-400 mr-1`}>⭐</Text>
-                <Text style={tw`text-gray-300 text-sm`}>{friend.todayXP} XP</Text>
-              </View>
-            </View>
-          )}
+          <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+            {friend.mutual_friends_count > 0 ? `${friend.mutual_friends_count} mutual friends` : 'Friend'}
+          </Text>
         </View>
         
         <View style={tw`flex-row`}>
           <TouchableOpacity 
-            style={[tw`p-2 rounded-lg mr-2`, { backgroundColor: '#374151' }]}
+            style={[tw`p-2 rounded-lg mr-2`, { backgroundColor: colors.cardSecondary }]}
             onPress={() => {/* Open chat */}}
           >
-            <Ionicons name="chatbubble-outline" size={18} color="#9CA3AF" />
+            <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[tw`p-2 rounded-lg`, { backgroundColor: '#374151' }]}
+            style={[tw`p-2 rounded-lg`, { backgroundColor: colors.cardSecondary }]}
             onPress={() => handleRemoveFriend(friend.id, friend.username)}
           >
-            <Ionicons name="ellipsis-horizontal" size={18} color="#9CA3AF" />
+            <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -148,40 +147,47 @@ export default function Friends() {
 
   const RequestCard = ({ request }) => (
     <View style={[
-      tw`bg-gray-800 rounded-2xl p-4 mb-3`,
-      { backgroundColor: '#1F2937' }
+      tw`rounded-2xl p-4 mb-3`,
+      { backgroundColor: colors.card }
     ]}>
       <View style={tw`flex-row items-center`}>
         <View style={[
           tw`w-12 h-12 rounded-xl items-center justify-center mr-3`,
-          { backgroundColor: '#8B5CF620', borderWidth: 1, borderColor: '#8B5CF6' }
+          { backgroundColor: colors.accent + '20', borderWidth: 1, borderColor: colors.accent }
         ]}>
-          <Text style={tw`text-lg`}>{request.avatar}</Text>
+          {request.avatar ? (
+            <Text style={tw`text-lg`}>{request.avatar}</Text>
+          ) : (
+            <Ionicons name="person" size={24} color={colors.accent} />
+          )}
         </View>
         
         <View style={tw`flex-1`}>
-          <Text style={tw`text-white font-bold text-base`}>{request.username}</Text>
-          <Text style={tw`text-gray-400 text-sm`}>Level {request.level} • {request.sentAt}</Text>
-          {request.mutualFriends > 0 && (
-            <Text style={tw`text-gray-500 text-xs mt-1`}>
-              👥 {request.mutualFriends} mutual friends
+          <Text style={[tw`font-bold text-base`, { color: colors.text }]}>{request.username}</Text>
+          <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+            {request.level && `Level ${request.level} • `}
+            {new Date(request.created_at).toLocaleDateString()}
+          </Text>
+          {request.mutual_friends_count > 0 && (
+            <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>
+              👥 {request.mutual_friends_count} mutual friends
             </Text>
           )}
         </View>
         
         <View style={tw`flex-row`}>
           <TouchableOpacity 
-            style={[tw`px-3 py-2 rounded-lg mr-2`, { backgroundColor: '#10B981' }]}
+            style={[tw`px-3 py-2 rounded-lg mr-2`, { backgroundColor: colors.success }]}
             onPress={() => handleAcceptRequest(request.id)}
           >
             <Text style={tw`text-white font-semibold text-sm`}>Accept</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[tw`px-3 py-2 rounded-lg`, { backgroundColor: '#374151' }]}
+            style={[tw`px-3 py-2 rounded-lg`, { backgroundColor: colors.cardSecondary }]}
             onPress={() => handleRejectRequest(request.id)}
           >
-            <Text style={tw`text-gray-300 font-semibold text-sm`}>Decline</Text>
+            <Text style={[tw`font-semibold text-sm`, { color: colors.text }]}>Decline</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -189,18 +195,18 @@ export default function Friends() {
   )
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-900`}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={tw`text-white text-2xl font-bold flex-1`}>Friends</Text>
+          <Text style={[tw`text-2xl font-bold flex-1`, { color: colors.text }]}>Friends</Text>
           <TouchableOpacity 
-            style={[tw`p-2 rounded-xl`, { backgroundColor: '#8B5CF6' }]}
+            style={[tw`p-2 rounded-xl`, { backgroundColor: colors.accent }]}
             onPress={() => router.push('/more/social/add-friend')}
           >
             <Ionicons name="person-add" size={20} color="white" />
@@ -209,8 +215,8 @@ export default function Friends() {
 
         {/* Tab Navigation */}
         <View style={[
-          tw`bg-gray-800 rounded-2xl p-1 mb-6 flex-row`,
-          { backgroundColor: '#1F2937' }
+          tw`rounded-2xl p-1 mb-6 flex-row`,
+          { backgroundColor: colors.card }
         ]}>
           {[
             { id: 'friends', label: 'Friends', count: friends.length },
@@ -220,13 +226,13 @@ export default function Friends() {
               key={tab.id}
               style={[
                 tw`flex-1 py-3 rounded-xl`,
-                activeTab === tab.id && { backgroundColor: '#8B5CF6' }
+                activeTab === tab.id && { backgroundColor: colors.accent }
               ]}
               onPress={() => setActiveTab(tab.id)}
             >
               <Text style={[
                 tw`text-center font-semibold`,
-                { color: activeTab === tab.id ? 'white' : '#9CA3AF' }
+                { color: activeTab === tab.id ? 'white' : colors.textSecondary }
               ]}>
                 {tab.label} {tab.count > 0 && `(${tab.count})`}
               </Text>
@@ -234,64 +240,58 @@ export default function Friends() {
           ))}
         </View>
 
-        {/* Search Bar */}
-        <View style={[
-          tw`bg-gray-800 rounded-xl flex-row items-center px-4 py-3 mb-4`,
-          { backgroundColor: '#374151' }
-        ]}>
-          <Ionicons name="search" size={20} color="#9CA3AF" style={tw`mr-3`} />
-          <TextInput
-            style={tw`flex-1 text-white text-base`}
-            placeholder={`Search ${activeTab}...`}
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
         <ScrollView showsVerticalScrollIndicator={false}>
-          {activeTab === 'friends' && (
-            <View>
-              <Text style={tw`text-white text-lg font-bold mb-4`}>
-                Your Friends ({friends.length})
-              </Text>
-              
-              {friends.map((friend) => (
-                <FriendCard key={friend.id} friend={friend} />
-              ))}
-              
-              {friends.length === 0 && (
-                <View style={tw`items-center py-12`}>
-                  <Ionicons name="people-outline" size={64} color="#6B7280" />
-                  <Text style={tw`text-gray-400 text-lg mt-4`}>No friends yet</Text>
-                  <Text style={tw`text-gray-500 text-center mt-2`}>
-                    Add friends to see their progress and compete together
+          {loading ? (
+            <View style={tw`items-center py-12`}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading...</Text>
+            </View>
+          ) : (
+            <>
+              {activeTab === 'friends' && (
+                <View>
+                  <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+                    Your Friends ({friends.length})
                   </Text>
+                  
+                  {friends.map((friend) => (
+                    <FriendCard key={friend.id} friend={friend} />
+                  ))}
+                  
+                  {friends.length === 0 && (
+                    <View style={tw`items-center py-12`}>
+                      <Ionicons name="people-outline" size={64} color={colors.textSecondary} />
+                      <Text style={[tw`text-lg mt-4`, { color: colors.textSecondary }]}>No friends yet</Text>
+                      <Text style={[tw`text-center mt-2`, { color: colors.textSecondary }]}>
+                        Add friends to see their progress and compete together
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
-            </View>
-          )}
 
-          {activeTab === 'requests' && (
-            <View>
-              <Text style={tw`text-white text-lg font-bold mb-4`}>
-                Friend Requests ({friendRequests.length})
-              </Text>
-              
-              {friendRequests.map((request) => (
-                <RequestCard key={request.id} request={request} />
-              ))}
-              
-              {friendRequests.length === 0 && (
-                <View style={tw`items-center py-12`}>
-                  <Ionicons name="mail-outline" size={64} color="#6B7280" />
-                  <Text style={tw`text-gray-400 text-lg mt-4`}>No pending requests</Text>
-                  <Text style={tw`text-gray-500 text-center mt-2`}>
-                    Friend requests will appear here
+              {activeTab === 'requests' && (
+                <View>
+                  <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
+                    Friend Requests ({friendRequests.length})
                   </Text>
+                  
+                  {friendRequests.map((request) => (
+                    <RequestCard key={request.id} request={request} />
+                  ))}
+                  
+                  {friendRequests.length === 0 && (
+                    <View style={tw`items-center py-12`}>
+                      <Ionicons name="mail-outline" size={64} color={colors.textSecondary} />
+                      <Text style={[tw`text-lg mt-4`, { color: colors.textSecondary }]}>No pending requests</Text>
+                      <Text style={[tw`text-center mt-2`, { color: colors.textSecondary }]}>
+                        Friend requests will appear here
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
-            </View>
+            </>
           )}
         </ScrollView>
       </View>

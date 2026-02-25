@@ -1,25 +1,45 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
+import { socialAPI } from "../../lib/api"
 
 export default function Social() {
   const router = useRouter()
-  const { colors, currentTheme } = useTheme() // ← ONLY ADDITION: Theme support
+  const { colors, currentTheme } = useTheme()
   const [activeTab, setActiveTab] = useState("overview")
+  const [socialStats, setSocialStats] = useState({
+    friends: 0,
+    parties: 0,
+    activeChallenges: 0,
+    totalXpEarned: 0,
+    groupBadges: 0,
+    currentStreak: 0,
+    pendingRequests: 0,
+  })
+  const [loading, setLoading] = useState(true)
 
-  // Mock social stats
-  const socialStats = {
-    friends: 12,
-    parties: 3,
-    activeChallenges: 2,
-    totalXpEarned: 2450,
-    groupBadges: 5,
-    currentStreak: 7
+  // Load social stats
+  useEffect(() => {
+    loadSocialStats()
+  }, [])
+
+  const loadSocialStats = async () => {
+    try {
+      setLoading(true)
+      const response = await socialAPI.getStats()
+      if (response.success && response.stats) {
+        setSocialStats(response.stats)
+      }
+    } catch (error) {
+      console.error("Failed to load social stats:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Mock recent activity
@@ -91,11 +111,20 @@ export default function Social() {
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         
         {/* Header */}
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
-          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
+        <View style={tw`flex-row items-center justify-between mb-6 mt-2`}>
+          <View style={tw`flex-row items-center`}>
+            <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Social Hub</Text>
+          </View>
+          <TouchableOpacity onPress={loadSocialStats} disabled={loading}>
+            <Ionicons 
+              name="refresh" 
+              size={24} 
+              color={loading ? colors.textSecondary : colors.text} 
+            />
           </TouchableOpacity>
-          <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Social Hub</Text>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -142,8 +171,10 @@ export default function Social() {
                 <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Badges</Text>
               </View>
               <View style={tw`items-center`}>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.currentStreak}</Text>
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>🔥 Streak</Text>
+                <View style={tw`flex-row items-center`}>
+                  <Ionicons name="flame" size={14} color={colors.accent} />
+                  <Text style={[tw`text-xs ml-1`, { color: colors.textSecondary }]}>Streak</Text>
+                </View>
               </View>
             </View>
           </View>

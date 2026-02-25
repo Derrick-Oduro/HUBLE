@@ -27,12 +27,12 @@ import React from "react"
 const getAPIBaseURL = () => {
   if (__DEV__) {
     // Force use of your computer's IP address for physical device
-    return 'http://10.174.59.124:3000/api';
+    return 'http://10.4.62.166:3000/api';
   }
   return 'https://your-production-api.com/api';
 };
 
-const API_BASE_URL = 'http://10.21.48.60:3000/api';
+const API_BASE_URL = 'http://10.0.72.74:3000/api';
 
 export default function SignupScreen() {
   const router = useRouter()
@@ -123,7 +123,7 @@ export default function SignupScreen() {
         }
 
         Alert.alert(
-          "Account Created! 🎉",
+          "Account Created!",
           "Welcome to HUBLE! Your journey to better habits starts now.",
           [{ text: "Get Started", onPress: () => router.replace("/(tabs)") }]
         );

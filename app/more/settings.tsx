@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Switch, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
@@ -19,6 +19,47 @@ export default function Settings() {
   const [vibration, setVibration] = useState(true)
   const [autoBackup, setAutoBackup] = useState(false)
   const [analytics, setAnalytics] = useState(true)
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  // Save settings whenever they change
+  useEffect(() => {
+    saveSettings()
+  }, [notifications, sound, vibration, autoBackup, analytics])
+
+  const loadSettings = async () => {
+    try {
+      const savedSettings = await AsyncStorage.getItem('appSettings')
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings)
+        setNotifications(settings.notifications ?? true)
+        setSound(settings.sound ?? true)
+        setVibration(settings.vibration ?? true)
+        setAutoBackup(settings.autoBackup ?? false)
+        setAnalytics(settings.analytics ?? true)
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error)
+    }
+  }
+
+  const saveSettings = async () => {
+    try {
+      const settings = {
+        notifications,
+        sound,
+        vibration,
+        autoBackup,
+        analytics
+      }
+      await AsyncStorage.setItem('appSettings', JSON.stringify(settings))
+    } catch (error) {
+      console.error('Error saving settings:', error)
+    }
+  }
 
   const settingCategories = [
     {

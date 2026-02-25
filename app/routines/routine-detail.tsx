@@ -171,7 +171,7 @@ export default function RoutineDetail() {
                 const completeResponse = await routinesAPI.completeRoutine(parseInt(id), completedTasks.map((_, index) => index))
                 if (completeResponse.success) {
                   Alert.alert(
-                    "Routine Completed! 🎉",
+                    "Routine Completed!",
                     `${completeResponse.message || 'Amazing work!'}\n+${completeResponse.rewards?.experience || 20} XP, +${completeResponse.rewards?.coins || 10} Coins!`,
                     [{ text: "Awesome!", style: "default" }]
                   )
@@ -580,7 +580,7 @@ export default function RoutineDetail() {
               borderColor: colors.success + '40',
             }
           ]}>
-            <Text style={tw`text-4xl mb-2`}>🎉</Text>
+            <Ionicons name="trophy" size={48} color={colors.success} style={tw`mb-2`} />
             <Text style={[tw`text-lg font-bold mb-1`, { color: colors.success }]}>
               Routine Complete!
             </Text>

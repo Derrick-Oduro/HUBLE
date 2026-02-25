@@ -14,6 +14,7 @@ const dailiesRoutes = require("./routes/dailiesRoutes");
 const routinesRoutes = require("./routes/routinesRoutes");
 const focusRoutes = require("./routes/focusRoutes"); // Add this line
 const statsRoutes = require("./routes/statsRoutes"); // Add this line
+const socialRoutes = require("./routes/socialRoutes"); // Add social routes
 
 const app = express();
 
@@ -22,7 +23,7 @@ app.use(
   helmet({
     contentSecurityPolicy: false, // Disable for API
     crossOriginEmbedderPolicy: false,
-  })
+  }),
 );
 
 // Rate limiting
@@ -44,7 +45,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 
 // Body parsing middleware
@@ -88,6 +89,7 @@ app.use("/api/dailies", dailiesRoutes);
 app.use("/api/routines", routinesRoutes);
 app.use("/api/focus", focusRoutes); // Add this line
 app.use("/api/stats", statsRoutes); // Add this line
+app.use("/api/social", socialRoutes); // Add social routes
 
 // 404 handler
 app.use("*", (req, res) => {

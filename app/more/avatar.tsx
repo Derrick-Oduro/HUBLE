@@ -204,7 +204,10 @@ export default function Avatar() {
 
         {/* Avatar Selection */}
         <View style={tw`mb-6`}>
-          <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>🎭 Choose Avatar</Text>
+          <View style={tw`flex-row items-center mb-4`}>
+            <Ionicons name="happy" size={24} color={colors.accent} style={tw`mr-2`} />
+            <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Choose Avatar</Text>
+          </View>
           
           <View style={tw`flex-row flex-wrap justify-between`}>
             {avatarOptions.map((option, index) => (
@@ -224,7 +227,7 @@ export default function Avatar() {
                     setSelectedAvatar(option.emoji)
                   } else {
                     Alert.alert(
-                      "🔒 Locked",
+                      "Locked",
                       `Reach level ${option.level} to unlock ${option.name}`
                     )
                   }
@@ -251,7 +254,10 @@ export default function Avatar() {
 
         {/* Color Selection */}
         <View style={tw`mb-6`}>
-          <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>🎨 Choose Color</Text>
+          <View style={tw`flex-row items-center mb-4`}>
+            <Ionicons name="color-palette" size={24} color={colors.accent} style={tw`mr-2`} />
+            <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Choose Color</Text>
+          </View>
           
           <View style={tw`flex-row flex-wrap justify-between`}>
             {colorOptions.map((option, index) => (
@@ -296,7 +302,7 @@ export default function Avatar() {
                   if (option.unlocked) {
                     setSelectedBorder(option.id)
                   } else {
-                    Alert.alert("🔒 Locked", "Level up to unlock this border style!")
+                    Alert.alert("Locked", "Level up to unlock this border style!")
                   }
                 }}
                 disabled={!option.unlocked}

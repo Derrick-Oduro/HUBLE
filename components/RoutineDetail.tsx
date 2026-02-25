@@ -285,7 +285,7 @@ export default function RoutineDetail({ route }) {
 
           <Text style={tw`text-gray-400 text-sm`}>
             {completedTasks === totalTasks && totalTasks > 0
-              ? "All tasks completed! Great job! 🎉"
+              ? "All tasks completed! Great job!"
               : `${totalTasks - completedTasks} tasks remaining`}
           </Text>
         </View>
