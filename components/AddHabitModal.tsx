@@ -20,9 +20,10 @@ interface AddHabitModalProps {
   onClose: () => void
   onAdd: (habit: any) => void
   initialValues?: any
+  onDelete?: (id: number) => void
 }
 
-export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues }: AddHabitModalProps) {
+export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues, onDelete }: AddHabitModalProps) {
   const { colors } = useTheme()
   
   const habitColors = useMemo(
@@ -147,15 +148,29 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
             {initialValues ? "Edit Habit" : "New Habit"}
           </Text>
           
-          <TouchableOpacity
-            style={[
-              tw`px-4 py-2 rounded-lg`,
-              { backgroundColor: colors.accent }
-            ]}
-            onPress={handleSubmit}
-          >
-            <Text style={tw`text-white font-bold`}>Save</Text>
-          </TouchableOpacity>
+          <View style={tw`flex-row items-center`}>
+            {initialValues && onDelete && (
+              <TouchableOpacity
+                style={[
+                  tw`px-3 py-2 rounded-lg mr-2`,
+                  { backgroundColor: colors.error + '22' }
+                ]}
+                onPress={() => onDelete(initialValues.id)}
+              >
+                <Ionicons name="trash-outline" size={18} color={colors.error} />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                tw`px-4 py-2 rounded-lg`,
+                { backgroundColor: colors.accent }
+              ]}
+              onPress={handleSubmit}
+            >
+              <Text style={tw`text-white font-bold`}>Save</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView style={tw`flex-1 p-5`} showsVerticalScrollIndicator={false}>

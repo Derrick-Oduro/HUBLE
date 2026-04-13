@@ -518,7 +518,7 @@ export default function HabitsScreen() {
       <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <FlatList
-        style={tw`flex-1 px-4 pt-2`}
+        style={tw`flex-1 px-2 pt-2`}
         data={habits}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
@@ -562,9 +562,7 @@ export default function HabitsScreen() {
             subtext={`${item.description}${(item.streak || 0) > 0 ? ` \u2022 ${item.streak} day streak` : ""}`}
             completed={item.completed}
             streak={item.streak}
-            difficulty={item.difficulty}
             onEdit={editHabit}
-            onDelete={deleteHabit}
             onComplete={handleHabitComplete}
             onFail={handleHabitFail}
           />
@@ -608,6 +606,11 @@ export default function HabitsScreen() {
           }}
           onAdd={updateHabit}
           initialValues={editingHabit}
+          onDelete={(habitId) => {
+            setIsAddModalVisible(false)
+            setEditingHabit(null)
+            deleteHabit(habitId)
+          }}
         />
       ) : (
         <AddHabitModal 
