@@ -11,7 +11,8 @@
     "lint": "eslint src/**/*.js",
     "lint:fix": "eslint src/**/*.js --fix",
     "db:migrate": "node scripts/migrate.js",
-    "db:seed": "node scripts/seed.js"
+    "db:seed": "node scripts/seed.js",
+    "init-admin": "node initAdmin.js"
   },
   "keywords": [
     "habit",
@@ -22,13 +23,14 @@
     "sqlite",
     "mobile"
   ],
-  "author": "Your Name",
+  "author": "Derrick-Oduro",
   "license": "MIT",
   "dependencies": {
     "bcrypt": "^5.1.1",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "expo-av": "^16.0.8",
     "express": "^4.18.2",
     "express-validator": "^7.2.1",
     "helmet": "^7.2.0",
@@ -47,10 +49,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/huble-backend.git"
+    "url": "git+https://github.com/Derrick-Oduro/HUBLE.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/huble-backend/issues"
+    "url": "https://github.com/Derrick-Oduro/HUBLE/issues"
   },
-  "homepage": "https://github.com/yourusername/huble-backend#readme"
+  "homepage": "https://github.com/Derrick-Oduro/HUBLE#readme"
 }

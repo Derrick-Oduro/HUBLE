@@ -1,13 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Switch, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import tw from "../../lib/tailwind"
 import { useTheme } from "../../contexts/ThemeProvider"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import React from "react"
+import {
+  loadAppSettings,
+  saveAppSettings,
+  syncNotificationSchedules,
+} from "../../lib/notificationService"
+
 
 export default function Settings() {
   const router = useRouter()
@@ -19,6 +24,7 @@ export default function Settings() {
   const [vibration, setVibration] = useState(true)
   const [autoBackup, setAutoBackup] = useState(false)
   const [analytics, setAnalytics] = useState(true)
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
 
   // Load settings on mount
   useEffect(() => {
@@ -27,37 +33,52 @@ export default function Settings() {
 
   // Save settings whenever they change
   useEffect(() => {
+    if (!hasLoadedSettings) return
+
+    const saveSettings = async () => {
+      try {
+        const settings = {
+          notifications,
+          sound,
+          vibration,
+          autoBackup,
+          analytics
+        }
+        await saveAppSettings(settings)
+      } catch (error) {
+        console.error('Error saving settings:', error)
+      }
+    }
+
     saveSettings()
-  }, [notifications, sound, vibration, autoBackup, analytics])
+  }, [hasLoadedSettings, notifications, sound, vibration, autoBackup, analytics])
+
+  useEffect(() => {
+    if (!hasLoadedSettings) return
+
+    const syncNotifications = async () => {
+      try {
+        await syncNotificationSchedules(notifications)
+      } catch (error) {
+        console.error("Failed to sync notification schedules:", error)
+      }
+    }
+
+    syncNotifications()
+  }, [hasLoadedSettings, notifications])
 
   const loadSettings = async () => {
     try {
-      const savedSettings = await AsyncStorage.getItem('appSettings')
-      if (savedSettings) {
-        const settings = JSON.parse(savedSettings)
-        setNotifications(settings.notifications ?? true)
-        setSound(settings.sound ?? true)
-        setVibration(settings.vibration ?? true)
-        setAutoBackup(settings.autoBackup ?? false)
-        setAnalytics(settings.analytics ?? true)
-      }
+      const settings = await loadAppSettings()
+      setNotifications(settings.notifications)
+      setSound(settings.sound)
+      setVibration(settings.vibration)
+      setAutoBackup(settings.autoBackup)
+      setAnalytics(settings.analytics)
     } catch (error) {
       console.error('Error loading settings:', error)
-    }
-  }
-
-  const saveSettings = async () => {
-    try {
-      const settings = {
-        notifications,
-        sound,
-        vibration,
-        autoBackup,
-        analytics
-      }
-      await AsyncStorage.setItem('appSettings', JSON.stringify(settings))
-    } catch (error) {
-      console.error('Error saving settings:', error)
+    } finally {
+      setHasLoadedSettings(true)
     }
   }
 
@@ -139,7 +160,7 @@ export default function Settings() {
                         "statsData"
                       ])
                       Alert.alert("Success", "All data has been reset.")
-                    } catch (error) {
+                    } catch {
                       Alert.alert("Error", "Failed to reset data.")
                     }
                   }
@@ -155,7 +176,7 @@ export default function Settings() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
@@ -239,3 +260,4 @@ export default function Settings() {
     </SafeAreaView>
   )
 }
+

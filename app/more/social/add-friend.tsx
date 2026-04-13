@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../../contexts/ThemeProvider"
 import tw from "../../../lib/tailwind"
 import { friendsAPI } from "../../../lib/api"
-import React from "react"
+
 
 export default function AddFriend() {
   const router = useRouter()
@@ -99,7 +99,7 @@ export default function AddFriend() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         
         {/* Header */}
@@ -196,8 +196,8 @@ export default function AddFriend() {
                 <View style={tw`items-center py-12`}>
                   <Ionicons name="search-outline" size={64} color={colors.textSecondary} />
                   <Text style={[tw`text-lg mt-4`, { color: colors.textSecondary }]}>Search for users</Text>
-                  <Text style={[tw`text-center mt-2 px-8`, { color: colors.textSecondary }]}>
-                    Enter a username or email and tap "Search Users" to find friends
+                  <Text style={[tw`text-center mt-2 px-8`, { color: colors.textSecondary }]}> 
+                    Enter a username or email and tap Search Users to find friends
                   </Text>
                 </View>
               )}

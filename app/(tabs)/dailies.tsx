@@ -1,14 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert } from "react-native"
+import React, { useState, useEffect } from "react"
+import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert, Pressable } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import AddDailyModal from "../../components/AddDailyModal"
+import EditDailyModal from "../../components/EditDailyModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
-import React from "react"
+
 import { dailiesAPI } from "../../lib/api"
 import CharacterPanel from "../../components/CharacterPanel"
 
@@ -32,11 +33,14 @@ interface DailyTask {
 }
 
 export default function DailiesScreen() {
-  const { colors, currentTheme } = useTheme()
+  const { colors, currentTheme, isGlowEnabled } = useTheme()
   const { stats, updateExperience, updateHealth, updateCoins } = useStats()
   
   const [dailies, setDailies] = useState<DailyTask[]>([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false)
+  const [editingDaily, setEditingDaily] = useState<DailyTask | null>(null)
+  const [expandedMenuId, setExpandedMenuId] = useState<number | null>(null)
 
   // Load dailies from storage
   useEffect(() => {
@@ -96,14 +100,6 @@ export default function DailiesScreen() {
 
     loadDailies()
   }, [])
-
-  const saveDailies = async (newDailies: DailyTask[]) => {
-    try {
-      await AsyncStorage.setItem("dailiesData", JSON.stringify(newDailies))
-    } catch (error) {
-      console.error("Error saving dailies:", error)
-    }
-  }
 
   const addDaily = async (newDaily: any) => {
     try {
@@ -268,6 +264,63 @@ export default function DailiesScreen() {
     }
   }
 
+  const updateDaily = async (id: number, updatedData: any) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken')
+      const isGuest = await AsyncStorage.getItem('isGuest')
+
+      if (token && isGuest !== 'true') {
+        console.log('📝 Updating daily on backend:', id, updatedData)
+        
+        try {
+          const response = await dailiesAPI.updateDaily(id, updatedData)
+          
+          if (response.success) {
+            // Update local state with backend response
+            const updatedDailies = dailies.map(d => 
+              d.id === id 
+                ? { 
+                  ...d, 
+                  ...updatedData,
+                  title: updatedData.title,
+                  description: updatedData.description,
+                  priority: updatedData.priority,
+                  difficulty: updatedData.difficulty,
+                  category: updatedData.category
+                } 
+                : d
+            )
+            
+            setDailies(updatedDailies)
+            await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedDailies))
+            
+            console.log('✅ Daily updated on backend successfully')
+            Alert.alert("Success", "Task updated successfully!")
+            return
+          }
+        } catch (error) {
+          console.error('❌ Failed to update on backend, updating locally:', error)
+        }
+      }
+
+      // Guest mode or backend failed - update locally
+      console.log('📱 Updating daily locally:', id, updatedData)
+      const updatedDailies = dailies.map(d => 
+        d.id === id 
+          ? { ...d, ...updatedData } 
+          : d
+      )
+      
+      setDailies(updatedDailies)
+      await AsyncStorage.setItem("dailiesData", JSON.stringify(updatedDailies))
+      Alert.alert("Success", "Task updated successfully!")
+      
+    } catch (error) {
+      console.error("Error updating daily:", error)
+      Alert.alert("Error", "Failed to update task")
+    }
+  }
+
   const deleteDaily = async (id: number) => {
     Alert.alert(
       "Delete Task",
@@ -319,27 +372,27 @@ export default function DailiesScreen() {
     }
   }
 
-  const getDifficultyIcon = (difficulty: string) => {
-    switch (difficulty) {
+  const getDifficultyInfo = (diff: string) => {
+    switch (diff) {
       case 'easy':
+        return { icon: 'leaf', color: colors.success, label: 'Easy' }
       case 'medium':
+        return { icon: 'flash', color: colors.warning, label: 'Medium' }
       case 'hard':
-      default: 
+        return { icon: 'diamond', color: colors.error, label: 'Hard' }
+      default:
+        return { icon: 'leaf', color: colors.success, label: 'Easy' }
     }
   }
 
   // Calculate stats
-  const completedCount = dailies.filter(d => d.completed).length
-  const totalCount = dailies.length
-  const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-
   // Calculate daily completion stats
   const completedDailies = dailies.filter(daily => daily.completed).length
   const totalDailies = dailies.length
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <FlatList
         style={tw`flex-1 px-5 pt-2`}
@@ -380,86 +433,153 @@ export default function DailiesScreen() {
         )}
         renderItem={({ item }) => {
           const priorityColor = getPriorityColor(item.priority)
+          const difficultyInfo = getDifficultyInfo(item.difficulty)
+          const isExpanded = expandedMenuId === item.id
+          
+          const handleExpand = () => {
+            setExpandedMenuId(isExpanded ? null : item.id)
+          }
           
           return (
-            <TouchableOpacity
-              onPress={() => {
-                // Add edit functionality here later
-                console.log('Edit daily:', item.title)
-              }}
-              activeOpacity={0.7}
-              style={[
-                tw`rounded-xl p-2 mb-2`, // Changed from p-3 to p-2 (smaller height)
-                { 
-                  backgroundColor: colors.card,
-                  borderLeftWidth: 6,
-                  borderLeftColor: priorityColor,
-                  shadowColor: colors.accent,
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 2,
-                  elevation: 1,
-                }
-              ]}
-            >
-              <View style={tw`flex-row items-center justify-between`}> {/* Changed from items-start */}
-                <View style={tw`flex-1 mr-2`}>
-                  <Text style={[
-                    tw`text-base font-semibold`,
-                    { 
-                      color: item.completed ? colors.textSecondary : colors.text,
-                      textDecorationLine: item.completed ? 'line-through' : 'none'
-                    }
-                  ]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  
-                  {item.description && (
-                    <Text style={[
-                      tw`text-xs mt-1`,
-                      { color: colors.textSecondary }
-                    ]} numberOfLines={1}>
-                      {item.description}
-                    </Text>
-                  )}
-                  
-                  {/* Simplified bottom row - removed category */}
-                  <View style={tw`flex-row items-center mt-1`}>
-                    <View style={[
-                      tw`px-2 py-0.5 rounded-full`,
-                      { backgroundColor: priorityColor + '20' }
-                    ]}>
-                      <Text style={[tw`text-xs font-medium capitalize`, { color: priorityColor }]}>
-                        {item.priority}
-                      </Text>
+            <View style={tw`mb-2.5`}>
+              <Pressable
+                onPress={handleExpand}
+                style={[
+                  tw`rounded-xl p-2`,
+                  { 
+                    backgroundColor: colors.card,
+                    borderLeftWidth: 4,
+                    borderLeftColor: priorityColor,
+                    shadowColor: colors.accent,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isGlowEnabled ? 0.08 : 0,
+                    shadowRadius: isGlowEnabled ? 4 : 0,
+                    elevation: isGlowEnabled ? 2 : 0,
+                  }
+                ]}
+              >
+                <View style={tw`flex-row items-center justify-between`}>
+                  <View style={tw`flex-1 mr-2`}>
+                    {/* Title with difficulty icon */}
+                    <View style={tw`flex-row items-center`}>
+                      <View
+                        style={[
+                          tw`w-7 h-7 rounded-lg items-center justify-center mr-2`,
+                          { backgroundColor: `${difficultyInfo.color}20` }
+                        ]}
+                      >
+                        <Ionicons name={difficultyInfo.icon} size={16} color={difficultyInfo.color} />
+                      </View>
+                      
+                      <View style={tw`flex-1`}>
+                        <Text style={[
+                          tw`text-sm font-semibold`,
+                          { 
+                            color: item.completed ? colors.textSecondary : colors.text,
+                            textDecorationLine: item.completed ? 'line-through' : 'none'
+                          }
+                        ]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        
+                        {/* Compact subtitle */}
+                        {item.description && (
+                          <Text style={[
+                            tw`text-xs mt-0.5`,
+                            { color: colors.textSecondary }
+                          ]} numberOfLines={1}>
+                            {item.description}
+                          </Text>
+                        )}
+                      </View>
                     </View>
                   </View>
-                </View>
-                
-                {/* Right side buttons */}
-                <View style={tw`flex-row items-center`}>
-                  <TouchableOpacity
-                    style={[
-                      tw`w-7 h-7 rounded-full items-center justify-center mr-2`,
-                      { 
-                        backgroundColor: item.completed ? colors.success : colors.cardSecondary,
-                        borderWidth: 1.5,
-                        borderColor: item.completed ? colors.success : colors.textSecondary,
-                      }
-                    ]}
-                    onPress={() => toggleDaily(item.id)}
-                  >
-                    {item.completed && (
-                      <Ionicons name="checkmark" size={14} color="white" />
-                    )}
-                  </TouchableOpacity>
                   
-                  <TouchableOpacity onPress={() => deleteDaily(item.id)}>
-                    <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
+                  {/* Right side buttons */}
+                  <View style={tw`flex-row items-center`}>
+                    <TouchableOpacity
+                      style={[
+                        tw`w-6 h-6 rounded-lg items-center justify-center mr-1.5`,
+                        { 
+                          backgroundColor: item.completed ? colors.success : colors.cardSecondary,
+                          borderWidth: 1.5,
+                          borderColor: item.completed ? colors.success : colors.textSecondary,
+                        }
+                      ]}
+                      onPress={() => toggleDaily(item.id)}
+                    >
+                      {item.completed && (
+                        <Ionicons name="checkmark" size={12} color="white" />
+                      )}
+                    </TouchableOpacity>
+                    
+                    {/* Expand Arrow */}
+                    <TouchableOpacity onPress={handleExpand}>
+                      <Ionicons 
+                        name={isExpanded ? "chevron-up" : "chevron-down"} 
+                        size={16} 
+                        color={colors.textSecondary} 
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
+              </Pressable>
+              
+              {/* Expanded Actions - Edit and Delete Only */}
+              {isExpanded && (
+                <View style={[
+                  tw`overflow-hidden rounded-b-xl mt-1`,
+                  {
+                    backgroundColor: colors.cardSecondary,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isGlowEnabled ? 0.1 : 0,
+                    shadowRadius: isGlowEnabled ? 4 : 0,
+                    elevation: isGlowEnabled ? 3 : 0,
+                  }
+                ]}>
+                  <View style={[
+                    tw`px-2 py-1.5 flex-row justify-around`,
+                    { 
+                      backgroundColor: colors.cardSecondary,
+                      borderBottomLeftRadius: 12, 
+                      borderBottomRightRadius: 12 
+                    }
+                  ]}>
+                    {/* Edit Button */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setExpandedMenuId(null)
+                        setEditingDaily(item)
+                        setIsEditModalVisible(true)
+                      }}
+                      style={[
+                        tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
+                        { backgroundColor: colors.textSecondary + '25' }
+                      ]}
+                    >
+                      <Ionicons name="pencil" size={14} color={colors.textSecondary} />
+                      <Text style={[tw`text-xs mt-0.5 font-medium`, { color: colors.textSecondary }]}>Edit</Text>
+                    </TouchableOpacity>
+
+                    {/* Delete Button */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setExpandedMenuId(null)
+                        deleteDaily(item.id)
+                      }}
+                      style={[
+                        tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
+                        { backgroundColor: colors.error + '25' }
+                      ]}
+                    >
+                      <Ionicons name="trash" size={14} color={colors.error} />
+                      <Text style={[tw`text-xs mt-0.5 font-medium`, { color: colors.error }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
           )
         }}
       />
@@ -483,9 +603,9 @@ export default function DailiesScreen() {
               backgroundColor: colors.accent,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 6,
-              elevation: 8,
+              shadowOpacity: isGlowEnabled ? 0.3 : 0,
+              shadowRadius: isGlowEnabled ? 6 : 0,
+              elevation: isGlowEnabled ? 8 : 0,
               borderWidth: 4,
               borderColor: colors.background,
               marginLeft: 2, // Fine adjustment for centering
@@ -502,6 +622,17 @@ export default function DailiesScreen() {
         onClose={() => setIsAddModalVisible(false)}
         onAdd={addDaily}
       />
+
+      <EditDailyModal
+        isVisible={isEditModalVisible}
+        onClose={() => {
+          setIsEditModalVisible(false)
+          setEditingDaily(null)
+        }}
+        daily={editingDaily}
+        onSave={updateDaily}
+      />
     </SafeAreaView>
   )
 }
+

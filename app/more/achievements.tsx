@@ -1,66 +1,125 @@
 "use client"
 
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, FlatList } from "react-native"
+import React, { useState, useEffect, useCallback } from "react"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Modal, Share } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
-import React from "react"
+
+import { achievementsAPI } from "../../lib/api"
+
+const CATEGORY_META = {
+  habits: { title: 'Habit Master', icon: 'checkmark-circle' },
+  focus: { title: 'Focus Expert', icon: 'timer' },
+  level: { title: 'Level Master', icon: 'trending-up' },
+  dailies: { title: 'Daily Dedication', icon: 'calendar' },
+  routines: { title: 'Routine Champion', icon: 'list' },
+  social: { title: 'Social Star', icon: 'people' },
+}
 
 export default function Achievements() {
   const router = useRouter()
   const { colors, currentTheme } = useTheme()
+  const [loading, setLoading] = useState(true)
+  const [achievementCategories, setAchievementCategories] = useState([])
+  const [totalAchievements, setTotalAchievements] = useState(0)
+  const [unlockedAchievements, setUnlockedAchievements] = useState(0)
+  const [celebrationQueue, setCelebrationQueue] = useState<any[]>([])
+  const [activeCelebration, setActiveCelebration] = useState<any | null>(null)
 
-  // Mock achievements data with better structure
-  const achievementCategories = [
-    {
-      id: 'habits',
-      title: 'Habit Master',
-      color: '#10B981',
-      icon: 'checkmark-circle',
-      achievements: [
-        { id: 1, title: "First Steps", description: "Complete your first habit", unlocked: true, progress: 1, total: 1 },
-        { id: 2, title: "Week Warrior", description: "Complete habits for 7 days straight", unlocked: true, progress: 7, total: 7 },
-        { id: 3, title: "Month Champion", description: "Complete habits for 30 days", unlocked: false, progress: 15, total: 30 },
-        { id: 4, title: "Habit Legend", description: "Complete habits for 100 days", unlocked: false, progress: 15, total: 100 },
-      ]
-    },
-    {
-      id: 'focus',
-      title: 'Focus Expert',
-      color: '#F59E0B',
-      icon: 'timer',
-      achievements: [
-        { id: 5, title: "Focused Mind", description: "Complete 10 focus sessions", unlocked: true, progress: 10, total: 10 },
-        { id: 6, title: "Deep Worker", description: "Focus for 5 hours in a day", unlocked: false, progress: 2, total: 5 },
-        { id: 7, title: "Concentration King", description: "Complete 100 focus sessions", unlocked: false, progress: 25, total: 100 },
-      ]
-    },
-    {
-      id: 'level',
-      title: 'Level Master',
-      color: '#8B5CF6',
-      icon: 'trending-up',
-      achievements: [
-        { id: 8, title: "Level Up!", description: "Reach level 5", unlocked: true, progress: 5, total: 5 },
-        { id: 9, title: "XP Hunter", description: "Earn 1000 XP", unlocked: false, progress: 450, total: 1000 },
-        { id: 10, title: "Elite Status", description: "Reach level 20", unlocked: false, progress: 5, total: 20 },
-      ]
+  const loadAchievements = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await achievementsAPI.getAchievements()
+      
+      if (response.success) {
+        // Convert backend grouped data to frontend format
+        const categories = Object.keys(response.achievements).map(categoryKey => {
+          const meta = CATEGORY_META[categoryKey] || { title: categoryKey, icon: 'star' };
+          return {
+            id: categoryKey,
+            title: meta.title,
+            color: response.achievements[categoryKey][0]?.color || '#10B981',
+            icon: meta.icon,
+            achievements: response.achievements[categoryKey]
+          };
+        });
+
+        setAchievementCategories(categories)
+        setTotalAchievements(response.stats.total)
+        setUnlockedAchievements(response.stats.unlocked)
+
+        const unlockedList = categories.flatMap((category) =>
+          category.achievements
+            .filter((achievement: any) => achievement.unlocked)
+            .map((achievement: any) => ({
+              ...achievement,
+              categoryTitle: category.title,
+              color: achievement.color || category.color,
+            })),
+        )
+
+        const seenRaw = await AsyncStorage.getItem("seenAchievementIds")
+        const seenIds = new Set(seenRaw ? JSON.parse(seenRaw) : [])
+        const newUnlocks = unlockedList.filter((achievement: any) => !seenIds.has(achievement.id))
+
+        if (newUnlocks.length > 0) {
+          setCelebrationQueue(newUnlocks)
+          setActiveCelebration(newUnlocks[0])
+        }
+
+        await AsyncStorage.setItem("seenAchievementIds", JSON.stringify(unlockedList.map((achievement: any) => achievement.id)))
+      }
+    } catch (error) {
+      console.error("Failed to load achievements:", error)
+    } finally {
+      setLoading(false)
     }
-  ]
+  }, [])
+
+  useEffect(() => {
+    loadAchievements()
+  }, [loadAchievements])
 
   const getProgressPercentage = (progress: number, total: number) => {
     return Math.min(100, (progress / total) * 100)
   }
 
-  const totalAchievements = achievementCategories.reduce((sum, cat) => sum + cat.achievements.length, 0)
-  const unlockedAchievements = achievementCategories.reduce(
-    (sum, cat) => sum + cat.achievements.filter(a => a.unlocked).length, 0
-  )
+  const shareAchievement = async () => {
+    if (!activeCelebration) return
+
+    try {
+      await Share.share({
+        message: `I just unlocked \"${activeCelebration.title}\" in HUBLE. Staying consistent is paying off.`,
+      })
+    } catch (error) {
+      console.error("Failed to share achievement:", error)
+    }
+  }
+
+  const closeCelebration = () => {
+    const [, ...remaining] = celebrationQueue
+    setCelebrationQueue(remaining)
+    setActiveCelebration(remaining[0] || null)
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={currentTheme.statusBarStyle} />
+        <View style={tw`flex-1 justify-center items-center`}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[tw`mt-4`, { color: colors.text }]}>Loading achievements...</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
@@ -106,7 +165,7 @@ export default function Achievements() {
               <View style={tw`flex-row justify-between items-center mb-2`}>
                 <Text style={[tw`font-medium`, { color: colors.text }]}>Overall Progress</Text>
                 <Text style={tw`text-yellow-400 font-bold`}>
-                  {Math.round((unlockedAchievements / totalAchievements) * 100)}%
+                  {totalAchievements > 0 ? Math.round((unlockedAchievements / totalAchievements) * 100) : 0}%
                 </Text>
               </View>
               <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
@@ -114,7 +173,7 @@ export default function Achievements() {
                   style={[
                     tw`h-full bg-yellow-500 rounded-full`,
                     {
-                      width: `${(unlockedAchievements / totalAchievements) * 100}%`,
+                      width: `${totalAchievements > 0 ? (unlockedAchievements / totalAchievements) * 100 : 0}%`,
                       shadowColor: '#F59E0B',
                       shadowOffset: { width: 0, height: 1 },
                       shadowOpacity: 0.6,
@@ -215,6 +274,70 @@ export default function Achievements() {
           ))}
         </ScrollView>
       </View>
+
+      <Modal
+        visible={!!activeCelebration}
+        transparent
+        animationType="fade"
+        onRequestClose={closeCelebration}
+      >
+        <View style={tw`flex-1 justify-center items-center bg-black bg-opacity-55 px-6`}>
+          <View
+            style={[
+              tw`w-full rounded-3xl p-6 items-center`,
+              {
+                backgroundColor: colors.card,
+                borderWidth: 2,
+                borderColor: activeCelebration?.color || colors.accent,
+              },
+            ]}
+          >
+            <View style={tw`flex-row mb-3`}>
+              {[0, 1, 2, 3, 4].map((index) => (
+                <Ionicons
+                  key={index}
+                  name="sparkles"
+                  size={18}
+                  color={activeCelebration?.color || colors.accent}
+                  style={tw`mx-1`}
+                />
+              ))}
+            </View>
+
+            <View
+              style={[
+                tw`w-20 h-20 rounded-full items-center justify-center mb-4`,
+                { backgroundColor: (activeCelebration?.color || colors.accent) + "20" },
+              ]}
+            >
+              <Ionicons name="trophy" size={40} color={activeCelebration?.color || colors.accent} />
+            </View>
+
+            <Text style={[tw`text-xs font-bold uppercase tracking-wide`, { color: colors.textSecondary }]}>Achievement unlocked</Text>
+            <Text style={[tw`text-2xl font-bold mt-2 text-center`, { color: colors.text }]}>{activeCelebration?.title}</Text>
+            <Text style={[tw`text-center mt-2`, { color: colors.textSecondary }]}>
+              {activeCelebration?.description}
+            </Text>
+
+            <View style={tw`flex-row w-full mt-6`}>
+              <TouchableOpacity
+                style={[tw`flex-1 py-3 rounded-xl mr-2`, { backgroundColor: colors.cardSecondary }]}
+                onPress={closeCelebration}
+              >
+                <Text style={[tw`text-center font-semibold`, { color: colors.text }]}>Close</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[tw`flex-1 py-3 rounded-xl ml-2`, { backgroundColor: activeCelebration?.color || colors.accent }]}
+                onPress={shareAchievement}
+              >
+                <Text style={tw`text-center font-semibold text-white`}>Share</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
+

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Switch, Alert, TextInput } from "react-native"
+import React, { useState, useEffect } from "react"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Switch, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import tw from "../../lib/tailwind"
 import { useTheme } from "../../contexts/ThemeProvider"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import React from "react"
+
 
 export default function Security() {
   const router = useRouter()
@@ -27,6 +27,21 @@ export default function Security() {
 
   // Save settings whenever they change
   useEffect(() => {
+    const saveSecuritySettings = async () => {
+      try {
+        const settings = {
+          biometricAuth,
+          twoFactorAuth,
+          autoLogout,
+          dataEncryption,
+          privacyMode
+        }
+        await AsyncStorage.setItem('securitySettings', JSON.stringify(settings))
+      } catch (error) {
+        console.error('Error saving security settings:', error)
+      }
+    }
+
     saveSecuritySettings()
   }, [biometricAuth, twoFactorAuth, autoLogout, dataEncryption, privacyMode])
 
@@ -43,21 +58,6 @@ export default function Security() {
       }
     } catch (error) {
       console.error('Error loading security settings:', error)
-    }
-  }
-
-  const saveSecuritySettings = async () => {
-    try {
-      const settings = {
-        biometricAuth,
-        twoFactorAuth,
-        autoLogout,
-        dataEncryption,
-        privacyMode
-      }
-      await AsyncStorage.setItem('securitySettings', JSON.stringify(settings))
-    } catch (error) {
-      console.error('Error saving security settings:', error)
     }
   }
 
@@ -168,7 +168,7 @@ export default function Security() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
@@ -381,4 +381,5 @@ export default function Security() {
     </SafeAreaView>
   )
 }
+
 

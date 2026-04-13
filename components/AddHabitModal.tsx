@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { 
   View, 
   Text, 
@@ -8,7 +8,6 @@ import {
   TouchableOpacity, 
   Modal, 
   ScrollView, 
-  Alert,
   KeyboardAvoidingView,
   Platform 
 } from "react-native"
@@ -26,12 +25,10 @@ interface AddHabitModalProps {
 export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues }: AddHabitModalProps) {
   const { colors } = useTheme()
   
-  const habitColors = [
-    colors.accent,
-    colors.success, 
-    colors.warning,
-    colors.error
-  ]
+  const habitColors = useMemo(
+    () => [colors.accent, colors.success, colors.warning, colors.error],
+    [colors.accent, colors.success, colors.warning, colors.error],
+  )
   
   const [title, setTitle] = useState(initialValues?.title || "")
   const [description, setDescription] = useState(initialValues?.description || "")
@@ -53,7 +50,7 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
         setSelectedColor(habitColors[0]) // Always use theme's accent as default
       }
     }
-  }, [isVisible, initialValues])
+  }, [habitColors, initialValues, isVisible])
   
   const [targetDays, setTargetDays] = useState([1, 2, 3, 4, 5, 6, 0]) // 0 = Sunday
 
@@ -67,7 +64,7 @@ export default function AddHabitModal({ isVisible, onClose, onAdd, initialValues
       setSelectedColor(initialValues.color || habitColors[0])
       setTargetDays(initialValues.targetDays || [1, 2, 3, 4, 5, 6, 0])
     }
-  }, [initialValues])
+  }, [habitColors, initialValues])
 
   const resetForm = () => {
     setTitle("")

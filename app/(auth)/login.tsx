@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -18,15 +18,16 @@ import {
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import tw from "../../lib/tailwind"
+import { authAPI } from "../../lib/api"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useTheme } from "../../contexts/ThemeProvider"
 import { useStats } from "../../contexts/StatsProvider"
-import React from "react"
 
-// API Configuration
-const API_BASE_URL = __DEV__ 
-  ? 'http://10.0.72.74:3000/api'
-  : 'https://your-production-api.com/api';
+type LoginErrors = {
+  email?: string | null
+  password?: string | null
+}
+
 
 export default function LoginScreen() {
   const router = useRouter()
@@ -36,7 +37,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors] = useState({})
+  const [errors, setErrors] = useState<LoginErrors>({})
 
   // Check if user is already logged in
   useEffect(() => {
@@ -44,9 +45,10 @@ export default function LoginScreen() {
       try {
         const token = await AsyncStorage.getItem("userToken");
         const isLoggedIn = await AsyncStorage.getItem("isLoggedIn");
+        const onboardingComplete = await AsyncStorage.getItem("onboardingComplete");
         
         if (token && isLoggedIn === "true") {
-          router.replace("/(tabs)");
+          router.replace(onboardingComplete === "true" ? "/(tabs)" : "/onboarding");
         }
       } catch (error) {
         console.error("Error checking existing login:", error);
@@ -57,7 +59,7 @@ export default function LoginScreen() {
   }, [router]);
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: LoginErrors = {};
     
     if (!email.trim()) {
       newErrors.email = "Email is required";
@@ -80,18 +82,10 @@ export default function LoginScreen() {
     setErrors({});
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          password: password
-        }),
+      const data = await authAPI.login({
+        email: email.trim().toLowerCase(),
+        password,
       });
-
-      const data = await response.json();
 
       if (data.success) {
         // Store authentication data
@@ -102,13 +96,16 @@ export default function LoginScreen() {
         // Load user stats
         await loadUserStats();
 
+        const onboardingComplete = await AsyncStorage.getItem("onboardingComplete")
+        const nextRoute = onboardingComplete === "true" ? "/(tabs)" : "/onboarding"
+
         Alert.alert(
           "Welcome Back!",
           `Hi ${data.user.username}! Ready to continue your journey?`,
           [
             {
               text: "Let's Go!",
-              onPress: () => router.replace("/(tabs)"),
+              onPress: () => router.replace(nextRoute),
             },
           ]
         );
@@ -116,9 +113,12 @@ export default function LoginScreen() {
       } else {
         // Handle validation errors from backend
         if (data.details && Array.isArray(data.details)) {
-          const backendErrors = {};
-          data.details.forEach(error => {
-            backendErrors[error.field] = error.message;
+          const backendErrors: LoginErrors = {};
+          data.details.forEach((error: any) => {
+            const field = error.field as keyof LoginErrors
+            if (field === "email" || field === "password") {
+              backendErrors[field] = error.message;
+            }
           });
           setErrors(backendErrors);
         } else {
@@ -126,12 +126,24 @@ export default function LoginScreen() {
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
-      Alert.alert(
-        "Connection Error", 
-        "Unable to connect to server. Please check your internet connection and try again."
-      );
+
+      if (error?.details && Array.isArray(error.details)) {
+        const backendErrors: LoginErrors = {};
+        error.details.forEach((detail: any) => {
+          const field = detail.field as keyof LoginErrors
+          if (field === "email" || field === "password") {
+            backendErrors[field] = detail.message;
+          }
+        });
+        setErrors(backendErrors);
+      } else {
+        Alert.alert(
+          "Login Failed",
+          error?.message || "Unable to connect to server. Please check your connection and try again."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -144,34 +156,27 @@ export default function LoginScreen() {
       const guestUsername = `Guest${Math.floor(Math.random() * 10000)}`;
       const guestEmail = `${guestUsername.toLowerCase()}@guest.huble.app`;
       
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: guestUsername,
-          email: guestEmail,
-          password: "guest123456"
-        }),
+      const data = await authAPI.register({
+        username: guestUsername,
+        email: guestEmail,
+        password: "guest123456",
       });
-
-      const data = await response.json();
 
       if (data.success) {
         await AsyncStorage.setItem("userToken", data.token);
         await AsyncStorage.setItem("userData", JSON.stringify(data.user));
         await AsyncStorage.setItem("isLoggedIn", "true");
         await AsyncStorage.setItem("isGuest", "true");
+        await AsyncStorage.removeItem("onboardingComplete");
 
         await loadUserStats();
-        router.replace("/(tabs)");
+        router.replace("/onboarding");
       } else {
         Alert.alert("Error", "Failed to create guest session. Please try again.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Guest login error:", error);
-      Alert.alert("Error", "Failed to create guest session. Please try again.");
+      Alert.alert("Error", error?.message || "Failed to create guest session. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -331,7 +336,7 @@ export default function LoginScreen() {
           {/* Sign Up Link */}
           <View style={tw`flex-row justify-center`}>
             <Text style={[tw`mr-1`, { color: colors.textSecondary }]}>
-              Don't have an account?
+              Do not have an account?
             </Text>
             <TouchableOpacity 
               onPress={() => router.push("/signup")}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Alert, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams } from "expo-router"
@@ -11,11 +11,11 @@ import EditTaskModal from "../../components/EditTaskModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
-import React from "react"
+
 import { routinesAPI } from "../../lib/api"
 
 export default function RoutineDetail() {
-  const { colors, currentTheme } = useTheme()
+  const { colors, currentTheme, isGlowEnabled } = useTheme()
   const { id } = useLocalSearchParams()
   const { updateExperience, updateCoins } = useStats() // ← FIX: Change addCoins to updateCoins
   const router = useRouter()
@@ -301,7 +301,7 @@ export default function RoutineDetail() {
   if (loading) {
     return (
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+        <StatusBar barStyle={currentTheme.statusBarStyle} />
         <View style={tw`flex-1 justify-center items-center`}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[tw`mt-4 text-base`, { color: colors.textSecondary }]}>Loading routine...</Text>
@@ -313,12 +313,12 @@ export default function RoutineDetail() {
   if (!routine) {
     return (
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+        <StatusBar barStyle={currentTheme.statusBarStyle} />
         <View style={tw`flex-1 justify-center items-center px-5`}>
           <Ionicons name="sad-outline" size={64} color={colors.textSecondary} style={tw`mb-4`} />
           <Text style={[tw`text-xl font-bold mb-2`, { color: colors.text }]}>Routine not found</Text>
           <Text style={[tw`text-center mb-6`, { color: colors.textSecondary }]}>
-            The routine you're looking for doesn't exist or has been deleted.
+            The routine you are looking for does not exist or has been deleted.
           </Text>
           <TouchableOpacity
             style={[
@@ -327,9 +327,9 @@ export default function RoutineDetail() {
                 backgroundColor: colors.accent,
                 shadowColor: colors.accent,
                 shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.3,
-                shadowRadius: 4,
-                elevation: 4,
+                shadowOpacity: isGlowEnabled ? 0.3 : 0,
+                shadowRadius: isGlowEnabled ? 4 : 0,
+                elevation: isGlowEnabled ? 4 : 0,
               }
             ]}
             onPress={() => router.back()}
@@ -343,7 +343,7 @@ export default function RoutineDetail() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       {/* Enhanced Header */}
       <View style={[tw`flex-row items-center justify-between px-5 py-4 border-b`, { borderColor: colors.cardSecondary }]}>
@@ -380,9 +380,9 @@ export default function RoutineDetail() {
               backgroundColor: colors.accent,
               shadowColor: colors.accent,
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-              elevation: 4,
+              shadowOpacity: isGlowEnabled ? 0.3 : 0,
+              shadowRadius: isGlowEnabled ? 4 : 0,
+              elevation: isGlowEnabled ? 4 : 0,
             }
           ]}
           onPress={() => setIsAddTaskModalVisible(true)}
@@ -399,9 +399,9 @@ export default function RoutineDetail() {
             backgroundColor: colors.card,
             shadowColor: colors.accent,
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 4,
+            shadowOpacity: isGlowEnabled ? 0.1 : 0,
+            shadowRadius: isGlowEnabled ? 8 : 0,
+            elevation: isGlowEnabled ? 4 : 0,
           }
         ]}>
           {routine.description && (
@@ -436,9 +436,9 @@ export default function RoutineDetail() {
                   backgroundColor: completionPercentage === 100 ? colors.success : colors.accent,
                   shadowColor: completionPercentage === 100 ? colors.success : colors.accent,
                   shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.6,
-                  shadowRadius: 4,
-                  elevation: 3,
+                  shadowOpacity: isGlowEnabled ? 0.6 : 0,
+                  shadowRadius: isGlowEnabled ? 4 : 0,
+                  elevation: isGlowEnabled ? 3 : 0,
                 }
               ]}
             />
@@ -453,9 +453,9 @@ export default function RoutineDetail() {
               backgroundColor: colors.card,
               shadowColor: colors.cardSecondary,
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 8,
-              elevation: 4,
+              shadowOpacity: isGlowEnabled ? 0.1 : 0,
+              shadowRadius: isGlowEnabled ? 8 : 0,
+              elevation: isGlowEnabled ? 4 : 0,
             }
           ]}>
             <View style={[
@@ -475,9 +475,9 @@ export default function RoutineDetail() {
                   backgroundColor: colors.accent,
                   shadowColor: colors.accent,
                   shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 4,
-                  elevation: 4,
+                  shadowOpacity: isGlowEnabled ? 0.3 : 0,
+                  shadowRadius: isGlowEnabled ? 4 : 0,
+                  elevation: isGlowEnabled ? 4 : 0,
                 }
               ]}
               onPress={() => setIsAddTaskModalVisible(true)}
@@ -500,9 +500,9 @@ export default function RoutineDetail() {
                     opacity: task.completed ? 0.8 : 1,
                     shadowColor: task.completed ? colors.success : colors.cardSecondary,
                     shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 4,
-                    elevation: 2,
+                    shadowOpacity: isGlowEnabled ? 0.1 : 0,
+                    shadowRadius: isGlowEnabled ? 4 : 0,
+                    elevation: isGlowEnabled ? 2 : 0,
                   }
                 ]}
                 onPress={() => toggleTask(task.id)}
@@ -585,7 +585,7 @@ export default function RoutineDetail() {
               Routine Complete!
             </Text>
             <Text style={[tw`text-center`, { color: colors.text }]}>
-              Amazing work! You've completed all tasks for this routine.
+              Amazing work! You have completed all tasks for this routine.
             </Text>
           </View>
         )}
@@ -612,4 +612,5 @@ export default function RoutineDetail() {
     </SafeAreaView>
   )
 }
+
 

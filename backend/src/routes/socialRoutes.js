@@ -39,8 +39,12 @@ router.put(
 // Party Routes
 router.get("/parties", authenticate, socialController.getAvailableParties);
 router.get("/parties/my", authenticate, socialController.getUserParties);
-router.get("/parties/:id", authenticate, socialController.getPartyById);
 router.post("/parties", authenticate, socialController.createParty);
+router.post(
+  "/parties/:id/contribute",
+  authenticate,
+  socialController.contributeToParty,
+);
 router.post("/parties/:id/join", authenticate, socialController.joinParty);
 router.delete("/parties/:id/leave", authenticate, socialController.leaveParty);
 router.post(
@@ -63,6 +67,7 @@ router.put(
   authenticate,
   socialController.declinePartyInvitation,
 );
+router.get("/parties/:id", authenticate, socialController.getPartyById);
 router.get(
   "/parties/:id/members",
   authenticate,
@@ -88,6 +93,29 @@ router.get(
   "/challenges/:id/leaderboard",
   authenticate,
   socialController.getChallengeLeaderboard,
+);
+
+// Activity Feed Routes
+router.get("/activities", authenticate, socialController.getUserActivities);
+router.get(
+  "/activities/friends",
+  authenticate,
+  socialController.getFriendsActivities,
+);
+router.get(
+  "/activities/party/:partyId",
+  authenticate,
+  socialController.getPartyActivities,
+);
+router.post(
+  "/activities/:activityId/cheer",
+  authenticate,
+  socialController.cheerActivity,
+);
+router.delete(
+  "/activities/:activityId/cheer",
+  authenticate,
+  socialController.uncheerActivity,
 );
 
 module.exports = router;

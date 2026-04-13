@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import { View, Text, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from "react-native"
 import tw from "../lib/tailwind"
 import { useTheme } from "../contexts/ThemeProvider"
-import React from "react"
+
 
 interface AddTaskModalProps {
   isVisible: boolean

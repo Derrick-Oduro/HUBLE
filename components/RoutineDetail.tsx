@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, ActivityIndicator, Alert, ScrollView } from "react-native"
+import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, ActivityIndicator, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useFocusEffect } from "@react-navigation/native"

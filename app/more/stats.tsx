@@ -1,15 +1,13 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, RefreshControl, Dimensions } from "react-native"
+import React, { useState, useCallback } from "react"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, RefreshControl } from "react-native"
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
 import { useStats } from "../../contexts/StatsProvider"
-import React from "react"
 
-const { width } = Dimensions.get('window')
 
 // Gamified Progress Bar with XP-style animation
 const GameProgressBar = ({ value, max, color, label, icon, showLevel = false, colors }) => {
@@ -167,7 +165,7 @@ export default function Stats() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       {/* Header */}
       <View style={tw`flex-row items-center px-5 pt-2 pb-4`}>
@@ -437,3 +435,4 @@ export default function Stats() {
     </SafeAreaView>
   )
 }
+

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../lib/tailwind"
 import { useTheme } from "../contexts/ThemeProvider"
-import React from "react"
+
 
 interface HabitItemProps {
   id: number
@@ -41,29 +41,10 @@ export default function HabitItem({
   onComplete,
   onFail,
 }: HabitItemProps) {
-  const { colors } = useTheme()
+  const { colors, isGlowEnabled } = useTheme()
   const [isExpanded, setIsExpanded] = useState(false)
   const [scaleAnim] = useState(new Animated.Value(1))
   const [slideAnim] = useState(new Animated.Value(0))
-
-  const getColorValue = (colorInput: string) => {
-    // If it's already a hex color, return it
-    if (colorInput?.startsWith('#')) {
-      return colorInput
-    }
-    
-    // Handle old Tailwind colors for backward compatibility
-    const colorMap: { [key: string]: string } = {
-      'green-500': '#10B981',
-      'blue-500': '#3B82F6', 
-      'yellow-500': '#F59E0B',
-      'purple-500': '#8B5CF6',
-      'red-500': '#EF4444',
-      'pink-500': '#EC4899',
-    }
-    
-    return colorMap[colorInput] || colors.accent
-  }
 
   const getDifficultyInfo = (diff: string) => {
     switch (diff) {
@@ -203,7 +184,7 @@ export default function HabitItem({
   return (
     <Animated.View 
       style={[
-        tw`mb-3`,
+        tw`mb-2.5`,
         {
           transform: [{ scale: scaleAnim }],
         }
@@ -213,38 +194,38 @@ export default function HabitItem({
       <Pressable
         onPress={handlePress}
         style={[
-          tw`rounded-2xl p-2`,
+          tw`rounded-xl p-2`,
           {
-            borderLeftWidth: 8,
+            borderLeftWidth: 4,
             borderLeftColor: habitColor,
             backgroundColor: completed ? colors.cardSecondary : colors.card,
             opacity: completed ? 0.7 : 1.0,
             shadowColor: habitColor,
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: completed ? 0.1 : 0.25,
-            shadowRadius: 6,
-            elevation: 6,
+            shadowOpacity: isGlowEnabled ? (completed ? 0.1 : 0.2) : 0,
+            shadowRadius: isGlowEnabled ? 4 : 0,
+            elevation: isGlowEnabled ? 4 : 0,
           }
         ]}
       >
         {/* Compact Header Row */}
         <View style={tw`flex-row items-center justify-between`}>
-          <View style={tw`flex-1 mr-3`}>
+          <View style={tw`flex-1 mr-2`}>
             {/* Title with small emoji */}
             <View style={tw`flex-row items-center`}>
               <View
                 style={[
-                  tw`w-8 h-8 rounded-xl items-center justify-center mr-3`,
+                  tw`w-7 h-7 rounded-lg items-center justify-center mr-2`,
                   { backgroundColor: `${habitColor}20` }
                 ]}
               >
-                <Ionicons name={difficultyInfo.icon} size={18} color={difficultyInfo.color} />
+                <Ionicons name={difficultyInfo.icon} size={16} color={difficultyInfo.color} />
               </View>
               
               <View style={tw`flex-1`}>
                 <Text
                   style={[
-                    tw`font-bold text-base`,
+                    tw`font-bold text-sm`,
                     {
                       color: completed ? colors.textSecondary : colors.text,
                       textDecorationLine: completed ? 'line-through' : 'none',
@@ -258,7 +239,7 @@ export default function HabitItem({
                 {/* Compact subtitle */}
                 <Text
                   style={[
-                    tw`text-xs mt-1`,
+                    tw`text-xs mt-0.5`,
                     { color: colors.textSecondary }
                   ]}
                   numberOfLines={1}
@@ -275,7 +256,7 @@ export default function HabitItem({
             {streak > 0 && (
               <View
                 style={[
-                  tw`px-2 py-1 rounded-full mr-2`,
+                  tw`px-1.5 py-0.5 rounded-full mr-1.5`,
                   { backgroundColor: `${habitColor}25` }
                 ]}
               >
@@ -286,7 +267,7 @@ export default function HabitItem({
                   ]}
                 >
                   <View style={tw`flex-row items-center`}>
-                    <Ionicons name="flame" size={14} color={habitColor} style={tw`mr-1`} />
+                    <Ionicons name="flame" size={12} color={habitColor} style={tw`mr-0.5`} />
                     <Text style={[tw`text-xs font-bold`, { color: habitColor }]}>{streak}</Text>
                   </View>
                 </Text>
@@ -294,10 +275,10 @@ export default function HabitItem({
             )}
 
             {/* Compact Completion Button */}
-            <TouchableOpacity onPress={handleComplete} style={tw`mr-2`}>
+            <TouchableOpacity onPress={handleComplete} style={tw`mr-1.5`}>
               <View
                 style={[
-                  tw`w-7 h-7 rounded-xl border-2 items-center justify-center`,
+                  tw`w-6 h-6 rounded-lg border-2 items-center justify-center`,
                   {
                     backgroundColor: completed ? habitColor : 'transparent',
                     borderColor: habitColor,
@@ -305,7 +286,7 @@ export default function HabitItem({
                 ]}
               >
                 {completed && (
-                  <Ionicons name="checkmark" size={16} color="white" />
+                  <Ionicons name="checkmark" size={14} color="white" />
                 )}
               </View>
             </TouchableOpacity>
@@ -314,7 +295,7 @@ export default function HabitItem({
             <TouchableOpacity onPress={handlePress}>
               <Ionicons 
                 name={isExpanded ? "chevron-up" : "chevron-down"} 
-                size={18} 
+                size={16} 
                 color={colors.textSecondary} 
               />
             </TouchableOpacity>
@@ -322,9 +303,9 @@ export default function HabitItem({
         </View>
 
         {/* Ultra-Thin Modern Progress Bar */}
-        <View style={tw`mt-2 ml-11 mr-2`}>
+        <View style={tw`mt-1.5 ml-9 mr-1`}>
           <View style={[
-            tw`h-1 rounded-full overflow-hidden`,
+            tw`h-0.5 rounded-full overflow-hidden`,
             { backgroundColor: colors.cardSecondary }
           ]}>
             <Animated.View
@@ -343,43 +324,43 @@ export default function HabitItem({
       {/* Compact Expanded Actions */}
       <Animated.View
         style={[
-          tw`overflow-hidden rounded-b-2xl`,
+          tw`overflow-hidden rounded-b-xl`,
           {
             maxHeight: slideAnim.interpolate({
               inputRange: [0, 1],
-              outputRange: [0, 65],
+              outputRange: [0, 60],
             }),
             opacity: slideAnim,
           }
         ]}
       >
         <View style={[
-          tw`px-3 py-2 flex-row justify-around`,
+          tw`px-2 py-1.5 flex-row justify-around`,
           { 
             backgroundColor: colors.cardSecondary,
-            marginTop: -6, 
-            paddingTop: 10, 
-            borderBottomLeftRadius: 16, 
-            borderBottomRightRadius: 16 
+            marginTop: -4, 
+            paddingTop: 8, 
+            borderBottomLeftRadius: 12, 
+            borderBottomRightRadius: 12 
           }
         ]}>
           {/* Complete Button */}
           <TouchableOpacity
             onPress={handleComplete}
             style={[
-              tw`flex-1 py-2 rounded-xl mx-1 items-center`,
+              tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
               { backgroundColor: `${habitColor}25` }
             ]}
             disabled={completed}
           >
             <Ionicons
               name="checkmark-circle"
-              size={16}
+              size={14}
               color={completed ? colors.textSecondary : habitColor}
             />
             <Text
               style={[
-                tw`text-xs mt-1 font-medium`,
+                tw`text-xs mt-0.5 font-medium`,
                 { color: completed ? colors.textSecondary : habitColor }
               ]}
             >
@@ -391,36 +372,36 @@ export default function HabitItem({
           <TouchableOpacity
             onPress={handleFail}
             style={[
-              tw`flex-1 py-2 rounded-xl mx-1 items-center`,
+              tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
               { backgroundColor: colors.error + '25' }
             ]}
           >
-            <Ionicons name="close-circle" size={16} color={colors.error} />
-            <Text style={[tw`text-xs mt-1 font-medium`, { color: colors.error }]}>Failed</Text>
+            <Ionicons name="close-circle" size={14} color={colors.error} />
+            <Text style={[tw`text-xs mt-0.5 font-medium`, { color: colors.error }]}>Failed</Text>
           </TouchableOpacity>
 
           {/* Edit Button */}
           <TouchableOpacity
             onPress={() => onEdit(id)}
             style={[
-              tw`flex-1 py-2 rounded-xl mx-1 items-center`,
+              tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
               { backgroundColor: colors.textSecondary + '25' }
             ]}
           >
-            <Ionicons name="pencil" size={16} color={colors.textSecondary} />
-            <Text style={[tw`text-xs mt-1 font-medium`, { color: colors.textSecondary }]}>Edit</Text>
+            <Ionicons name="pencil" size={14} color={colors.textSecondary} />
+            <Text style={[tw`text-xs mt-0.5 font-medium`, { color: colors.textSecondary }]}>Edit</Text>
           </TouchableOpacity>
 
           {/* Delete Button */}
           <TouchableOpacity
             onPress={() => onDelete(id)}
             style={[
-              tw`flex-1 py-2 rounded-xl mx-1 items-center`,
+              tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
               { backgroundColor: colors.error + '25' }
             ]}
           >
-            <Ionicons name="trash" size={16} color={colors.error} />
-            <Text style={[tw`text-xs mt-1 font-medium`, { color: colors.error }]}>Delete</Text>
+            <Ionicons name="trash" size={14} color={colors.error} />
+            <Text style={[tw`text-xs mt-0.5 font-medium`, { color: colors.error }]}>Delete</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>

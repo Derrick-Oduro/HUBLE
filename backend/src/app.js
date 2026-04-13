@@ -15,6 +15,10 @@ const routinesRoutes = require("./routes/routinesRoutes");
 const focusRoutes = require("./routes/focusRoutes"); // Add this line
 const statsRoutes = require("./routes/statsRoutes"); // Add this line
 const socialRoutes = require("./routes/socialRoutes"); // Add social routes
+const adminRoutes = require("./routes/adminRoutes"); // Add admin routes
+const achievementsRoutes = require("./routes/achievementsRoutes"); // Add achievements routes
+const dataRoutes = require("./routes/dataRoutes"); // Add data routes
+const configRoutes = require("./routes/configRoutes");
 
 const app = express();
 
@@ -52,6 +56,9 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// Serve admin panel static files
+app.use("/admin", express.static("public/admin"));
+
 // Compression
 app.use(compression());
 
@@ -65,12 +72,6 @@ if (process.env.NODE_ENV !== "production") {
     next();
   });
 }
-
-// Initialize database connection
-database
-  .connect()
-  .then(() => console.log("✅ Database connected successfully"))
-  .catch(console.error);
 
 // Health check
 app.get("/health", (req, res) => {
@@ -90,6 +91,21 @@ app.use("/api/routines", routinesRoutes);
 app.use("/api/focus", focusRoutes); // Add this line
 app.use("/api/stats", statsRoutes); // Add this line
 app.use("/api/social", socialRoutes); // Add social routes
+app.use("/api/achievements", achievementsRoutes); // Add achievements routes
+app.use("/api/data", dataRoutes); // Add data routes
+app.use("/api/config", configRoutes);
+
+// Debug middleware specifically for admin routes
+app.use("/api/admin", (req, res, next) => {
+  console.log("🟢 Admin route middleware hit:", req.method, req.url);
+  console.log("🟢 Full path:", req.path);
+  console.log("🟢 Body:", req.body);
+  next();
+});
+
+console.log("🎨 Registering admin routes at /api/admin");
+app.use("/api/admin", adminRoutes); // Add admin routes
+console.log("✅ Admin routes registered");
 
 // 404 handler
 app.use("*", (req, res) => {

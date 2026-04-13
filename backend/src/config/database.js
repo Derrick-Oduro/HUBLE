@@ -5,7 +5,7 @@ const fs = require("fs");
 class Database {
   constructor() {
     this.db = null;
-    this.dbPath = path.join(__dirname, "../../data/huble.db");
+    this.dbPath = path.resolve(process.cwd(), "data", "huble.db");
   }
 
   async connect() {
@@ -58,7 +58,7 @@ class Database {
           try {
             await this.run(sql);
             console.log("✅ Added column:", sql.split(" ")[4]);
-          } catch (error) {
+          } catch (_error) {
             // Column might already exist, that's okay
             console.log("⚠️ Column might already exist:", sql.split(" ")[4]);
           }
@@ -121,6 +121,208 @@ class Database {
       }
     } catch (error) {
       console.error("❌ Error fixing user_stats table:", error);
+      throw error;
+    }
+  }
+
+  async fixUsersTable() {
+    try {
+      console.log("🔧 Fixing users table...");
+      const tableInfo = await this.all("PRAGMA table_info(users)");
+
+      const columnsToAdd = [
+        {
+          name: "avatar_color",
+          sql: `ALTER TABLE users ADD COLUMN avatar_color TEXT DEFAULT '#8B5CF6'`,
+        },
+        {
+          name: "avatar_border",
+          sql: `ALTER TABLE users ADD COLUMN avatar_border TEXT DEFAULT 'normal'`,
+        },
+      ];
+
+      for (const column of columnsToAdd) {
+        const exists = tableInfo.some((info) => info.name === column.name);
+        if (!exists) {
+          await this.run(column.sql);
+          console.log(`✅ Added users column: ${column.name}`);
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error fixing users table:", error);
+      throw error;
+    }
+  }
+
+  async fixPartiesTable() {
+    try {
+      console.log("🔧 Fixing parties table...");
+      const tableInfo = await this.all("PRAGMA table_info(parties)");
+
+      const hasColumn = (columnName) =>
+        tableInfo.some((column) => column.name === columnName);
+
+      const columnsToAdd = [
+        {
+          name: "emoji",
+          sql: "ALTER TABLE parties ADD COLUMN emoji TEXT DEFAULT '🎉'",
+        },
+        {
+          name: "color",
+          sql: "ALTER TABLE parties ADD COLUMN color TEXT DEFAULT '#8B5CF6'",
+        },
+        {
+          name: "progress",
+          sql: "ALTER TABLE parties ADD COLUMN progress INTEGER DEFAULT 0",
+        },
+        {
+          name: "type",
+          sql: "ALTER TABLE parties ADD COLUMN type TEXT DEFAULT 'cooperative'",
+        },
+        {
+          name: "weekly_goal_label",
+          sql: "ALTER TABLE parties ADD COLUMN weekly_goal_label TEXT DEFAULT 'Weekly team goal'",
+        },
+        {
+          name: "weekly_goal_target",
+          sql: "ALTER TABLE parties ADD COLUMN weekly_goal_target INTEGER DEFAULT 10",
+        },
+      ];
+
+      for (const column of columnsToAdd) {
+        if (!hasColumn(column.name)) {
+          await this.run(column.sql);
+          console.log(`✅ Added parties column: ${column.name}`);
+        }
+      }
+
+      if (!hasColumn("created_by") && hasColumn("creator_id")) {
+        await this.run("ALTER TABLE parties ADD COLUMN created_by INTEGER");
+        await this.run(
+          "UPDATE parties SET created_by = creator_id WHERE created_by IS NULL",
+        );
+        console.log("✅ Backfilled parties.created_by from creator_id");
+      }
+
+      if (!hasColumn("privacy")) {
+        await this.run(
+          "ALTER TABLE parties ADD COLUMN privacy TEXT DEFAULT 'public'",
+        );
+        console.log("✅ Added parties column: privacy");
+      }
+    } catch (error) {
+      console.error("❌ Error fixing parties table:", error);
+      throw error;
+    }
+  }
+
+  async fixChallengesTable() {
+    try {
+      console.log("🔧 Fixing challenges table...");
+      const tableInfo = await this.all("PRAGMA table_info(challenges)");
+
+      const hasColumn = (columnName) =>
+        tableInfo.some((column) => column.name === columnName);
+
+      const columnsToAdd = [
+        {
+          name: "emoji",
+          sql: "ALTER TABLE challenges ADD COLUMN emoji TEXT DEFAULT '🏆'",
+        },
+        {
+          name: "color",
+          sql: "ALTER TABLE challenges ADD COLUMN color TEXT DEFAULT '#8B5CF6'",
+        },
+        {
+          name: "difficulty",
+          sql: "ALTER TABLE challenges ADD COLUMN difficulty TEXT DEFAULT 'Medium'",
+        },
+        {
+          name: "reward",
+          sql: "ALTER TABLE challenges ADD COLUMN reward TEXT",
+        },
+        {
+          name: "goal_value",
+          sql: "ALTER TABLE challenges ADD COLUMN goal_value INTEGER",
+        },
+        {
+          name: "goal_type",
+          sql: "ALTER TABLE challenges ADD COLUMN goal_type TEXT DEFAULT 'count'",
+        },
+        {
+          name: "mode",
+          sql: "ALTER TABLE challenges ADD COLUMN mode TEXT DEFAULT 'competitive'",
+        },
+        {
+          name: "team_target",
+          sql: "ALTER TABLE challenges ADD COLUMN team_target INTEGER",
+        },
+      ];
+
+      for (const column of columnsToAdd) {
+        if (!hasColumn(column.name)) {
+          await this.run(column.sql);
+          console.log(`✅ Added challenges column: ${column.name}`);
+        }
+      }
+
+      if (hasColumn("target_value")) {
+        await this.run(
+          "UPDATE challenges SET goal_value = COALESCE(goal_value, target_value) WHERE goal_value IS NULL",
+        );
+      }
+
+      await this.run(
+        "UPDATE challenges SET team_target = COALESCE(team_target, goal_value, target_value, 0) WHERE team_target IS NULL",
+      );
+
+      await this.run(
+        "UPDATE challenges SET mode = 'competitive' WHERE mode IS NULL OR TRIM(mode) = ''",
+      );
+
+      if (hasColumn("reward_xp") && hasColumn("reward_coins")) {
+        await this.run(`
+          UPDATE challenges
+          SET reward = CASE
+            WHEN reward IS NOT NULL AND TRIM(reward) != '' THEN reward
+            WHEN COALESCE(reward_xp, 0) > 0 AND COALESCE(reward_coins, 0) > 0 THEN '⭐ ' || reward_xp || ' XP + 💰 ' || reward_coins || ' Coins'
+            WHEN COALESCE(reward_xp, 0) > 0 THEN '⭐ ' || reward_xp || ' XP'
+            WHEN COALESCE(reward_coins, 0) > 0 THEN '💰 ' || reward_coins || ' Coins'
+            ELSE 'Challenge reward'
+          END
+        `);
+      }
+    } catch (error) {
+      console.error("❌ Error fixing challenges table:", error);
+      throw error;
+    }
+  }
+
+  async fixChallengeParticipantsTable() {
+    try {
+      console.log("🔧 Fixing challenge_participants table...");
+      const tableInfo = await this.all(
+        "PRAGMA table_info(challenge_participants)",
+      );
+
+      const hasColumn = (columnName) =>
+        tableInfo.some((column) => column.name === columnName);
+
+      if (!hasColumn("updated_at")) {
+        await this.run(
+          "ALTER TABLE challenge_participants ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+        );
+        console.log("✅ Added challenge_participants column: updated_at");
+      }
+
+      if (!hasColumn("completed")) {
+        await this.run(
+          "ALTER TABLE challenge_participants ADD COLUMN completed BOOLEAN DEFAULT 0",
+        );
+        console.log("✅ Added challenge_participants column: completed");
+      }
+    } catch (error) {
+      console.error("❌ Error fixing challenge_participants table:", error);
       throw error;
     }
   }
@@ -247,14 +449,70 @@ class Database {
         FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE SET NULL
       )`,
 
-      // Achievements table
+      // Achievements definition table
       `CREATE TABLE IF NOT EXISTS achievements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        color TEXT NOT NULL,
+        requirement_type TEXT NOT NULL,
+        requirement_value INTEGER NOT NULL,
+        xp_reward INTEGER DEFAULT 0,
+        coin_reward INTEGER DEFAULT 0,
+        unlock_level INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      // User achievements progress table
+      `CREATE TABLE IF NOT EXISTS user_achievements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
-        achievement_type TEXT NOT NULL,
-        achievement_name TEXT NOT NULL,
+        achievement_id INTEGER NOT NULL,
+        progress INTEGER DEFAULT 0,
+        unlocked BOOLEAN DEFAULT 0,
+        unlocked_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (achievement_id) REFERENCES achievements(id) ON DELETE CASCADE,
+        UNIQUE(user_id, achievement_id)
+      )`,
+
+      // Activity feed table
+      `CREATE TABLE IF NOT EXISTS activity_feed (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        activity_type TEXT NOT NULL,
+        title TEXT NOT NULL,
         description TEXT,
-        earned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        icon TEXT,
+        color TEXT,
+        metadata TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`,
+
+      // Activity cheers table
+      `CREATE TABLE IF NOT EXISTS activity_cheers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        activity_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (activity_id) REFERENCES activity_feed(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(activity_id, user_id)
+      )`,
+
+      // Password reset tokens table
+      `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        expires_at DATETIME NOT NULL,
+        used BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )`,
 
@@ -291,7 +549,13 @@ class Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         description TEXT,
+        emoji TEXT DEFAULT '🎉',
+        color TEXT DEFAULT '#8B5CF6',
+        type TEXT DEFAULT 'cooperative',
         goal TEXT,
+        weekly_goal_label TEXT DEFAULT 'Weekly team goal',
+        weekly_goal_target INTEGER DEFAULT 10,
+        progress INTEGER DEFAULT 0,
         privacy TEXT NOT NULL DEFAULT 'public' CHECK(privacy IN ('public', 'private')),
         max_members INTEGER DEFAULT 10,
         created_by INTEGER NOT NULL,
@@ -310,6 +574,19 @@ class Database {
         FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE(party_id, user_id)
+      )`,
+
+      // Weekly party contributions
+      `CREATE TABLE IF NOT EXISTS party_contributions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        party_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        week_key TEXT NOT NULL,
+        points INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(party_id, user_id, week_key)
       )`,
 
       // Party invitations table
@@ -332,8 +609,16 @@ class Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
+        emoji TEXT DEFAULT '🏆',
+        color TEXT DEFAULT '#8B5CF6',
+        difficulty TEXT DEFAULT 'Medium',
+        reward TEXT,
         type TEXT NOT NULL CHECK(type IN ('streak', 'total', 'speed')),
         target_value INTEGER,
+        goal_value INTEGER,
+        goal_type TEXT DEFAULT 'count',
+        mode TEXT DEFAULT 'competitive',
+        team_target INTEGER,
         start_date DATE NOT NULL,
         end_date DATE NOT NULL,
         reward_xp INTEGER DEFAULT 0,
@@ -352,6 +637,7 @@ class Database {
         completed BOOLEAN DEFAULT 0,
         joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         completed_at DATETIME,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (challenge_id) REFERENCES challenges(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE(challenge_id, user_id)
@@ -371,8 +657,21 @@ class Database {
       }
     }
 
+    await this.fixUsersTable();
+    await this.fixPartiesTable();
+    await this.fixChallengesTable();
+    await this.fixChallengeParticipantsTable();
+
     // Fix user_stats table separately
     await this.fixUserStatsTable();
+
+    const Theme = require("../models/Theme");
+    const AvatarOption = require("../models/AvatarOption");
+
+    await Theme.createTable();
+    await AvatarOption.createTable();
+    await Theme.seedDefaults();
+    await AvatarOption.seedDefaults();
   }
 
   // Promisify database methods

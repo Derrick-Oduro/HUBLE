@@ -12,46 +12,95 @@ import React, { useState, useEffect } from "react"
 export default function More() {
   const router = useRouter()
   const { stats } = useStats()
-  const { colors, currentTheme } = useTheme()
+  const { colors, currentTheme, isGlowEnabled } = useTheme()
+  const unifiedIconColor = colors.accent
   
   // Add state for user data
   const [userData, setUserData] = useState(null)
   const [isGuest, setIsGuest] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [avatarData, setAvatarData] = useState({
+    avatar: "🧙‍♂️",
+    color: "#8B5CF6",
+    border: "normal"
+  })
 
   // Load user data when component mounts
   useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        console.log('🔍 Loading user data from AsyncStorage...');
+        
+        const userDataString = await AsyncStorage.getItem("userData")
+        const guestStatus = await AsyncStorage.getItem("isGuest")
+        const isLoggedIn = await AsyncStorage.getItem("isLoggedIn")
+        const userToken = await AsyncStorage.getItem("userToken")
+        
+        console.log('📥 Raw userData:', userDataString);
+        console.log('📥 Guest status:', guestStatus);
+        console.log('📥 Is logged in:', isLoggedIn);
+        console.log('📥 User token:', userToken ? 'Present' : 'Missing');
+        
+        if (userDataString) {
+          const user = JSON.parse(userDataString)
+          console.log('✅ Parsed user data:', user);
+          setUserData(user)
+        } else {
+          console.log('❌ No user data found in AsyncStorage');
+        }
+        
+        setIsGuest(guestStatus === "true")
+
+        const savedData = await AsyncStorage.getItem('avatarData')
+        if (savedData) {
+          const parsed = JSON.parse(savedData)
+          setAvatarData({
+            avatar: parsed.avatar || "🧙‍♂️",
+            color: parsed.color || "#8B5CF6",
+            border: parsed.border || "normal"
+          })
+        }
+      } catch (error) {
+        console.error("❌ Error loading user data:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     loadUserData()
   }, [])
 
-  // Update the loadUserData function with more logging:
-  const loadUserData = async () => {
+  // Focus effect to reload avatar when coming back from avatar screen
+  useEffect(() => {
+    const unsubscribe = router.subscribe?.(() => {
+      loadAvatarData()
+    })
+    return () => unsubscribe?.()
+  }, [router])
+
+  // Also load avatar on screen focus
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadAvatarData()
+    }, 1000) // Check every second when on this screen
+    
+    return () => clearInterval(interval)
+  }, [])
+
+  // Load avatar data
+  const loadAvatarData = async () => {
     try {
-      console.log('🔍 Loading user data from AsyncStorage...');
-      
-      const userDataString = await AsyncStorage.getItem("userData")
-      const guestStatus = await AsyncStorage.getItem("isGuest")
-      const isLoggedIn = await AsyncStorage.getItem("isLoggedIn")
-      const userToken = await AsyncStorage.getItem("userToken")
-      
-      console.log('📥 Raw userData:', userDataString);
-      console.log('📥 Guest status:', guestStatus);
-      console.log('📥 Is logged in:', isLoggedIn);
-      console.log('📥 User token:', userToken ? 'Present' : 'Missing');
-      
-      if (userDataString) {
-        const user = JSON.parse(userDataString)
-        console.log('✅ Parsed user data:', user);
-        setUserData(user)
-      } else {
-        console.log('❌ No user data found in AsyncStorage');
+      const savedData = await AsyncStorage.getItem('avatarData')
+      if (savedData) {
+        const parsed = JSON.parse(savedData)
+        setAvatarData({
+          avatar: parsed.avatar || "🧙‍♂️",
+          color: parsed.color || "#8B5CF6",
+          border: parsed.border || "normal"
+        })
       }
-      
-      setIsGuest(guestStatus === "true")
     } catch (error) {
-      console.error("❌ Error loading user data:", error)
-    } finally {
-      setLoading(false)
+      console.log('Error loading avatar data:', error)
     }
   }
 
@@ -79,63 +128,77 @@ export default function More() {
   // Enhanced grid items with categories - Added Social
   const accountItems = [
     {
-      icon: <FontAwesome5 name="user-astronaut" size={24} color={colors.accent} />,
+      icon: <FontAwesome5 name="user-astronaut" size={24} color={unifiedIconColor} />,
       label: "Avatar",
       path: "avatar",
       description: "Customize your profile",
-      color: colors.accent,
+      color: unifiedIconColor,
     },
     {
-      icon: <Ionicons name="stats-chart" size={24} color={colors.success} />,
+      icon: <Ionicons name="stats-chart" size={24} color={unifiedIconColor} />,
       label: "Stats",
       path: "stats",
       description: "View your progress",
-      color: colors.success,
+      color: unifiedIconColor,
     },
     {
-      icon: <MaterialCommunityIcons name="trophy-award" size={24} color={colors.warning} />,
+      icon: <MaterialCommunityIcons name="trophy-award" size={24} color={unifiedIconColor} />,
       label: "Achievements",
       path: "achievements",
       description: "Unlock badges & rewards",
-      color: colors.warning,
+      color: unifiedIconColor,
     },
     {
-      icon: <Ionicons name="people" size={24} color="#EC4899" />,
+      icon: <Ionicons name="people" size={24} color={unifiedIconColor} />,
       label: "Social",
       path: "social",
       description: "Friends, parties & challenges",
-      color: "#EC4899",
+      color: unifiedIconColor,
     },
   ]
 
   const appItems = [
     {
-      icon: <Ionicons name="color-palette" size={24} color="#06B6D4" />,
+      icon: <Ionicons name="analytics" size={24} color={unifiedIconColor} />,
+      label: "Analytics",
+      path: "analytics",
+      description: "View detailed insights",
+      color: unifiedIconColor,
+    },
+    {
+      icon: <Ionicons name="podium" size={24} color={unifiedIconColor} />,
+      label: "Leaderboards",
+      path: "leaderboards",
+      description: "Compete with others",
+      color: unifiedIconColor,
+    },
+    {
+      icon: <Ionicons name="color-palette" size={24} color={unifiedIconColor} />,
       label: "Themes",
       path: "themes",
       description: "Customize appearance",
-      color: "#06B6D4",
+      color: unifiedIconColor,
     },
     {
-      icon: <Ionicons name="settings-outline" size={24} color="#6B7280" />,
+      icon: <Ionicons name="settings-outline" size={24} color={unifiedIconColor} />,
       label: "Settings",
       path: "settings",
       description: "App preferences",
-      color: "#6B7280",
+      color: unifiedIconColor,
     },
     {
-      icon: <Ionicons name="shield-checkmark-outline" size={24} color="#3B82F6" />,
+      icon: <Ionicons name="shield-checkmark-outline" size={24} color={unifiedIconColor} />,
       label: "Security",
       path: "security",
       description: "Privacy & security",
-      color: "#3B82F6",
+      color: unifiedIconColor,
     },
     {
-      icon: <Ionicons name="help-circle-outline" size={24} color={colors.error} />,
+      icon: <Ionicons name="help-circle-outline" size={24} color={unifiedIconColor} />,
       label: "Help",
       path: "help",
       description: "Support & FAQ",
-      color: colors.error,
+      color: unifiedIconColor,
     },
   ]
 
@@ -151,112 +214,250 @@ export default function More() {
   // Get display values with fallbacks
   const displayName = userData?.username || "Guest User"
   const displayEmail = userData?.email || "guest@huble.app"
-  const userHandle = isGuest ? "@Guest" : `@${userData?.username || "user"}`
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-6`}>
         
-        {/* Profile Card - slightly more compact */}
-        <View style={[
-          tw`mx-5 mb-6 rounded-2xl p-5`, // p-6 → p-5
-          {
-            backgroundColor: colors.card,
-            shadowColor: colors.accent,
-            shadowOffset: { width: 0, height: 2 }, // reduced from height: 4
-            shadowOpacity: 0.08, // reduced from 0.1
-            shadowRadius: 8, // reduced from 12
-            elevation: 4, // reduced from 8
-          }
-        ]}>
-          <View style={tw`flex-row items-center mb-4`}>
+        {/* Profile Card - Compact Premium Design */}
+        <View style={tw`mx-5 mb-5`}>
+          <View style={[
+            tw`rounded-2xl overflow-hidden`,
+            {
+              backgroundColor: colors.card,
+              shadowColor: avatarData.color,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: isGlowEnabled ? 0.12 : 0,
+              shadowRadius: isGlowEnabled ? 12 : 0,
+              elevation: isGlowEnabled ? 6 : 0,
+            }
+          ]}>
+            {/* Gradient Effect Background */}
             <View style={[
-              tw`w-14 h-14 rounded-2xl mr-4 items-center justify-center`, // w-16 h-16 → w-14 h-14
+              tw`absolute top-0 left-0 right-0`,
               {
-                backgroundColor: colors.accent + '20',
-                borderWidth: 2,
-                borderColor: colors.accent,
+                height: 80,
+                backgroundColor: avatarData.color,
+                opacity: 0.08,
               }
-            ]}>
-              <FontAwesome5 name="user-astronaut" size={22} color={colors.accent} /> {/* size 24 → 22 */}
-            </View>
-            <View style={tw`flex-1`}>
-              <View style={tw`flex-row items-center mb-1`}>
-                <Text style={[tw`text-xl font-bold mr-2`, { color: colors.text }]}>{displayName}</Text> {/* text-2xl → text-xl */}
-                {isGuest && (
-                  <View style={[
-                    tw`px-2 py-1 rounded-full`,
-                    { backgroundColor: colors.warning + '20' }
-                  ]}>
-                    <Text style={[tw`text-xs font-bold`, { color: colors.warning }]}>GUEST</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={[tw`text-sm mb-1`, { color: colors.textSecondary }]}>{userHandle}</Text> {/* text-base → text-sm */}
-              <Text style={[tw`text-xs mb-2`, { color: colors.textSecondary }]}>{displayEmail}</Text> {/* text-sm → text-xs */}
-              <View style={tw`flex-row items-center`}>
-                <View style={[
-                  tw`px-3 py-1 rounded-full mr-2`,
-                  { backgroundColor: colors.accent + '20' }
-                ]}>
-                  <Text style={[tw`text-sm font-bold`, { color: colors.accent }]}>Level {stats.level}</Text>
-                </View>
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}> {/* text-sm → text-xs */}
-                  {stats.experience}/{stats.maxExperience} XP
-                </Text>
-              </View>
-            </View>
+            ]} />
             
-            <TouchableOpacity 
-              style={[
-                tw`p-2 rounded-xl`, // p-3 → p-2
-                { backgroundColor: colors.cardSecondary }
-              ]}
-              onPress={() => navigateTo('avatar')}
-            >
-              <Ionicons name="create-outline" size={18} color={colors.text} /> {/* size 20 → 18 */}
-            </TouchableOpacity>
-          </View>
+            {/* Profile Content */}
+            <View style={tw`p-4`}>
+              {/* Avatar & Basic Info */}
+              <View style={tw`flex-row items-start mb-4`}>
+                {/* Avatar with Premium Styling */}
+                <View style={tw`mr-3`}>
+                  <View style={[
+                    tw`w-16 h-16 rounded-2xl items-center justify-center`,
+                    {
+                      backgroundColor: avatarData.color + '15',
+                      borderWidth: 2.5,
+                      borderColor: avatarData.color,
+                      shadowColor: avatarData.color,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: isGlowEnabled ? (avatarData.border === 'glow' ? 0.5 : 0.25) : 0,
+                      shadowRadius: isGlowEnabled ? (avatarData.border === 'glow' ? 12 : 6) : 0,
+                      elevation: isGlowEnabled ? 4 : 0,
+                    }
+                  ]}>
+                    <Text style={tw`text-3xl`}>{avatarData.avatar}</Text>
+                  </View>
+                  {/* Level Badge on Avatar */}
+                  <View style={tw`absolute -bottom-1.5 left-0 right-0 items-center`}>
+                    <View style={[
+                      tw`px-2 py-0.5 rounded-full flex-row items-center`,
+                      {
+                        backgroundColor: colors.card,
+                        borderWidth: 1.5,
+                        borderColor: avatarData.color,
+                      }
+                    ]}>
+                      <Ionicons name="star" size={10} color={avatarData.color} style={tw`mr-0.5`} />
+                      <Text style={[tw`text-xs font-bold`, { color: avatarData.color }]}>
+                        {stats.level}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
 
-          {/* User ID & Join Date - more compact */}
-          {userData?.id && (
-            <View style={[tw`mb-3 p-3 rounded-lg`, { backgroundColor: colors.cardSecondary }]}> {/* mb-4 → mb-3 */}
-              <Text style={[tw`text-xs font-bold mb-1`, { color: colors.textSecondary }]}>USER ID</Text>
-              <Text style={[tw`text-sm font-mono`, { color: colors.text }]}>#{userData.id}</Text>
-              {userData.createdAt && (
-                <>
-                  <Text style={[tw`text-xs font-bold mt-2 mb-1`, { color: colors.textSecondary }]}>MEMBER SINCE</Text>
-                  <Text style={[tw`text-sm`, { color: colors.text }]}>
-                    {new Date(userData.createdAt).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
+                {/* User Info */}
+                <View style={tw`flex-1`}>
+                  <View style={tw`flex-row items-center mb-1`}>
+                    <Text style={[tw`text-lg font-bold mr-2`, { color: colors.text }]}>
+                      {displayName}
+                    </Text>
+                    {isGuest && (
+                      <View style={[
+                        tw`px-1.5 py-0.5 rounded`,
+                        { backgroundColor: colors.warning + '25' }
+                      ]}>
+                        <Text style={[tw`text-xs font-bold`, { color: colors.warning }]}>GUEST</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={tw`flex-row items-center mb-0.5`}>
+                    <Ionicons name="at" size={12} color={colors.textSecondary} style={tw`mr-1`} />
+                    <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                      {userData?.username || "guest"}
+                    </Text>
+                  </View>
+                  <View style={tw`flex-row items-center mb-2`}>
+                    <Ionicons name="mail-outline" size={12} color={colors.textSecondary} style={tw`mr-1`} />
+                    <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                      {displayEmail}
+                    </Text>
+                  </View>
+                  
+                  {/* XP Progress Bar */}
+                  <View>
+                    <View style={tw`flex-row justify-between items-center mb-0.5`}>
+                      <Text style={[tw`text-xs`, { color: avatarData.color }]}>
+                        {stats.experience}/{stats.maxExperience} XP
+                      </Text>
+                    </View>
+                    <View style={[
+                      tw`h-1.5 rounded-full overflow-hidden`,
+                      { backgroundColor: colors.cardSecondary }
+                    ]}>
+                      <View style={[
+                        tw`h-full rounded-full`,
+                        {
+                          width: `${(stats.experience / stats.maxExperience) * 100}%`,
+                          backgroundColor: avatarData.color,
+                        }
+                      ]} />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Edit Button */}
+                <TouchableOpacity 
+                  style={[
+                    tw`p-2 rounded-xl`,
+                    { 
+                      backgroundColor: avatarData.color + '15',
+                      borderWidth: 1,
+                      borderColor: avatarData.color + '25',
+                    }
+                  ]}
+                  onPress={() => navigateTo('avatar')}
+                >
+                  <Ionicons name="create-outline" size={18} color={avatarData.color} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Stats Grid with Icons */}
+              <View style={tw`flex-row flex-wrap justify-between mb-3`}>
+                {/* Habits Stat */}
+                <View style={[
+                  tw`rounded-xl p-2 items-center`,
+                  { 
+                    backgroundColor: unifiedIconColor + '12',
+                    width: '23%',
+                    borderWidth: 1,
+                    borderColor: unifiedIconColor + '25',
+                  }
+                ]}>
+                  <Ionicons name="checkmark-circle" size={20} color={unifiedIconColor} />
+                  <Text style={[tw`text-base font-bold mt-1`, { color: colors.text }]}>
+                    {stats.habitsCompleted}
                   </Text>
-                </>
-              )}
-            </View>
-          )}
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Habits</Text>
+                </View>
 
-          {/* Quick Stats - unchanged */}
-          <View style={[tw`flex-row justify-between pt-4 border-t`, { borderColor: colors.cardSecondary }]}>
-            <View style={tw`items-center`}>
-              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.habitsCompleted}</Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Habits</Text>
-            </View>
-            <View style={tw`items-center`}>
-              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.dailiesCompleted}</Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Dailies</Text>
-            </View>
-            <View style={tw`items-center`}>
-              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.routinesCompleted}</Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Routines</Text>
-            </View>
-            <View style={tw`items-center`}>
-              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{stats.focusSessionsToday}</Text>
-              <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Focus</Text>
+                {/* Dailies Stat */}
+                <View style={[
+                  tw`rounded-xl p-2 items-center`,
+                  { 
+                    backgroundColor: unifiedIconColor + '12',
+                    width: '23%',
+                    borderWidth: 1,
+                    borderColor: unifiedIconColor + '25',
+                  }
+                ]}>
+                  <Ionicons name="calendar" size={20} color={unifiedIconColor} />
+                  <Text style={[tw`text-base font-bold mt-1`, { color: colors.text }]}>
+                    {stats.dailiesCompleted}
+                  </Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Dailies</Text>
+                </View>
+
+                {/* Routines Stat */}
+                <View style={[
+                  tw`rounded-xl p-2 items-center`,
+                  { 
+                    backgroundColor: unifiedIconColor + '12',
+                    width: '23%',
+                    borderWidth: 1,
+                    borderColor: unifiedIconColor + '25',
+                  }
+                ]}>
+                  <Ionicons name="repeat" size={20} color={unifiedIconColor} />
+                  <Text style={[tw`text-base font-bold mt-1`, { color: colors.text }]}>
+                    {stats.routinesCompleted}
+                  </Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Routines</Text>
+                </View>
+
+                {/* Focus Stat */}
+                <View style={[
+                  tw`rounded-xl p-2 items-center`,
+                  { 
+                    backgroundColor: unifiedIconColor + '12',
+                    width: '23%',
+                    borderWidth: 1,
+                    borderColor: unifiedIconColor + '25',
+                  }
+                ]}>
+                  <Ionicons name="timer" size={20} color={unifiedIconColor} />
+                  <Text style={[tw`text-base font-bold mt-1`, { color: colors.text }]}>
+                    {stats.focusSessionsToday}
+                  </Text>
+                  <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Focus</Text>
+                </View>
+              </View>
+
+              {/* Additional Info Row */}
+              {userData?.id && (
+                <View style={[
+                  tw`flex-row justify-between items-center pt-2.5 border-t`,
+                  { borderColor: colors.cardSecondary }
+                ]}>
+                  <View style={tw`flex-row items-center`}>
+                    <View style={[
+                      tw`w-6 h-6 rounded-full items-center justify-center mr-1.5`,
+                      { backgroundColor: avatarData.color + '18' }
+                    ]}>
+                      <Ionicons name="finger-print" size={12} color={avatarData.color} />
+                    </View>
+                    <View>
+                      <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>ID #{userData.id}</Text>
+                    </View>
+                  </View>
+                  
+                  {userData.createdAt && (
+                    <View style={tw`flex-row items-center`}>
+                      <View style={[
+                        tw`w-6 h-6 rounded-full items-center justify-center mr-1.5`,
+                        { backgroundColor: avatarData.color + '18' }
+                      ]}>
+                        <Ionicons name="calendar-outline" size={12} color={avatarData.color} />
+                      </View>
+                      <View>
+                        <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                          {new Date(userData.createdAt).toLocaleDateString('en-US', { 
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -274,9 +475,9 @@ export default function More() {
                     backgroundColor: colors.card,
                     shadowColor: item.color,
                     shadowOffset: { width: 0, height: 1 }, // reduced from height: 2
-                    shadowOpacity: 0.08, // reduced from 0.1
-                    shadowRadius: 4, // reduced from 8
-                    elevation: 2, // reduced from 4
+                    shadowOpacity: isGlowEnabled ? 0.08 : 0, // reduced from 0.1
+                    shadowRadius: isGlowEnabled ? 4 : 0, // reduced from 8
+                    elevation: isGlowEnabled ? 2 : 0, // reduced from 4
                   }
                 ]}
                 onPress={() => navigateTo(item.path)}
@@ -337,9 +538,9 @@ export default function More() {
                 backgroundColor: colors.error,
                 shadowColor: colors.error,
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 8,
+                shadowOpacity: isGlowEnabled ? 0.3 : 0,
+                shadowRadius: isGlowEnabled ? 8 : 0,
+                elevation: isGlowEnabled ? 8 : 0,
               }
             ]} 
             onPress={handleLogout}
@@ -355,3 +556,4 @@ export default function More() {
     </SafeAreaView>
   )
 }
+

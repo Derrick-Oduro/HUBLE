@@ -1,19 +1,35 @@
 "use client"
 
-import { useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Alert } from "react-native"
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import tw from "../../lib/tailwind"
 import { useTheme } from "../../contexts/ThemeProvider"
-import React from "react"
+
+
+const preferredCategoryOrder = ["Default", "Nature", "Vibrant", "Premium", "Special", "Elegant"]
 
 export default function Themes() {
   const router = useRouter()
-  const { currentTheme, selectedThemeId, themes, setTheme, colors } = useTheme()
+  const { currentTheme, selectedThemeId, themes, setTheme, refreshThemes, colors } = useTheme()
   const [previewTheme, setPreviewTheme] = useState(selectedThemeId)
 
-  const categories = ["Default", "Nature", "Vibrant", "Premium", "Special", "Elegant"]
+  const normalizeCategory = (category?: string) => {
+    if (!category || typeof category !== 'string') return 'Other'
+    return category
+      .trim()
+      .split(/[\s_-]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  useEffect(() => {
+    refreshThemes().catch((error) => {
+      console.error("Failed to refresh themes on Themes screen:", error)
+    })
+  }, [refreshThemes])
 
   const handleApplyTheme = async () => {
     const selectedTheme = themes.find(t => t.id === previewTheme)
@@ -35,7 +51,10 @@ export default function Themes() {
     )
   }
 
-  const ThemePreview = ({ theme, isSelected, onSelect }) => (
+  const ThemePreview = ({ theme, isSelected, onSelect }) => {
+    const hasGlowEffect = theme.visualEffect === 'glow'
+
+    return (
     <TouchableOpacity
       style={[
         tw`rounded-2xl p-5 mb-4`,
@@ -46,9 +65,9 @@ export default function Themes() {
           opacity: theme.unlocked ? 1 : 0.7,
           shadowColor: theme.colors.accent,
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: isSelected ? 0.3 : 0,
-          shadowRadius: 8,
-          elevation: isSelected ? 8 : 0,
+          shadowOpacity: hasGlowEffect ? 0.3 : 0,
+          shadowRadius: hasGlowEffect ? 10 : 0,
+          elevation: hasGlowEffect ? 8 : 0,
         }
       ]}
       onPress={() => onSelect(theme.id)}
@@ -174,16 +193,46 @@ export default function Themes() {
         )}
       </View>
     </TouchableOpacity>
+    )
+  }
+
+  const groupedThemes = useMemo(() => {
+    const byCategory = themes.reduce((acc, theme) => {
+      const categoryLabel = normalizeCategory(theme.category)
+      if (!acc[categoryLabel]) {
+        acc[categoryLabel] = []
+      }
+      acc[categoryLabel].push(theme)
+      return acc
+    }, {} as Record<string, typeof themes>)
+
+    const allCategories = Object.keys(byCategory)
+    const orderedCategories = [
+      ...preferredCategoryOrder.filter((category) => byCategory[category]),
+      ...allCategories
+        .filter((category) => !preferredCategoryOrder.includes(category))
+        .sort((a, b) => a.localeCompare(b)),
+    ]
+
+    return orderedCategories.map((category) => ({
+      category,
+      themes: byCategory[category],
+    }))
+  }, [themes])
+
+  const unlockedThemeCount = useMemo(
+    () => themes.filter((theme) => theme.unlocked).length,
+    [themes],
   )
 
-  const groupedThemes = categories.map(category => ({
-    category,
-    themes: themes.filter(theme => theme.category === category)
-  })).filter(group => group.themes.length > 0)
+  const lockedThemes = useMemo(
+    () => themes.filter((theme) => !theme.unlocked),
+    [themes],
+  )
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
@@ -234,7 +283,7 @@ export default function Themes() {
                 Category: {currentTheme.category}
               </Text>
               <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
-                {themes.filter(t => t.unlocked).length}/{themes.length} unlocked
+                {unlockedThemeCount}/{themes.length} unlocked
               </Text>
             </View>
           </View>
@@ -287,45 +336,47 @@ export default function Themes() {
             </View>
           </View>
 
-          {/* Coming Soon */}
+          {/* Unlock Progress */}
           <View style={[
             tw`rounded-2xl p-5`,
             { backgroundColor: colors.card }
           ]}>
             <View style={tw`flex-row items-center mb-3`}>
               <Ionicons name="sparkles" size={24} color={colors.warning} style={tw`mr-3`} />
-              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>Coming Soon</Text>
+              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>Theme Unlock Progress</Text>
             </View>
-            
-            <Text style={[tw`mb-3`, { color: colors.textSecondary }]}>
-              More amazing themes are on the way! Special seasonal themes and community-created designs.
-            </Text>
-            
-            <View style={tw`flex-row flex-wrap`}>
-              {[
-                { name: "Christmas", icon: "snow" },
-                { name: "Neon City", icon: "city" },
-                { name: "Minimal", icon: "ellipse-outline" },
-                { name: "Galaxy", icon: "planet" },
-                { name: "Retro", icon: "radio" },
-                { name: "Pastel", icon: "flower" }
-              ].map((theme, index) => (
-                <View
-                  key={index}
-                  style={[
-                    tw`px-3 py-2 rounded-full mr-2 mb-2 flex-row items-center`,
-                    { backgroundColor: colors.cardSecondary }
-                  ]}
-                >
-                  <Ionicons name={theme.icon} size={16} color={colors.textSecondary} style={tw`mr-1`} />
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{theme.name}</Text>
+
+            {lockedThemes.length === 0 ? (
+              <Text style={[tw`mb-1`, { color: colors.textSecondary }]}> 
+                You have unlocked every available theme.
+              </Text>
+            ) : (
+              <>
+                <Text style={[tw`mb-3`, { color: colors.textSecondary }]}> 
+                  Keep progressing to unlock {lockedThemes.length} more theme{lockedThemes.length === 1 ? "" : "s"}.
+                </Text>
+
+                <View style={tw`flex-row flex-wrap`}>
+                  {lockedThemes.slice(0, 6).map((theme) => (
+                    <View
+                      key={theme.id}
+                      style={[
+                        tw`px-3 py-2 rounded-full mr-2 mb-2 flex-row items-center`,
+                        { backgroundColor: colors.cardSecondary }
+                      ]}
+                    >
+                      <Ionicons name="lock-closed" size={14} color={colors.warning} style={tw`mr-1`} />
+                      <Text style={[tw`text-sm`, { color: colors.text }]}>{theme.name}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
+              </>
+            )}
           </View>
         </ScrollView>
       </View>
     </SafeAreaView>
   )
 }
+
 

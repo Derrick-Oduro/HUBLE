@@ -11,7 +11,6 @@ import { Ionicons } from "@expo/vector-icons"
 import {
   PanGestureHandler,
   PanGestureHandlerGestureEvent,
-  State,
 } from "react-native-gesture-handler"
 import Animated, {
   useAnimatedGestureHandler,
@@ -21,6 +20,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated"
 import tw from "../lib/tailwind"
+import { useTheme } from "../contexts/ThemeProvider"
 
 interface DraggableHabitItemProps {
   id: number
@@ -53,6 +53,7 @@ export default function DraggableHabitItem({
   onFail,
   onReorder,
 }: DraggableHabitItemProps) {
+  const { isGlowEnabled } = useTheme()
   const translateY = useSharedValue(0)
   const scale = useSharedValue(1)
   const zIndex = useSharedValue(0)
@@ -127,7 +128,7 @@ export default function DraggableHabitItem({
       { scale: scale.value },
     ],
     zIndex: zIndex.value,
-    elevation: isDragging.value ? 10 : 2,
+    elevation: isDragging.value ? 10 : 0,
   }))
 
   const handleLongPress = () => {
@@ -155,9 +156,9 @@ export default function DraggableHabitItem({
               borderLeftColor: getColorValue(color),
               shadowColor: completed ? '#10B981' : getColorValue(color),
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-              elevation: 3,
+              shadowOpacity: isGlowEnabled ? 0.3 : 0,
+              shadowRadius: isGlowEnabled ? 4 : 0,
+              elevation: isGlowEnabled ? 3 : 0,
             }
           ]}
         >

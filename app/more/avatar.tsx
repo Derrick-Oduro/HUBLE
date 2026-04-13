@@ -1,14 +1,30 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, TextInput, Alert } from "react-native"
-import { Ionicons, FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons"
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
 import { useStats } from "../../contexts/StatsProvider"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import React from "react"
+
+import { authAPI, configAPI } from "../../lib/api"
+
+const defaultAvatarOptions = [
+  { emoji: "🧙‍♂️", name: "Wizard", unlocked: true, level: 1 },
+  { emoji: "🧙‍♀️", name: "Sorceress", unlocked: true, level: 1 },
+  { emoji: "👨‍💻", name: "Developer", unlocked: true, level: 3 },
+  { emoji: "👩‍💻", name: "Coder", unlocked: true, level: 3 },
+  { emoji: "🦸‍♂️", name: "Hero", unlocked: true, level: 5 },
+  { emoji: "🦸‍♀️", name: "Heroine", unlocked: true, level: 5 },
+  { emoji: "🥷", name: "Ninja", unlocked: true, level: 10 },
+  { emoji: "🤴", name: "Prince", unlocked: true, level: 15 },
+  { emoji: "👸", name: "Princess", unlocked: true, level: 15 },
+  { emoji: "🧠", name: "Mastermind", unlocked: true, level: 20 },
+  { emoji: "⚡", name: "Lightning", unlocked: true, level: 25 },
+  { emoji: "🔥", name: "Fire Master", unlocked: true, level: 30 },
+]
 
 export default function Avatar() {
   const router = useRouter()
@@ -20,22 +36,7 @@ export default function Avatar() {
   const [selectedAvatar, setSelectedAvatar] = useState("🧙‍♂️")
   const [selectedColor, setSelectedColor] = useState("#8B5CF6")
   const [selectedBorder, setSelectedBorder] = useState("normal")
-
-  // Avatar options with unlock requirements
-  const avatarOptions = [
-    { emoji: "🧙‍♂️", name: "Wizard", unlocked: true, level: 1 },
-    { emoji: "🧙‍♀️", name: "Sorceress", unlocked: true, level: 1 },
-    { emoji: "👨‍💻", name: "Developer", unlocked: stats.level >= 3, level: 3 },
-    { emoji: "👩‍💻", name: "Coder", unlocked: stats.level >= 3, level: 3 },
-    { emoji: "🦸‍♂️", name: "Hero", unlocked: stats.level >= 5, level: 5 },
-    { emoji: "🦸‍♀️", name: "Heroine", unlocked: stats.level >= 5, level: 5 },
-    { emoji: "🥷", name: "Ninja", unlocked: stats.level >= 10, level: 10 },
-    { emoji: "🤴", name: "Prince", unlocked: stats.level >= 15, level: 15 },
-    { emoji: "👸", name: "Princess", unlocked: stats.level >= 15, level: 15 },
-    { emoji: "🧠", name: "Mastermind", unlocked: stats.level >= 20, level: 20 },
-    { emoji: "⚡", name: "Lightning", unlocked: stats.level >= 25, level: 25 },
-    { emoji: "🔥", name: "Fire Master", unlocked: stats.level >= 30, level: 30 },
-  ]
+  const [avatarOptions, setAvatarOptions] = useState(defaultAvatarOptions)
 
   // Color options
   const colorOptions = [
@@ -57,13 +58,35 @@ export default function Avatar() {
     { id: "legendary", name: "Legendary", unlocked: stats.level >= 20 },
   ]
 
-  // Load saved avatar data
-  useEffect(() => {
-    loadAvatarData()
-  }, [])
-
-  const loadAvatarData = async () => {
+  const loadAvatarData = useCallback(async () => {
     try {
+      try {
+        const [profileResponse, avatarsResponse] = await Promise.all([
+          authAPI.getProfile(),
+          configAPI.getAvatars(),
+        ])
+
+        if (avatarsResponse?.avatars?.length) {
+          setAvatarOptions(
+            avatarsResponse.avatars.map((option: any) => ({
+              emoji: option.emoji,
+              name: option.name,
+              unlocked: stats.level >= (option.unlock_level || 1),
+              level: option.unlock_level || 1,
+            })),
+          )
+        }
+
+        if (profileResponse?.user) {
+          setUsername(profileResponse.user.username || "WhiteMisty")
+          setSelectedAvatar(profileResponse.user.avatar || "🧙‍♂️")
+          setSelectedColor(profileResponse.user.avatar_color || "#8B5CF6")
+          setSelectedBorder(profileResponse.user.avatar_border || "normal")
+        }
+      } catch (profileError) {
+        console.log('Backend profile load failed, falling back to local avatar data:', profileError)
+      }
+
       const savedData = await AsyncStorage.getItem('avatarData')
       if (savedData) {
         const { username: savedUsername, avatar, color, border } = JSON.parse(savedData)
@@ -75,7 +98,11 @@ export default function Avatar() {
     } catch (error) {
       console.log('Error loading avatar data:', error)
     }
-  }
+  }, [stats.level])
+
+  useEffect(() => {
+    loadAvatarData()
+  }, [loadAvatarData])
 
   const handleSave = async () => {
     try {
@@ -85,6 +112,12 @@ export default function Avatar() {
         color: selectedColor,
         border: selectedBorder
       }
+      await authAPI.updateProfile({
+        username,
+        avatar: selectedAvatar,
+        avatar_color: selectedColor,
+        avatar_border: selectedBorder,
+      })
       await AsyncStorage.setItem('avatarData', JSON.stringify(avatarData))
       
       Alert.alert(
@@ -92,7 +125,7 @@ export default function Avatar() {
         "Your character has been updated successfully.",
         [{ text: "OK", onPress: () => router.back() }]
       )
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to save avatar data")
     }
   }
@@ -140,7 +173,7 @@ export default function Avatar() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       {/* Header */}
       <View style={tw`flex-row items-center px-5 pt-2 pb-4 justify-between`}>
@@ -338,4 +371,5 @@ export default function Avatar() {
     </SafeAreaView>
   )
 }
+
 

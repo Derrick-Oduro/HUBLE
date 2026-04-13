@@ -13,8 +13,39 @@ class Challenge {
     this.end_date = data.end_date;
     this.goal_value = data.goal_value;
     this.goal_type = data.goal_type; // 'count', 'duration', 'streak'
+    this.mode = data.mode || "competitive"; // 'competitive' | 'cooperative'
+    this.team_target = data.team_target;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
+  }
+
+  static toChallengeRow(row) {
+    if (!row) {
+      return row;
+    }
+
+    const goalValue = Number(row.goal_value ?? row.target_value ?? 0);
+    const rewardText =
+      row.reward ||
+      (Number(row.reward_xp || 0) > 0 || Number(row.reward_coins || 0) > 0
+        ? `${Number(row.reward_xp || 0) > 0 ? `⭐ ${row.reward_xp} XP` : ""}${
+            Number(row.reward_xp || 0) > 0 && Number(row.reward_coins || 0) > 0
+              ? " + "
+              : ""
+          }${Number(row.reward_coins || 0) > 0 ? `💰 ${row.reward_coins} Coins` : ""}`
+        : "Challenge reward");
+
+    return {
+      ...row,
+      emoji: row.emoji || "🏆",
+      color: row.color || "#8B5CF6",
+      difficulty: row.difficulty || "Medium",
+      reward: rewardText,
+      goal_value: goalValue,
+      goal_type: row.goal_type || "count",
+      mode: row.mode || "competitive",
+      team_target: Number(row.team_target || goalValue || 0),
+    };
   }
 
   // Create challenge
@@ -31,15 +62,50 @@ class Challenge {
         end_date,
         goal_value,
         goal_type,
+        mode,
+        team_target,
+        created_by,
+        startDate,
+        endDate,
+        goalValue,
+        goalType,
+        teamTarget,
+        rewardXp,
+        rewardCoins,
       } = challengeData;
+
+      const resolvedGoalValue = Number(goal_value ?? goalValue ?? 0);
+      const resolvedGoalType =
+        `${goal_type ?? goalType ?? "count"}`.trim() || "count";
+      const resolvedMode =
+        `${mode || "competitive"}`.trim().toLowerCase() === "cooperative"
+          ? "cooperative"
+          : "competitive";
+      const teamTargetSource =
+        team_target ?? teamTarget ?? resolvedGoalValue ?? 0;
+      const resolvedTeamTarget = Math.max(0, Number(teamTargetSource));
+      const resolvedStartDate = start_date || startDate;
+      const resolvedEndDate = end_date || endDate;
+      const resolvedRewardXp = Number(rewardXp || challengeData.reward_xp || 0);
+      const resolvedRewardCoins = Number(
+        rewardCoins || challengeData.reward_coins || 0,
+      );
+      const resolvedReward =
+        reward ||
+        (resolvedRewardXp > 0 || resolvedRewardCoins > 0
+          ? `${resolvedRewardXp > 0 ? `⭐ ${resolvedRewardXp} XP` : ""}${
+              resolvedRewardXp > 0 && resolvedRewardCoins > 0 ? " + " : ""
+            }${resolvedRewardCoins > 0 ? `💰 ${resolvedRewardCoins} Coins` : ""}`
+          : "Challenge reward");
 
       const result = await database.run(
         `
         INSERT INTO challenges (
           title, description, emoji, color, difficulty,
-          reward, start_date, end_date, goal_value, goal_type
+          reward, start_date, end_date, goal_value, goal_type,
+          mode, team_target, type, target_value, reward_xp, reward_coins, created_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
         [
           title,
@@ -47,11 +113,18 @@ class Challenge {
           emoji || "🏆",
           color || "#8B5CF6",
           difficulty || "Medium",
-          reward,
-          start_date,
-          end_date,
-          goal_value,
-          goal_type || "count",
+          resolvedReward,
+          resolvedStartDate,
+          resolvedEndDate,
+          resolvedGoalValue,
+          resolvedGoalType,
+          resolvedMode,
+          resolvedTeamTarget,
+          challengeData.type || "total",
+          resolvedGoalValue,
+          resolvedRewardXp,
+          resolvedRewardCoins,
+          created_by || null,
         ],
       );
 
@@ -79,7 +152,7 @@ class Challenge {
         [now, now],
       );
 
-      return challenges;
+      return challenges.map((challenge) => Challenge.toChallengeRow(challenge));
     } catch (error) {
       console.error("Error getting active challenges:", error);
       throw error;
@@ -101,7 +174,7 @@ class Challenge {
         [challengeId],
       );
 
-      return challenge;
+      return Challenge.toChallengeRow(challenge);
     } catch (error) {
       console.error("Error getting challenge by ID:", error);
       throw error;
@@ -125,7 +198,7 @@ class Challenge {
         [now],
       );
 
-      return challenges;
+      return challenges.map((challenge) => Challenge.toChallengeRow(challenge));
     } catch (error) {
       console.error("Error getting upcoming challenges:", error);
       throw error;
@@ -158,7 +231,7 @@ class Challenge {
         [userId, now, now],
       );
 
-      return challenges;
+      return challenges.map((challenge) => Challenge.toChallengeRow(challenge));
     } catch (error) {
       console.error("Error getting user challenges:", error);
       throw error;
@@ -191,7 +264,7 @@ class Challenge {
         [userId, now],
       );
 
-      return challenges;
+      return challenges.map((challenge) => Challenge.toChallengeRow(challenge));
     } catch (error) {
       console.error("Error getting completed challenges:", error);
       throw error;
@@ -255,6 +328,24 @@ class Challenge {
       console.error("Error updating challenge progress:", error);
       throw error;
     }
+  }
+
+  static async getCooperativeProgress(challengeId) {
+    const summary = await database.get(
+      `
+      SELECT
+        COALESCE(SUM(progress), 0) as group_progress,
+        COUNT(*) as participant_count
+      FROM challenge_participants
+      WHERE challenge_id = ?
+    `,
+      [challengeId],
+    );
+
+    return {
+      group_progress: Number(summary?.group_progress || 0),
+      participant_count: Number(summary?.participant_count || 0),
+    };
   }
 
   // Get leaderboard for a challenge

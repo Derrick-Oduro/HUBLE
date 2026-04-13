@@ -1,18 +1,38 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../contexts/ThemeProvider"
 import tw from "../../lib/tailwind"
-import { socialAPI } from "../../lib/api"
+import { activityAPI, socialAPI } from "../../lib/api"
+
+type SocialStats = {
+  friends: number
+  parties: number
+  activeChallenges: number
+  totalXpEarned: number
+  groupBadges: number
+  currentStreak: number
+  pendingRequests: number
+}
+
+type RecentActivityItem = {
+  id: number
+  type: string
+  message: string
+  time: string
+  icon: string
+  color: string
+  cheersCount: number
+  hasCheered: boolean
+}
 
 export default function Social() {
   const router = useRouter()
   const { colors, currentTheme } = useTheme()
-  const [activeTab, setActiveTab] = useState("overview")
-  const [socialStats, setSocialStats] = useState({
+  const [socialStats, setSocialStats] = useState<SocialStats>({
     friends: 0,
     parties: 0,
     activeChallenges: 0,
@@ -42,35 +62,106 @@ export default function Social() {
     }
   }
 
-  // Mock recent activity
-  const recentActivity = [
-    {
-      id: 1,
-      type: "friend_joined",
-      message: "CodeMaster completed their study session",
-      time: "2 hours ago",
-      icon: "person",
-      color: "#10B981"
-    },
-    {
-      id: 2,
-      type: "party_achievement",
-      message: "Study Squad unlocked 'Knowledge Seekers' badge",
-      time: "1 day ago",
-      icon: "trophy",
-      color: "#F59E0B"
-    },
-    {
-      id: 3,
-      type: "challenge_progress",
-      message: "You moved up to #5 in Meditation Challenge",
-      time: "2 days ago",
-      icon: "trending-up",
-      color: "#8B5CF6"
-    }
-  ]
+  // Load recent activity from friends
+  const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>([])
 
-  const socialFeatures = [
+  const loadRecentActivity = useCallback(async () => {
+    try {
+      const response = await activityAPI.getFriendsActivities(10)
+      if (response.success) {
+        setRecentActivity((response.activities || []).map((activity: any) => ({
+          id: Number(activity.id),
+          type: activity.activity_type || "activity",
+          message: activity.title || "New activity",
+          time: getTimeAgo(activity.created_at),
+          icon: activity.icon || "sparkles-outline",
+          color: activity.color || colors.accent,
+          cheersCount: Number(activity.cheers_count || 0),
+          hasCheered: Boolean(activity.has_cheered),
+        })))
+      }
+    } catch (error) {
+      console.error("Failed to load recent activity:", error)
+      setRecentActivity([])
+    }
+  }, [colors.accent])
+
+  useEffect(() => {
+    loadRecentActivity()
+  }, [loadRecentActivity])
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`
+    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`
+    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
+  }
+
+  const handleCheerToggle = async (activityId: number, currentlyCheered: boolean) => {
+    const delta = currentlyCheered ? -1 : 1
+
+    setRecentActivity((prev) =>
+      prev.map((activity) =>
+        activity.id === activityId
+          ? {
+              ...activity,
+              hasCheered: !currentlyCheered,
+              cheersCount: Math.max(0, activity.cheersCount + delta),
+            }
+          : activity,
+      ),
+    )
+
+    try {
+      const response = currentlyCheered
+        ? await activityAPI.uncheerActivity(activityId)
+        : await activityAPI.cheerActivity(activityId)
+
+      if (!response?.success) {
+        throw new Error("Cheer action failed")
+      }
+
+      setRecentActivity((prev) =>
+        prev.map((activity) =>
+          activity.id === activityId
+            ? {
+                ...activity,
+                hasCheered: Boolean(response.hasCheered),
+                cheersCount: Number(response.cheersCount || 0),
+              }
+            : activity,
+        ),
+      )
+    } catch (error) {
+      console.error("Failed to update cheer:", error)
+      setRecentActivity((prev) =>
+        prev.map((activity) =>
+          activity.id === activityId
+            ? {
+                ...activity,
+                hasCheered: currentlyCheered,
+                cheersCount: Math.max(0, activity.cheersCount - delta),
+              }
+            : activity,
+        ),
+      )
+    }
+  }
+
+  const socialFeatures: Array<{
+    icon: keyof typeof Ionicons.glyphMap
+    title: string
+    description: string
+    count: number
+    color: string
+    action: () => void
+  }> = [
     {
       icon: "people-outline",
       title: "Friends",
@@ -107,7 +198,7 @@ export default function Social() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         
         {/* Header */}
@@ -238,13 +329,29 @@ export default function Social() {
                   tw`w-10 h-10 rounded-lg items-center justify-center mr-3`,
                   { backgroundColor: `${activity.color}20` }
                 ]}>
-                  <Ionicons name={activity.icon} size={20} color={activity.color} />
+                  <Ionicons
+                    name={activity.icon as keyof typeof Ionicons.glyphMap}
+                    size={20}
+                    color={activity.color}
+                  />
                 </View>
                 
                 <View style={tw`flex-1`}>
                   <Text style={[tw`font-medium`, { color: colors.text }]}>{activity.message}</Text>
                   <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{activity.time}</Text>
                 </View>
+
+                <TouchableOpacity
+                  style={tw`items-center px-2 py-1`}
+                  onPress={() => handleCheerToggle(activity.id, activity.hasCheered)}
+                >
+                  <Ionicons
+                    name={activity.hasCheered ? "heart" : "heart-outline"}
+                    size={18}
+                    color={activity.hasCheered ? "#EC4899" : colors.textSecondary}
+                  />
+                  <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>{activity.cheersCount}</Text>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -302,7 +409,7 @@ export default function Social() {
             
             <TouchableOpacity 
               style={[tw`flex-row items-center justify-between py-3 border-b`, { borderColor: colors.cardSecondary }]}
-              onPress={() => router.push('/more/social/privacy')}
+              onPress={() => router.push('/more/security')}
             >
               <View style={tw`flex-row items-center`}>
                 <Ionicons name="eye-outline" size={20} color={colors.textSecondary} style={tw`mr-3`} />
@@ -316,7 +423,7 @@ export default function Social() {
 
             <TouchableOpacity 
               style={tw`flex-row items-center justify-between py-3`}
-              onPress={() => router.push('/more/social/blocked-users')}
+              onPress={() => router.push('/more/security')}
             >
               <View style={tw`flex-row items-center`}>
                 <Ionicons name="ban-outline" size={20} color={colors.textSecondary} style={tw`mr-3`} />

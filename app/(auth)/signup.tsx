@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import {
   View,
   Text,
@@ -18,21 +18,17 @@ import {
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import tw from "../../lib/tailwind"
+import { authAPI } from "../../lib/api"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useTheme } from "../../contexts/ThemeProvider"
 import { useStats } from "../../contexts/StatsProvider"
-import React from "react"
 
-// Find your computer's IP address first
-const getAPIBaseURL = () => {
-  if (__DEV__) {
-    // Force use of your computer's IP address for physical device
-    return 'http://10.4.62.166:3000/api';
-  }
-  return 'https://your-production-api.com/api';
-};
+type SignupErrors = {
+  username?: string | null
+  email?: string | null
+  password?: string | null
+}
 
-const API_BASE_URL = 'http://10.0.72.74:3000/api';
 
 export default function SignupScreen() {
   const router = useRouter()
@@ -43,10 +39,10 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors] = useState({})
+  const [errors, setErrors] = useState<SignupErrors>({})
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: SignupErrors = {};
     
     if (!username.trim()) {
       newErrors.username = "Username is required";
@@ -83,28 +79,8 @@ export default function SignupScreen() {
         password: password
       };
       
-      console.log('🚀 Attempting signup to:', `${API_BASE_URL}/auth/register`);
       console.log('📤 Request data:', requestData);
-      
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response headers:', response.headers);
-      
-      // Check if response is ok
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ HTTP Error:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await authAPI.register(requestData);
       console.log('✅ Response data:', data);
 
       if (data.success) {
@@ -112,6 +88,7 @@ export default function SignupScreen() {
         await AsyncStorage.setItem("userToken", data.token);
         await AsyncStorage.setItem("userData", JSON.stringify(data.user));
         await AsyncStorage.setItem("isLoggedIn", "true");
+        await AsyncStorage.removeItem("onboardingComplete");
 
         // Load user stats (FIX: Change function name)
         if (loadUserStats) {
@@ -125,15 +102,18 @@ export default function SignupScreen() {
         Alert.alert(
           "Account Created!",
           "Welcome to HUBLE! Your journey to better habits starts now.",
-          [{ text: "Get Started", onPress: () => router.replace("/(tabs)") }]
+          [{ text: "Get Started", onPress: () => router.replace("/onboarding") }]
         );
 
       } else {
         // Handle validation errors from backend
         if (data.details && Array.isArray(data.details)) {
-          const backendErrors = {};
-          data.details.forEach(error => {
-            backendErrors[error.field] = error.message;
+          const backendErrors: SignupErrors = {};
+          data.details.forEach((error: any) => {
+            const field = error.field as keyof SignupErrors
+            if (field === "username" || field === "email" || field === "password") {
+              backendErrors[field] = error.message;
+            }
           });
           setErrors(backendErrors);
         } else {
@@ -141,18 +121,31 @@ export default function SignupScreen() {
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Signup error:", error);
-      console.error("Error details:", error.message);
-      console.error("Error stack:", error.stack);
+
+      if (error?.details && Array.isArray(error.details)) {
+        const backendErrors: SignupErrors = {};
+        error.details.forEach((detail: any) => {
+          const field = detail.field as keyof SignupErrors
+          if (field === "username" || field === "email" || field === "password") {
+            backendErrors[field] = detail.message;
+          }
+        });
+        setErrors(backendErrors);
+        return;
+      }
+
+      console.error("Error details:", error?.message);
+      console.error("Error stack:", error?.stack);
       
       // More specific error messages
-      if (error.message.includes('Network request failed')) {
+      if (error?.message?.includes('Network request failed')) {
         Alert.alert(
           "Connection Error", 
           "Cannot reach the server. Make sure your backend is running."
         );
-      } else if (error.message.includes('timeout')) {
+      } else if (error?.message?.includes('timeout')) {
         Alert.alert(
           "Timeout Error", 
           "Server is taking too long to respond."
@@ -160,7 +153,7 @@ export default function SignupScreen() {
       } else {
         Alert.alert(
           "Error", 
-          `Signup failed: ${error.message}`
+          `Signup failed: ${error?.message || 'Unknown error'}`
         );
       }
     } finally {
@@ -175,34 +168,27 @@ export default function SignupScreen() {
       const guestUsername = `Guest${Math.floor(Math.random() * 10000)}`;
       const guestEmail = `${guestUsername.toLowerCase()}@guest.huble.app`;
       
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: guestUsername,
-          email: guestEmail,
-          password: "guest123456"
-        }),
+      const data = await authAPI.register({
+        username: guestUsername,
+        email: guestEmail,
+        password: "guest123456",
       });
-
-      const data = await response.json();
 
       if (data.success) {
         await AsyncStorage.setItem("userToken", data.token);
         await AsyncStorage.setItem("userData", JSON.stringify(data.user));
         await AsyncStorage.setItem("isLoggedIn", "true");
         await AsyncStorage.setItem("isGuest", "true");
+        await AsyncStorage.removeItem("onboardingComplete");
 
         await loadUserStats(); // ← FIX: Change from loadStats() to loadUserStats()
-        router.replace("/(tabs)");
+        router.replace("/onboarding");
       } else {
         Alert.alert("Error", "Failed to create guest account. Please try again.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Guest signup error:", error);
-      Alert.alert("Error", "Failed to create guest account. Please try again.");
+      Alert.alert("Error", error?.message || "Failed to create guest account. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -211,41 +197,17 @@ export default function SignupScreen() {
   const testBackendConnection = async () => {
     try {
       console.log('🔍 Testing backend connection...');
-      console.log('🔍 API URL:', API_BASE_URL);
-      
-      // Test health endpoint first
-      const healthURL = API_BASE_URL.replace('/api', '/health');
-      console.log('🔍 Health URL:', healthURL);
-      
-      const response = await fetch(healthURL, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response ok:', response.ok);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Backend response:', data);
+      const data = await authAPI.checkHealth();
+      console.log('✅ Backend response:', data);
         Alert.alert('✅ Success', `Backend connected!\nMessage: ${data.message || 'OK'}`);
         
-        // Now test the signup endpoint exists
-        console.log('🔍 Testing signup endpoint...');
-        const signupResponse = await fetch(`${API_BASE_URL}/auth/register`, {
-          method: 'OPTIONS', // Just check if endpoint exists
-        });
-        console.log('📥 Signup endpoint status:', signupResponse.status);
-        
-      } else {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-    } catch (error) {
+      // Now test the signup endpoint exists
+      console.log('🔍 Testing signup endpoint...');
+      await authAPI.checkRegisterEndpoint();
+      console.log('✅ Signup endpoint available');
+    } catch (error: any) {
       console.error('❌ Connection test failed:', error);
-      Alert.alert('❌ Connection Failed', `Error: ${error.message}`);
+      Alert.alert('❌ Connection Failed', `Error: ${error?.message || 'Unknown error'}`);
     }
   };
 

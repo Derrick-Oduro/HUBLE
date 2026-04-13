@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Alert, RefreshControl } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
@@ -11,31 +11,63 @@ import EditRoutineModal from "../../components/EditRoutineModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
-import React from "react"
+
 import { routinesAPI } from "../../lib/api"
 import CharacterPanel from "../../components/CharacterPanel"
 
 export default function Routines() {
-  const { colors, currentTheme } = useTheme()
+  const { colors, currentTheme, isGlowEnabled } = useTheme()
+
+  const getDefaultTimeByPeriod = (period: string) => {
+    if (period === "morning") return "07:00"
+    if (period === "afternoon") return "13:00"
+    return "20:30"
+  }
+
+  const getPeriodByIcon = (icon: string) => {
+    if (icon === "moon") return "evening"
+    if (icon === "partly-sunny") return "afternoon"
+    return "morning"
+  }
+
+  const getAnchorMinutes = (value?: string) => {
+    if (!value || typeof value !== "string") return 0
+    const [hours, minutes] = value.split(":").map((part) => Number(part))
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0
+    return (hours * 60) + minutes
+  }
+
+  const getClockLabel = (routine: any) => {
+    const period = routine.timeOfDay || getPeriodByIcon(routine.icon)
+    const anchor = routine.anchorTime || getDefaultTimeByPeriod(period)
+    const title = period.charAt(0).toUpperCase() + period.slice(1)
+    return `${title} at ${anchor}`
+  }
   
   const defaultRoutines = [
     { 
       id: "1", 
       title: "Morning Routine", 
       icon: "sunny", 
-      description: "Start your day with energy and purpose" 
+      description: "Start your day with energy and purpose",
+      timeOfDay: "morning",
+      anchorTime: "07:00",
     },
     { 
       id: "2", 
       title: "Afternoon Routine", 
       icon: "partly-sunny", 
-      description: "Stay productive and focused throughout the day" 
+      description: "Stay productive and focused throughout the day",
+      timeOfDay: "afternoon",
+      anchorTime: "13:00",
     },
     { 
       id: "3", 
       title: "Evening Routine", 
       icon: "moon", 
-      description: "Wind down and reflect on your achievements" 
+      description: "Wind down and reflect on your achievements",
+      timeOfDay: "evening",
+      anchorTime: "20:30",
     },
   ]
 
@@ -49,6 +81,11 @@ export default function Routines() {
   const [routineStats, setRoutineStats] = useState({ completed: 0, total: 0, percentage: 0 })
   const [routineProgress, setRoutineProgress] = useState({})
   const router = useRouter()
+
+  const orderedRoutines = useMemo(
+    () => [...routines].sort((a, b) => getAnchorMinutes(a.anchorTime) - getAnchorMinutes(b.anchorTime)),
+    [routines],
+  )
 
   // Fixed - Remove dependencies that cause infinite loops
   const calculateRoutineStats = useCallback(async () => {
@@ -149,6 +186,8 @@ export default function Routines() {
               title: backendRoutine.title,
               description: backendRoutine.description || '',
               icon: backendRoutine.icon || 'list-outline',
+              timeOfDay: backendRoutine.time_of_day || getPeriodByIcon(backendRoutine.icon || 'sunny'),
+              anchorTime: backendRoutine.anchor_time || getDefaultTimeByPeriod(getPeriodByIcon(backendRoutine.icon || 'sunny')),
               tasks: typeof backendRoutine.tasks === 'string' 
                 ? JSON.parse(backendRoutine.tasks) 
                 : (backendRoutine.tasks || []),
@@ -182,7 +221,11 @@ export default function Routines() {
 
       if (savedData) {
         const routinesData = JSON.parse(savedData)
-        const routinesArray = Object.values(routinesData)
+        const routinesArray = Object.values(routinesData).map((routine: any) => ({
+          ...routine,
+          timeOfDay: routine.timeOfDay || getPeriodByIcon(routine.icon || 'sunny'),
+          anchorTime: routine.anchorTime || getDefaultTimeByPeriod(routine.timeOfDay || getPeriodByIcon(routine.icon || 'sunny')),
+        }))
 
         if (routinesArray.length > 0) {
           setRoutines(routinesArray)
@@ -232,6 +275,8 @@ export default function Routines() {
                 title: backendRoutine.title,
                 description: backendRoutine.description || '',
                 icon: backendRoutine.icon || 'list-outline',
+                timeOfDay: backendRoutine.time_of_day || getPeriodByIcon(backendRoutine.icon || 'sunny'),
+                anchorTime: backendRoutine.anchor_time || getDefaultTimeByPeriod(getPeriodByIcon(backendRoutine.icon || 'sunny')),
                 tasks: typeof backendRoutine.tasks === 'string' 
                   ? JSON.parse(backendRoutine.tasks) 
                   : (backendRoutine.tasks || []),
@@ -265,7 +310,11 @@ export default function Routines() {
 
         if (savedData) {
           const routinesData = JSON.parse(savedData)
-          const routinesArray = Object.values(routinesData)
+          const routinesArray = Object.values(routinesData).map((routine: any) => ({
+            ...routine,
+            timeOfDay: routine.timeOfDay || getPeriodByIcon(routine.icon || 'sunny'),
+            anchorTime: routine.anchorTime || getDefaultTimeByPeriod(routine.timeOfDay || getPeriodByIcon(routine.icon || 'sunny')),
+          }))
 
           if (routinesArray.length > 0) {
             setRoutines(routinesArray)
@@ -298,7 +347,7 @@ export default function Routines() {
     }, [loading])
   )
 
-  const addRoutine = async (newRoutine: { title: any; icon: any; description: any; tasks?: any }) => {
+  const addRoutine = async (newRoutine: { title: any; icon: any; description: any; tasks?: any; timeOfDay?: string; anchorTime?: string }) => {
     if (!newRoutine.title.trim()) {
       Alert.alert("Error", "Routine title cannot be empty")
       return
@@ -321,6 +370,8 @@ export default function Routines() {
               title: response.routine.title,
               description: response.routine.description || '',
               icon: response.routine.icon || 'list-outline',
+              timeOfDay: newRoutine.timeOfDay || getPeriodByIcon(response.routine.icon || 'sunny'),
+              anchorTime: newRoutine.anchorTime || getDefaultTimeByPeriod(newRoutine.timeOfDay || getPeriodByIcon(response.routine.icon || 'sunny')),
               tasks: typeof response.routine.tasks === 'string' 
                 ? JSON.parse(response.routine.tasks) 
                 : (response.routine.tasks || []),
@@ -354,6 +405,8 @@ export default function Routines() {
         title: newRoutine.title.trim(),
         icon: newRoutine.icon,
         description: newRoutine.description.trim(),
+        timeOfDay: newRoutine.timeOfDay || getPeriodByIcon(newRoutine.icon),
+        anchorTime: newRoutine.anchorTime || getDefaultTimeByPeriod(newRoutine.timeOfDay || getPeriodByIcon(newRoutine.icon)),
         createdAt: new Date().toISOString(),
         tasks: newRoutine.tasks || [],
       }
@@ -384,7 +437,7 @@ export default function Routines() {
     }
   }
 
-  const saveEditedRoutine = async (editedRoutine: { id: string; title: any; icon: any; description: any }) => {
+  const saveEditedRoutine = async (editedRoutine: { id: string; title: any; icon: any; description: any; timeOfDay?: string; anchorTime?: string }) => {
     if (!editedRoutine.title.trim()) {
       Alert.alert("Error", "Routine title cannot be empty")
       return
@@ -428,6 +481,8 @@ export default function Routines() {
                   title: editedRoutine.title.trim(),
                   icon: editedRoutine.icon,
                   description: editedRoutine.description.trim(),
+                  timeOfDay: editedRoutine.timeOfDay || routinesData[editedRoutine.id].timeOfDay || getPeriodByIcon(editedRoutine.icon),
+                  anchorTime: editedRoutine.anchorTime || routinesData[editedRoutine.id].anchorTime || getDefaultTimeByPeriod(editedRoutine.timeOfDay || getPeriodByIcon(editedRoutine.icon)),
                 }
                 await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
               }
@@ -455,6 +510,8 @@ export default function Routines() {
             title: editedRoutine.title.trim(),
             icon: editedRoutine.icon,
             description: editedRoutine.description.trim(),
+            timeOfDay: editedRoutine.timeOfDay || routinesData[editedRoutine.id].timeOfDay || getPeriodByIcon(editedRoutine.icon),
+            anchorTime: editedRoutine.anchorTime || routinesData[editedRoutine.id].anchorTime || getDefaultTimeByPeriod(editedRoutine.timeOfDay || getPeriodByIcon(editedRoutine.icon)),
           }
           await AsyncStorage.setItem("routinesData", JSON.stringify(routinesData))
           
@@ -534,7 +591,7 @@ export default function Routines() {
   if (loading) {
     return (
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+        <StatusBar barStyle={currentTheme.statusBarStyle} />
         <View style={tw`flex-1 justify-center items-center px-5`}>
           <View style={[
             tw`w-20 h-20 rounded-full items-center justify-center mb-4`,
@@ -553,7 +610,7 @@ export default function Routines() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <ScrollView 
         style={tw`flex-1 px-5 pt-2`}
@@ -591,19 +648,19 @@ export default function Routines() {
         {/* Enhanced Routine Cards */}
         <View style={tw`mb-8`}>
           <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>
-            Your Routines ({routines.length})
+            Your Routines ({orderedRoutines.length})
           </Text>
           
-          {routines.length === 0 ? (
+          {orderedRoutines.length === 0 ? (
             <View style={[
               tw`rounded-2xl p-8 items-center`,
               {
                 backgroundColor: colors.card,
                 shadowColor: colors.cardSecondary,
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 12,
-                elevation: 6,
+                shadowOpacity: isGlowEnabled ? 0.1 : 0,
+                shadowRadius: isGlowEnabled ? 12 : 0,
+                elevation: isGlowEnabled ? 6 : 0,
               }
             ]}>
               <View style={[
@@ -623,9 +680,9 @@ export default function Routines() {
                     backgroundColor: colors.accent,
                     shadowColor: colors.accent,
                     shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 6,
+                    shadowOpacity: isGlowEnabled ? 0.3 : 0,
+                    shadowRadius: isGlowEnabled ? 8 : 0,
+                    elevation: isGlowEnabled ? 6 : 0,
                   }
                 ]}
                 onPress={() => setIsAddModalVisible(true)}
@@ -634,7 +691,7 @@ export default function Routines() {
               </TouchableOpacity>
             </View>
           ) : (
-            routines.map((routine) => {
+            orderedRoutines.map((routine) => {
               const progress = routineProgress[routine.id] || { completedTasks: 0, totalTasks: 0, percentage: 0, isComplete: false }
               
               return (
@@ -646,9 +703,9 @@ export default function Routines() {
                       backgroundColor: colors.card,
                       shadowColor: progress.isComplete ? colors.success : colors.accent,
                       shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 12,
-                      elevation: 6,
+                      shadowOpacity: isGlowEnabled ? 0.15 : 0,
+                      shadowRadius: isGlowEnabled ? 12 : 0,
+                      elevation: isGlowEnabled ? 6 : 0,
                       borderWidth: progress.isComplete ? 2 : 0,
                       borderColor: progress.isComplete ? colors.success + '40' : 'transparent',
                     },
@@ -694,6 +751,12 @@ export default function Routines() {
                                 <Text style={[tw`text-xs font-bold`, { color: colors.success }]}>✓ Done</Text>
                               </View>
                             )}
+                          </View>
+                          <View style={tw`flex-row items-center mb-1`}>
+                            <Ionicons name="time-outline" size={14} color={colors.textSecondary} style={tw`mr-1`} />
+                            <Text style={[tw`text-xs font-semibold`, { color: colors.textSecondary }]}>
+                              {getClockLabel(routine)}
+                            </Text>
                           </View>
                           <Text style={[tw`text-sm leading-5`, { color: colors.textSecondary }]} numberOfLines={2}>
                             {routine.description}
@@ -785,9 +848,9 @@ export default function Routines() {
               backgroundColor: colors.accent,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 6,
-              elevation: 8,
+              shadowOpacity: isGlowEnabled ? 0.3 : 0,
+              shadowRadius: isGlowEnabled ? 6 : 0,
+              elevation: isGlowEnabled ? 8 : 0,
               borderWidth: 4,
               borderColor: colors.background,
               marginLeft: 2, // Fine adjustment for centering
@@ -820,3 +883,4 @@ export default function Routines() {
     </SafeAreaView>
   )
 }
+

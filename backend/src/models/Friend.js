@@ -85,6 +85,7 @@ class Friend {
       const friends = await database.all(
         `
         SELECT 
+          f.id as friendship_id,
           u.id, u.username, u.email, u.level, u.experience, 
           u.avatar, u.current_streak, u.last_activity_date,
           f.status, f.created_at as friendship_date
@@ -104,6 +105,7 @@ class Friend {
 
       return friends.map((friend) => ({
         id: friend.id,
+        friendshipId: friend.friendship_id,
         username: friend.username,
         email: friend.email,
         level: friend.level,

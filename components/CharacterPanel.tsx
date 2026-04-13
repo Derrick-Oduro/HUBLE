@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { View, Text } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import tw from '../lib/tailwind'
 import { useStats } from '../contexts/StatsProvider'
 import { useTheme } from '../contexts/ThemeProvider'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface CharacterPanelProps {
   completedCount: number
@@ -12,8 +13,37 @@ interface CharacterPanelProps {
 }
 
 export default function CharacterPanel({ completedCount, totalCount, taskType }: CharacterPanelProps) {
-  const { colors } = useTheme()
+  const { colors, isGlowEnabled } = useTheme()
   const { stats } = useStats()
+  const [avatarData, setAvatarData] = useState({
+    avatar: "🧙‍♂️",
+    color: "#8B5CF6",
+    border: "normal"
+  })
+
+  // Load avatar data
+  useEffect(() => {
+    loadAvatarData()
+    // Refresh avatar every few seconds in case it was updated
+    const interval = setInterval(loadAvatarData, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const loadAvatarData = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem('avatarData')
+      if (savedData) {
+        const parsed = JSON.parse(savedData)
+        setAvatarData({
+          avatar: parsed.avatar || "🧙‍♂️",
+          color: parsed.color || "#8B5CF6",
+          border: parsed.border || "normal"
+        })
+      }
+    } catch (error) {
+      console.log('Error loading avatar data:', error)
+    }
+  }
 
   // Smart color functions for progress bars
   const getHealthColor = (current: number, max: number) => {
@@ -69,23 +99,23 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
 
   return (
     <View style={[
-      tw`rounded-xl p-4 mb-3`, // Changed to match HabitItem style
+      tw`rounded-xl p-3 mb-3`, // Compact padding
       { 
         backgroundColor: colors.card,
         shadowColor: colors.accent,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: isGlowEnabled ? 0.1 : 0,
+        shadowRadius: isGlowEnabled ? 4 : 0,
+        elevation: isGlowEnabled ? 3 : 0,
       }
     ]}>
       {/* Header with Level and Title */}
-      <View style={tw`flex-row justify-between items-start mb-4`}>
+      <View style={tw`flex-row justify-between items-start mb-3`}>
         <View style={tw`flex-1`}>
-          <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>
+          <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>
             Level {stats.level} Hero
           </Text>
-          <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
+          <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
             {completedCount}/{totalCount} {getTaskTypeText()} {getTaskTypeAction()} today
           </Text>
         </View>
@@ -93,14 +123,14 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
         {/* Currency Display */}
         <View style={tw`items-end`}>
           <View style={tw`flex-row items-center mb-1`}>
-            <Ionicons name="diamond" size={16} color="#A78BFA" style={tw`mr-1`} />
-            <Text style={[tw`text-sm font-bold`, { color: colors.text }]}>
+            <Ionicons name="diamond" size={14} color="#A78BFA" style={tw`mr-1`} />
+            <Text style={[tw`text-xs font-bold`, { color: colors.text }]}>
               {stats.gemsEarned}
             </Text>
           </View>
           <View style={tw`flex-row items-center`}>
-            <Text style={tw`text-lg mr-1`}>🪙</Text>
-            <Text style={[tw`text-sm font-bold`, { color: colors.text }]}>
+            <Ionicons name="logo-usd" size={14} color="#F59E0B" style={tw`mr-1`} />
+            <Text style={[tw`text-xs font-bold`, { color: colors.text }]}>
               {stats.coinsEarned}
             </Text>
           </View>
@@ -108,27 +138,31 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
       </View>
 
       {/* Character Avatar and Stats Row */}
-      <View style={tw`flex-row items-center mb-4`}>
+      <View style={tw`flex-row items-center mb-3`}>
         {/* Avatar Section */}
-        <View style={tw`mr-4`}>
+        <View style={tw`mr-3`}>
           <View style={[
-            tw`w-16 h-16 rounded-2xl items-center justify-center`,
+            tw`w-14 h-14 rounded-2xl items-center justify-center`,
             { 
-              backgroundColor: colors.accent + '20',
-              borderWidth: 3,
-              borderColor: colors.accent + '40',
+              backgroundColor: avatarData.color + '20',
+              borderWidth: avatarData.border === 'glow' ? 3 : avatarData.border === 'rainbow' ? 2.5 : 2,
+              borderColor: avatarData.color,
+              shadowColor: isGlowEnabled && avatarData.border === 'glow' ? avatarData.color : 'transparent',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: isGlowEnabled ? 0.8 : 0,
+              shadowRadius: isGlowEnabled ? 10 : 0,
             }
           ]}>
-            <Ionicons name="happy" size={32} color={colors.accent} />
+            <Text style={tw`text-3xl`}>{avatarData.avatar}</Text>
           </View>
           
           {/* Streak indicator under avatar */}
           <View style={[
-            tw`mt-2 px-2 py-1 rounded-full items-center flex-row`,
-            { backgroundColor: colors.accent + '20' }
+            tw`mt-1.5 px-1.5 py-0.5 rounded-full items-center flex-row`,
+            { backgroundColor: avatarData.color + '20' }
           ]}>
-            <Ionicons name="flame" size={12} color={colors.accent} style={tw`mr-1`} />
-            <Text style={[tw`text-xs font-bold`, { color: colors.accent }]}>
+            <Ionicons name="flame" size={10} color={avatarData.color} style={tw`mr-0.5`} />
+            <Text style={[tw`text-xs font-bold`, { color: avatarData.color }]}>
               {stats.currentStreak}
             </Text>
           </View>
@@ -137,11 +171,11 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
         {/* Progress Bars Section */}
         <View style={tw`flex-1`}>
           {/* Health Bar */}
-          <View style={tw`mb-3`}>
-            <View style={tw`flex-row justify-between items-center mb-1`}>
+          <View style={tw`mb-2`}>
+            <View style={tw`flex-row justify-between items-center mb-0.5`}>
               <View style={tw`flex-row items-center`}>
-                <Ionicons name="heart" size={14} color="#EF4444" style={tw`mr-1`} />
-                <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>
+                <Ionicons name="heart" size={12} color="#EF4444" style={tw`mr-1`} />
+                <Text style={[tw`text-xs font-semibold`, { color: colors.text }]}>
                   Health
                 </Text>
               </View>
@@ -151,7 +185,7 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
             </View>
             
             <View style={[
-              tw`h-3 rounded-full overflow-hidden`,
+              tw`h-2 rounded-full overflow-hidden`,
               { backgroundColor: colors.cardSecondary }
             ]}>
               <View
@@ -168,10 +202,10 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
 
           {/* Experience Bar */}
           <View>
-            <View style={tw`flex-row justify-between items-center mb-1`}>
+            <View style={tw`flex-row justify-between items-center mb-0.5`}>
               <View style={tw`flex-row items-center`}>
-                <Ionicons name="flash" size={14} color="#F59E0B" style={tw`mr-1`} />
-                <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>
+                <Ionicons name="flash" size={12} color="#F59E0B" style={tw`mr-1`} />
+                <Text style={[tw`text-xs font-semibold`, { color: colors.text }]}>
                   Experience
                 </Text>
               </View>
@@ -181,7 +215,7 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
             </View>
             
             <View style={[
-              tw`h-3 rounded-full overflow-hidden`,
+              tw`h-2 rounded-full overflow-hidden`,
               { backgroundColor: colors.cardSecondary }
             ]}>
               <View
@@ -201,20 +235,20 @@ export default function CharacterPanel({ completedCount, totalCount, taskType }:
       {/* Daily Progress Summary */}
       {totalCount > 0 && (
         <View style={[
-          tw`p-3 rounded-xl`,
+          tw`p-2.5 rounded-xl`,
           { backgroundColor: colors.cardSecondary }
         ]}>
-          <View style={tw`flex-row justify-between items-center mb-2`}>
-            <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>
-              Today's Progress
+          <View style={tw`flex-row justify-between items-center mb-1.5`}>
+            <Text style={[tw`text-xs font-semibold`, { color: colors.text }]}>
+              Today&apos;s Progress
             </Text>
-            <Text style={[tw`text-sm font-bold`, { color: getProgressColor(completionPercentage) }]}>
+            <Text style={[tw`text-xs font-bold`, { color: getProgressColor(completionPercentage) }]}>
               {completionPercentage}%
             </Text>
           </View>
           
           <View style={[
-            tw`h-2 rounded-full overflow-hidden mb-1`,
+            tw`h-1.5 rounded-full overflow-hidden mb-1`,
             { backgroundColor: colors.background }
           ]}>
             <View

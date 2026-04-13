@@ -28,6 +28,8 @@ export default function EditRoutineModal({ isVisible, onClose, onSave, routine }
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [icon, setIcon] = useState("sunny")
+  const [timeOfDay, setTimeOfDay] = useState("morning")
+  const [anchorTime, setAnchorTime] = useState("07:00")
 
   const iconOptions = [
     { name: "sunny", label: "Morning" },
@@ -40,11 +42,19 @@ export default function EditRoutineModal({ isVisible, onClose, onSave, routine }
     { name: "heart", label: "Self-care" },
   ]
 
+  const timeOfDayOptions = [
+    { id: "morning", label: "Morning", icon: "sunny-outline" },
+    { id: "afternoon", label: "Afternoon", icon: "partly-sunny-outline" },
+    { id: "evening", label: "Evening", icon: "moon-outline" },
+  ]
+
   useEffect(() => {
     if (routine) {
       setTitle(routine.title || "")
       setDescription(routine.description || "")
       setIcon(routine.icon || "sunny")
+      setTimeOfDay(routine.timeOfDay || "morning")
+      setAnchorTime(routine.anchorTime || "07:00")
     }
   }, [routine])
 
@@ -54,11 +64,19 @@ export default function EditRoutineModal({ isVisible, onClose, onSave, routine }
       return
     }
 
+    const isValidTime = /^([01]\d|2[0-3]):([0-5]\d)$/.test(anchorTime.trim())
+    if (!isValidTime) {
+      Alert.alert("Invalid time", "Use 24-hour format HH:MM, for example 21:30")
+      return
+    }
+
     const updatedRoutine = {
       ...routine,
       title: title.trim(),
       description: description.trim(),
       icon,
+      timeOfDay,
+      anchorTime: anchorTime.trim(),
     }
 
     onSave(updatedRoutine)
@@ -192,6 +210,62 @@ export default function EditRoutineModal({ isVisible, onClose, onSave, routine }
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+          </View>
+
+          {/* Routine Anchor */}
+          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}> 
+            <Text style={[tw`text-lg font-bold mb-2`, { color: colors.text }]}> 
+              Routine Anchor
+            </Text>
+            <Text style={[tw`text-sm mb-4`, { color: colors.textSecondary }]}> 
+              Keep this routine tied to a clear time-of-day anchor.
+            </Text>
+
+            <View style={tw`flex-row mb-4`}>
+              {timeOfDayOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    tw`flex-1 mr-2 rounded-xl py-3 px-2 items-center`,
+                    {
+                      backgroundColor: timeOfDay === option.id ? colors.accent : colors.cardSecondary,
+                    },
+                  ]}
+                  onPress={() => setTimeOfDay(option.id)}
+                >
+                  <Ionicons
+                    name={option.icon as any}
+                    size={18}
+                    color={timeOfDay === option.id ? "white" : colors.text}
+                    style={tw`mb-1`}
+                  />
+                  <Text style={[tw`text-xs font-semibold`, { color: timeOfDay === option.id ? "white" : colors.text }]}> 
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View>
+              <Text style={[tw`font-medium mb-2`, { color: colors.text }]}>Anchor Time (HH:MM)</Text>
+              <TextInput
+                style={[
+                  tw`rounded-xl p-4 text-base`,
+                  {
+                    backgroundColor: colors.cardSecondary,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.cardSecondary,
+                  },
+                ]}
+                placeholder="07:00"
+                placeholderTextColor={colors.textSecondary}
+                value={anchorTime}
+                onChangeText={setAnchorTime}
+                autoCapitalize="none"
+                maxLength={5}
+              />
             </View>
           </View>
         </ScrollView>

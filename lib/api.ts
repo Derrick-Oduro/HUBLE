@@ -1,55 +1,70 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from './config';
 
-const API_BASE_URL = __DEV__ 
-  ? 'http://10.0.72.74:3000/api'
-  : 'https://your-production-api.com/api';
+const API_BASE_URL = API_URL;
+const API_ROOT_URL = API_BASE_URL.replace('/api', '');
 
 // Helper function to get auth headers
-const getAuthHeaders = async () => {
+const getAuthHeaders = async (includeAuth = true) => {
   const token = await AsyncStorage.getItem('userToken');
   return {
     'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...(includeAuth && token && { 'Authorization': `Bearer ${token}` }),
   };
+};
+
+const parseResponseBody = async (response: Response) => {
+  if (response.status === 204) {
+    return {};
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return text ? { message: text } : {};
 };
 
 // Generic API call function
 const apiCall = async (endpoint: string, options: any = {}) => {
   try {
-    const headers = await getAuthHeaders();
-    console.log(`🌐 API Call: ${API_BASE_URL}${endpoint}`);
-    console.log(`📤 Request options:`, { ...options, headers });
+    const { includeAuth = true, fullUrl = false, ...requestOptions } = options;
+    const defaultHeaders = await getAuthHeaders(includeAuth);
+    const headers = {
+      ...defaultHeaders,
+      ...(requestOptions.headers || {}),
+    };
+    const requestUrl = fullUrl ? `${API_ROOT_URL}${endpoint}` : `${API_BASE_URL}${endpoint}`;
+
+    console.log(`🌐 API Call: ${requestUrl}`);
+    console.log(`📤 Request options:`, { ...requestOptions, headers });
     
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(requestUrl, {
       headers,
-      ...options,
+      ...requestOptions,
     });
 
     console.log(`📥 Response status: ${response.status} ${response.statusText}`);
 
+    const responseData = await parseResponseBody(response);
+
     if (!response.ok) {
-      // Try to get error details from response
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        console.log('❌ Error response:', errorData);
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch (e) {
-        // If response is not JSON, get text
-        try {
-          const errorText = await response.text();
-          console.log('❌ Error text:', errorText);
-          errorMessage = errorText || errorMessage;
-        } catch (e2) {
-          console.log('❌ Could not parse error response');
-        }
-      }
-      throw new Error(errorMessage);
+      console.log('❌ Error response:', responseData);
+      const errorMessage =
+        responseData?.message ||
+        responseData?.error ||
+        `HTTP ${response.status}: ${response.statusText}`;
+      const error: any = new Error(errorMessage);
+      error.status = response.status;
+      error.details = responseData?.details;
+      error.data = responseData;
+      throw error;
     }
 
-    const data = await response.json();
-    console.log(`✅ API Response:`, data);
-    return data;
+    console.log(`✅ API Response:`, responseData);
+    return responseData;
   } catch (error) {
     console.error(`❌ API call failed for ${endpoint}:`, error);
     throw error;
@@ -115,6 +130,20 @@ export const dailiesAPI = {
     }),
   }),
 
+  // Update daily
+  updateDaily: (id: number, dailyData: any) => apiCall(`/dailies/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      title: dailyData.title,
+      description: dailyData.description,
+      priority: dailyData.priority,
+      difficulty: dailyData.difficulty,
+      category: dailyData.category,
+      due_date: dailyData.dueDate,
+      tags: JSON.stringify(dailyData.tags || [])
+    }),
+  }),
+
   // Complete daily
   completeDaily: (id: number) => apiCall(`/dailies/${id}/complete`, {
     method: 'POST',
@@ -167,6 +196,33 @@ export const routinesAPI = {
 
 // Auth API
 export const authAPI = {
+  // Login user
+  login: (credentials: { email: string; password: string }) => apiCall('/auth/login', {
+    method: 'POST',
+    includeAuth: false,
+    body: JSON.stringify(credentials),
+  }),
+
+  // Register user
+  register: (userData: { username: string; email: string; password: string }) => apiCall('/auth/register', {
+    method: 'POST',
+    includeAuth: false,
+    body: JSON.stringify(userData),
+  }),
+
+  // Check backend health
+  checkHealth: () => apiCall('/health', {
+    method: 'GET',
+    includeAuth: false,
+    fullUrl: true,
+  }),
+
+  // Check register endpoint availability
+  checkRegisterEndpoint: () => apiCall('/auth/register', {
+    method: 'OPTIONS',
+    includeAuth: false,
+  }),
+
   // Update user stats
   updateStats: (statsData: any) => apiCall('/auth/stats', {
     method: 'POST',
@@ -175,6 +231,17 @@ export const authAPI = {
 
   // Get user profile
   getProfile: () => apiCall('/auth/profile'),
+
+  // Update user profile
+  updateProfile: (profileData: any) => apiCall('/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(profileData),
+  }),
+};
+
+export const configAPI = {
+  getThemes: () => apiCall('/config/themes', { includeAuth: false }),
+  getAvatars: () => apiCall('/config/avatars', { includeAuth: false }),
 };
 
 // Focus/Timer API (add this at the end of the file)
@@ -293,11 +360,22 @@ export const partiesAPI = {
     name: string;
     description?: string;
     goal?: string;
+    weeklyGoalLabel?: string;
+    weeklyGoalTarget?: number;
+    weekly_goal_label?: string;
+    weekly_goal_target?: number;
     privacy?: string;
     maxMembers?: number;
+    max_members?: number;
+    type?: string;
+    emoji?: string;
+    color?: string;
   }) => apiCall('/social/parties', {
     method: 'POST',
-    body: JSON.stringify(partyData),
+    body: JSON.stringify({
+      ...partyData,
+      max_members: partyData.max_members ?? partyData.maxMembers,
+    }),
   }),
 
   // Get user's parties
@@ -340,6 +418,12 @@ export const partiesAPI = {
 
   // Get party members
   getPartyMembers: (partyId: number) => apiCall(`/social/parties/${partyId}/members`),
+
+  // Contribute to weekly party goal
+  contributeToParty: (partyId: number, points = 1) => apiCall(`/social/parties/${partyId}/contribute`, {
+    method: 'POST',
+    body: JSON.stringify({ points }),
+  }),
 };
 
 // Challenges API
@@ -377,9 +461,24 @@ export const challengesAPI = {
     endDate: string;
     rewardXp?: number;
     rewardCoins?: number;
+    mode?: 'competitive' | 'cooperative';
+    teamTarget?: number;
+    emoji?: string;
+    color?: string;
+    difficulty?: string;
+    reward?: string;
   }) => apiCall('/social/challenges', {
     method: 'POST',
-    body: JSON.stringify(challengeData),
+    body: JSON.stringify({
+      ...challengeData,
+      start_date: challengeData.startDate,
+      end_date: challengeData.endDate,
+      goal_value: challengeData.targetValue,
+      goal_type: challengeData.type,
+      team_target: challengeData.teamTarget,
+      reward_xp: challengeData.rewardXp,
+      reward_coins: challengeData.rewardCoins,
+    }),
   }),
 };
 
@@ -387,4 +486,78 @@ export const challengesAPI = {
 export const socialAPI = {
   // Get social stats overview
   getStats: () => apiCall('/social/stats'),
+};
+
+// Achievements API
+export const achievementsAPI = {
+  // Get all achievements with user progress
+  getAchievements: () => apiCall('/achievements'),
+
+  // Check and unlock achievements based on current stats
+  checkAchievements: () => apiCall('/achievements/check', {
+    method: 'POST',
+  }),
+
+  // Get achievement statistics
+  getStats: () => apiCall('/achievements/stats'),
+
+  // Get unlocked achievements
+  getUnlocked: () => apiCall('/achievements/unlocked'),
+};
+
+// Activity Feed API
+export const activityAPI = {
+  // Get user's own activities
+  getUserActivities: (limit = 50) => apiCall(`/social/activities?limit=${limit}`),
+
+  // Get friends' activities for social feed
+  getFriendsActivities: (limit = 50) => apiCall(`/social/activities/friends?limit=${limit}`),
+
+  // Get party activities
+  getPartyActivities: (partyId: number, limit = 50) => apiCall(`/social/activities/party/${partyId}?limit=${limit}`),
+
+  // Cheer an activity
+  cheerActivity: (activityId: number) => apiCall(`/social/activities/${activityId}/cheer`, {
+    method: 'POST',
+  }),
+
+  // Remove cheer from an activity
+  uncheerActivity: (activityId: number) => apiCall(`/social/activities/${activityId}/cheer`, {
+    method: 'DELETE',
+  }),
+};
+
+// Password Reset API
+export const passwordResetAPI = {
+  // Request password reset
+  requestReset: (email: string) => apiCall('/auth/password-reset/request', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }),
+
+  // Verify reset token
+  verifyToken: (token: string) => apiCall('/auth/password-reset/verify', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  }),
+
+  // Reset password
+  resetPassword: (token: string, newPassword: string) => apiCall('/auth/password-reset/reset', {
+    method: 'POST',
+    body: JSON.stringify({ token, newPassword }),
+  }),
+};
+
+// Data Export & Analytics API
+export const dataAPI = {
+  // Export all user data
+  exportData: () => apiCall('/data/export'),
+
+  // Get analytics
+  getAnalytics: (days = 30) => apiCall(`/data/analytics?days=${days}`),
+
+  // Create backup
+  createBackup: () => apiCall('/data/backup', {
+    method: 'POST',
+  }),
 };

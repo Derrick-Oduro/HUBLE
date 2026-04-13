@@ -1,6 +1,7 @@
 const Friend = require("../models/Friend");
 const Party = require("../models/Party");
 const Challenge = require("../models/Challenge");
+const ActivityFeed = require("../models/ActivityFeed");
 
 // Friend Controllers
 exports.getFriends = async (req, res) => {
@@ -137,7 +138,38 @@ exports.getAvailableParties = async (req, res) => {
 exports.createParty = async (req, res) => {
   try {
     const userId = req.user.id;
-    const partyData = { ...req.body, creator_id: userId };
+    const partyData = {
+      name: `${req.body.name || ""}`.trim(),
+      description: `${req.body.description || ""}`.trim(),
+      goal: `${
+        req.body.goal ||
+        req.body.weeklyGoalLabel ||
+        req.body.weekly_goal_label ||
+        ""
+      }`.trim(),
+      weekly_goal_label: `${
+        req.body.weeklyGoalLabel ||
+        req.body.weekly_goal_label ||
+        req.body.goal ||
+        "Weekly team goal"
+      }`.trim(),
+      weekly_goal_target: Number(
+        req.body.weeklyGoalTarget || req.body.weekly_goal_target || 10,
+      ),
+      privacy: req.body.privacy === "private" ? "private" : "public",
+      max_members: Number(req.body.max_members || req.body.maxMembers || 10),
+      type: req.body.type || "cooperative",
+      emoji: req.body.emoji,
+      color: req.body.color,
+      created_by: userId,
+    };
+
+    if (!partyData.name) {
+      return res.status(400).json({
+        success: false,
+        error: "Party name is required",
+      });
+    }
 
     const partyId = await Party.create(partyData);
     res.json({ success: true, partyId, message: "Party created successfully" });
@@ -157,9 +189,28 @@ exports.getPartyById = async (req, res) => {
     }
 
     const members = await Party.getMembers(id);
-    res.json({ success: true, party: { ...party, members } });
+    const weekly = await Party.getWeeklyContributionSummary(id);
+    res.json({ success: true, party: { ...party, members, weekly } });
   } catch (error) {
     console.error("Get party error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.contributeToParty = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const points = Math.min(20, Math.max(1, Number(req.body?.points) || 1));
+
+    const summary = await Party.addContribution(id, userId, points);
+    res.json({
+      success: true,
+      message: "Contribution added",
+      weekly: summary,
+    });
+  } catch (error) {
+    console.error("Contribute to party error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -277,12 +328,22 @@ exports.getUserChallenges = async (req, res) => {
 exports.getChallengeById = async (req, res) => {
   try {
     const { id } = req.params;
-    const challenge = await Challenge.getById(id);
+    let challenge = await Challenge.getById(id);
 
     if (!challenge) {
       return res
         .status(404)
         .json({ success: false, error: "Challenge not found" });
+    }
+
+    if (`${challenge.mode || ""}`.toLowerCase() === "cooperative") {
+      const cooperative = await Challenge.getCooperativeProgress(id);
+      challenge = {
+        ...challenge,
+        group_progress: cooperative.group_progress,
+        participant_count:
+          cooperative.participant_count || challenge.participant_count || 0,
+      };
     }
 
     res.json({ success: true, challenge });
@@ -386,6 +447,20 @@ exports.getSocialStats = async (req, res) => {
       [userId],
     );
 
+    // Get group badges count - count unlocked achievements in social category
+    const groupBadgesResult = await database.get(
+      `SELECT COUNT(*) as count FROM user_achievements ua
+       INNER JOIN achievements a ON ua.achievement_id = a.id
+       WHERE ua.user_id = ? AND ua.unlocked = 1 AND a.category = 'social'`,
+      [userId],
+    );
+
+    // Get total XP earned from user_stats
+    const xpResult = await database.get(
+      `SELECT experience FROM user_stats WHERE user_id = ?`,
+      [userId],
+    );
+
     res.json({
       success: true,
       stats: {
@@ -394,12 +469,125 @@ exports.getSocialStats = async (req, res) => {
         activeChallenges: challengesResult.count || 0,
         pendingRequests: pendingRequestsResult.count || 0,
         currentStreak: userResult?.current_streak || 0,
-        groupBadges: 0, // Placeholder for future implementation
-        totalXpEarned: 0, // Placeholder for future implementation
+        groupBadges: groupBadgesResult?.count || 0,
+        totalXpEarned: xpResult?.experience || 0,
       },
     });
   } catch (error) {
     console.error("Get social stats error:", error);
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Activity Feed Controllers
+exports.getUserActivities = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 50;
+
+    const activities = await ActivityFeed.getUserActivities(userId, limit);
+    res.json({ success: true, activities });
+  } catch (error) {
+    console.error("Get user activities error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getFriendsActivities = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 50;
+
+    const activities = await ActivityFeed.getFriendsActivities(userId, limit);
+    res.json({ success: true, activities });
+  } catch (error) {
+    console.error("Get friends activities error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getPartyActivities = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const partyId = req.params.partyId;
+    const limit = parseInt(req.query.limit) || 50;
+
+    const activities = await ActivityFeed.getPartyActivities(
+      partyId,
+      userId,
+      limit,
+    );
+    res.json({ success: true, activities });
+  } catch (error) {
+    console.error("Get party activities error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.cheerActivity = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const activityId = Number(req.params.activityId);
+
+    if (!Number.isFinite(activityId)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid activity ID" });
+    }
+
+    const activity = await ActivityFeed.getActivityById(activityId);
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Activity not found" });
+    }
+
+    await ActivityFeed.cheerActivity(activityId, userId);
+    const summary = await ActivityFeed.getCheerSummary(activityId, userId);
+
+    return res.json({
+      success: true,
+      activityId,
+      cheersCount: summary.cheersCount,
+      hasCheered: summary.hasCheered,
+      message: "Cheered activity",
+    });
+  } catch (error) {
+    console.error("Cheer activity error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.uncheerActivity = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const activityId = Number(req.params.activityId);
+
+    if (!Number.isFinite(activityId)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid activity ID" });
+    }
+
+    const activity = await ActivityFeed.getActivityById(activityId);
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Activity not found" });
+    }
+
+    await ActivityFeed.uncheerActivity(activityId, userId);
+    const summary = await ActivityFeed.getCheerSummary(activityId, userId);
+
+    return res.json({
+      success: true,
+      activityId,
+      cheersCount: summary.cheersCount,
+      hasCheered: summary.hasCheered,
+      message: "Removed cheer",
+    });
+  } catch (error) {
+    console.error("Uncheer activity error:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };

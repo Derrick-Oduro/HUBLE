@@ -1,17 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, ActivityIndicator, Alert, FlatList } from "react-native"
+import React, { useState, useEffect } from "react"
+import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ActivityIndicator, Alert, FlatList } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import HabitItem from "../../components/HabitItem"
-import ProgressBar from "../../components/ProgressBar"
 import AddHabitModal from "../../components/AddHabitModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
-import React from "react"
+
 import { habitsAPI } from "../../lib/api"
+import { maybePromptForReview } from "../../lib/reviewPrompt"
 import CharacterPanel from "../../components/CharacterPanel"
 
 // Enhanced habit interface with streak tracking
@@ -383,6 +383,8 @@ export default function HabitsScreen() {
               `${response.message || 'Habit completed!'}\n+${expIncrease} XP earned!`,
               [{ text: "Awesome!", style: "default" }]
             )
+
+            await maybePromptForReview(response.habit?.streak || 0)
             
             console.log('✅ Habit completed on backend successfully')
             return
@@ -427,6 +429,8 @@ export default function HabitsScreen() {
         `+${totalExp} XP earned!\n${newStreak > 1 ? `${newStreak} day streak!` : ""}${streakBonus > 0 ? `\nStreak bonus: +${streakBonus} XP` : ""}`,
         [{ text: "Awesome!", style: "default" }]
       )
+
+      await maybePromptForReview(newStreak)
 
       const updatedHabits = habits.map((h) => 
         h.id === id 
@@ -497,12 +501,11 @@ export default function HabitsScreen() {
 
   const completedToday = habits.filter(h => h.completed).length
   const totalHabits = habits.length
-  const completionPercentage = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0
 
   if (loading) {
     return (
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+        <StatusBar barStyle={currentTheme.statusBarStyle} />
         <View style={tw`flex-1 justify-center items-center`}>
           <ActivityIndicator size="small" color={colors.accent} />
         </View>
@@ -512,7 +515,7 @@ export default function HabitsScreen() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <FlatList
         style={tw`flex-1 px-4 pt-2`}
@@ -556,7 +559,7 @@ export default function HabitsScreen() {
             id={item.id}
             title={item.title}
             color={item.color}
-            subtext={`${item.description}${item.streak > 0 ? ` \u2022 ${item.streak} day streak` : ""}`}
+            subtext={`${item.description}${(item.streak || 0) > 0 ? ` \u2022 ${item.streak} day streak` : ""}`}
             completed={item.completed}
             streak={item.streak}
             difficulty={item.difficulty}
@@ -616,3 +619,4 @@ export default function HabitsScreen() {
     </SafeAreaView>
   )
 }
+

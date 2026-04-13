@@ -1,5 +1,5 @@
-const bcrypt = require('bcrypt');
-const database = require('../config/database');
+const bcrypt = require("bcrypt");
+const database = require("../config/database");
 
 class User {
   constructor(data) {
@@ -14,8 +14,10 @@ class User {
     this.max_health = data.max_health || 100;
     this.coins = data.coins || 0;
     this.gems = data.gems || 0;
-    this.avatar = data.avatar || '😊';
-    this.theme = data.theme || 'dark';
+    this.avatar = data.avatar || "😊";
+    this.avatar_color = data.avatar_color || "#8B5CF6";
+    this.avatar_border = data.avatar_border || "normal";
+    this.theme = data.theme || "dark";
     this.total_tasks_completed = data.total_tasks_completed || 0;
     this.current_streak = data.current_streak || 0;
     this.longest_streak = data.longest_streak || 0;
@@ -29,15 +31,18 @@ class User {
     try {
       const { username, email, password } = userData;
       const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const result = await database.run(`
+
+      const result = await database.run(
+        `
         INSERT INTO users (username, email, password, level, experience, max_experience, health, max_health, coins, gems)
         VALUES (?, ?, ?, 1, 0, 100, 100, 100, 0, 0)
-      `, [username, email, hashedPassword]);
-      
+      `,
+        [username, email, hashedPassword],
+      );
+
       return result.lastID;
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error("Error creating user:", error);
       throw error;
     }
   }
@@ -45,14 +50,17 @@ class User {
   // Find user by email or username
   static async findByCredentials(identifier) {
     try {
-      const user = await database.get(`
+      const user = await database.get(
+        `
         SELECT * FROM users 
         WHERE email = ? OR username = ?
-      `, [identifier, identifier]);
-      
+      `,
+        [identifier, identifier],
+      );
+
       return user ? new User(user) : null;
     } catch (error) {
-      console.error('Error finding user by credentials:', error);
+      console.error("Error finding user by credentials:", error);
       throw error;
     }
   }
@@ -60,10 +68,10 @@ class User {
   // Find user by ID
   static async findById(id) {
     try {
-      const user = await database.get('SELECT * FROM users WHERE id = ?', [id]);
+      const user = await database.get("SELECT * FROM users WHERE id = ?", [id]);
       return user ? new User(user) : null;
     } catch (error) {
-      console.error('Error finding user by ID:', error);
+      console.error("Error finding user by ID:", error);
       throw error;
     }
   }
@@ -71,13 +79,13 @@ class User {
   // Update user stats
   async updateStats(stats) {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
+      const today = new Date().toISOString().split("T")[0];
+
       // Calculate new level based on experience
       const newExperience = stats.experience || this.experience;
       const newLevel = Math.floor(newExperience / 100) + 1;
       const newMaxExperience = newLevel * 100;
-      
+
       // Update streak logic
       let updateQuery = `
         UPDATE users 
@@ -91,19 +99,20 @@ class User {
         stats.health || this.health,
         stats.coins || this.coins,
         stats.gems || this.gems,
-        stats.total_tasks_completed || this.total_tasks_completed
+        stats.total_tasks_completed || this.total_tasks_completed,
       ];
 
       if (stats.taskCompleted) {
-        updateQuery += ', current_streak = current_streak + 1, longest_streak = MAX(longest_streak, current_streak + 1), last_activity_date = ?';
+        updateQuery +=
+          ", current_streak = current_streak + 1, longest_streak = MAX(longest_streak, current_streak + 1), last_activity_date = ?";
         queryParams.push(today);
       }
 
-      updateQuery += ' WHERE id = ?';
+      updateQuery += " WHERE id = ?";
       queryParams.push(this.id);
 
       await database.run(updateQuery, queryParams);
-      
+
       // Update instance properties
       this.experience = newExperience;
       this.level = newLevel;
@@ -111,10 +120,10 @@ class User {
       this.health = stats.health || this.health;
       this.coins = stats.coins || this.coins;
       this.gems = stats.gems || this.gems;
-      
+
       return true;
     } catch (error) {
-      console.error('Error updating user stats:', error);
+      console.error("Error updating user stats:", error);
       throw error;
     }
   }
@@ -122,25 +131,32 @@ class User {
   // Update user profile
   async updateProfile(profileData) {
     try {
-      await database.run(`
+      await database.run(
+        `
         UPDATE users 
-        SET username = ?, avatar = ?, theme = ?, updated_at = CURRENT_TIMESTAMP
+        SET username = ?, avatar = ?, avatar_color = ?, avatar_border = ?, theme = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `, [
-        profileData.username || this.username,
-        profileData.avatar || this.avatar,
-        profileData.theme || this.theme,
-        this.id
-      ]);
+      `,
+        [
+          profileData.username || this.username,
+          profileData.avatar || this.avatar,
+          profileData.avatar_color || this.avatar_color,
+          profileData.avatar_border || this.avatar_border,
+          profileData.theme || this.theme,
+          this.id,
+        ],
+      );
 
       // Update instance properties
       this.username = profileData.username || this.username;
       this.avatar = profileData.avatar || this.avatar;
+      this.avatar_color = profileData.avatar_color || this.avatar_color;
+      this.avatar_border = profileData.avatar_border || this.avatar_border;
       this.theme = profileData.theme || this.theme;
-      
+
       return true;
     } catch (error) {
-      console.error('Error updating user profile:', error);
+      console.error("Error updating user profile:", error);
       throw error;
     }
   }
@@ -150,15 +166,37 @@ class User {
     try {
       return await bcrypt.compare(password, this.password);
     } catch (error) {
-      console.error('Error verifying password:', error);
+      console.error("Error verifying password:", error);
       return false;
+    }
+  }
+
+  // Update password
+  async updatePassword(newPassword) {
+    try {
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await database.run(
+        `
+        UPDATE users 
+        SET password = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+        [hashedPassword, this.id],
+      );
+
+      this.password = hashedPassword;
+      return true;
+    } catch (error) {
+      console.error("Error updating password:", error);
+      throw error;
     }
   }
 
   // Get user stats for a specific date range
   static async getUserStats(userId, days = 30) {
     try {
-      const stats = await database.all(`
+      const stats = await database.all(
+        `
         SELECT 
           stat_date,
           habits_completed,
@@ -171,11 +209,13 @@ class User {
         WHERE user_id = ? 
         AND stat_date >= date('now', '-${days} days')
         ORDER BY stat_date DESC
-      `, [userId]);
-      
+      `,
+        [userId],
+      );
+
       return stats;
     } catch (error) {
-      console.error('Error fetching user stats:', error);
+      console.error("Error fetching user stats:", error);
       throw error;
     }
   }
@@ -183,9 +223,10 @@ class User {
   // Record daily stats
   static async recordDailyStats(userId, statsData) {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      await database.run(`
+      const today = new Date().toISOString().split("T")[0];
+
+      await database.run(
+        `
         INSERT OR REPLACE INTO user_stats (
           user_id, stat_date, habits_completed, dailies_completed, 
           routines_completed, focus_time, experience_gained, coins_gained
@@ -197,19 +238,34 @@ class User {
           COALESCE((SELECT experience_gained FROM user_stats WHERE user_id = ? AND stat_date = ?), 0) + ?,
           COALESCE((SELECT coins_gained FROM user_stats WHERE user_id = ? AND stat_date = ?), 0) + ?
         )
-      `, [
-        userId, today,
-        userId, today, statsData.habits_completed || 0,
-        userId, today, statsData.dailies_completed || 0,
-        userId, today, statsData.routines_completed || 0,
-        userId, today, statsData.focus_time || 0,
-        userId, today, statsData.experience_gained || 0,
-        userId, today, statsData.coins_gained || 0
-      ]);
-      
+      `,
+        [
+          userId,
+          today,
+          userId,
+          today,
+          statsData.habits_completed || 0,
+          userId,
+          today,
+          statsData.dailies_completed || 0,
+          userId,
+          today,
+          statsData.routines_completed || 0,
+          userId,
+          today,
+          statsData.focus_time || 0,
+          userId,
+          today,
+          statsData.experience_gained || 0,
+          userId,
+          today,
+          statsData.coins_gained || 0,
+        ],
+      );
+
       return true;
     } catch (error) {
-      console.error('Error recording daily stats:', error);
+      console.error("Error recording daily stats:", error);
       throw error;
     }
   }

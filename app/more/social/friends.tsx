@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Alert, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../../contexts/ThemeProvider"
 import tw from "../../../lib/tailwind"
 import { friendsAPI } from "../../../lib/api"
-import React from "react"
+
 
 export default function Friends() {
   const router = useRouter()
@@ -17,11 +17,7 @@ export default function Friends() {
   const [friendRequests, setFriendRequests] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [activeTab])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       if (activeTab === 'friends') {
@@ -37,7 +33,11 @@ export default function Friends() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleAcceptRequest = async (friendshipId: number) => {
     try {
@@ -91,7 +91,7 @@ export default function Friends() {
         tw`rounded-2xl p-4 mb-3`,
         { backgroundColor: colors.card }
       ]}
-      onPress={() => router.push(`/more/social/profile/${friend.friend_id}`)}
+      onPress={() => router.push(`/more/social/profile/${friend.id}`)}
     >
       <View style={tw`flex-row items-center`}>
         <View style={[
@@ -136,7 +136,7 @@ export default function Friends() {
           
           <TouchableOpacity 
             style={[tw`p-2 rounded-lg`, { backgroundColor: colors.cardSecondary }]}
-            onPress={() => handleRemoveFriend(friend.id, friend.username)}
+            onPress={() => handleRemoveFriend(friend.friendshipId || friend.id, friend.username)}
           >
             <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -166,7 +166,7 @@ export default function Friends() {
           <Text style={[tw`font-bold text-base`, { color: colors.text }]}>{request.username}</Text>
           <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
             {request.level && `Level ${request.level} • `}
-            {new Date(request.created_at).toLocaleDateString()}
+            {new Date(request.sentAt || request.created_at).toLocaleDateString()}
           </Text>
           {request.mutual_friends_count > 0 && (
             <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>
@@ -196,7 +196,7 @@ export default function Friends() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         
         {/* Header */}

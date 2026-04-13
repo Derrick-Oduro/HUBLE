@@ -1,7 +1,8 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { authAPI, configAPI, statsAPI } from '../lib/api'
 
 interface ThemeColors {
   background: string
@@ -15,6 +16,10 @@ interface ThemeColors {
   error: string
 }
 
+type UnlockType = 'none' | 'level' | 'tasks_completed' | 'streak' | 'focus_minutes'
+type VisualEffect = 'none' | 'glow'
+type StatusBarStyle = 'light-content' | 'dark-content'
+
 interface Theme {
   id: string
   name: string
@@ -24,6 +29,17 @@ interface Theme {
   unlocked: boolean
   requirement?: string
   icon: string
+  unlockType?: UnlockType
+  unlockValue?: number
+  visualEffect?: VisualEffect
+  statusBarStyle: StatusBarStyle
+}
+
+interface UserProgress {
+  level: number
+  total_tasks_completed: number
+  current_streak: number
+  focus_minutes: number
 }
 
 interface ThemeContextType {
@@ -31,10 +47,69 @@ interface ThemeContextType {
   selectedThemeId: string
   themes: Theme[]
   setTheme: (themeId: string) => Promise<void>
+  refreshThemes: (preferredThemeId?: string | null) => Promise<void>
   colors: ThemeColors
+  isGlowEnabled: boolean
 }
 
-const themes: Theme[] = [
+const parseColorToRgb = (color?: string): { r: number; g: number; b: number } | null => {
+  if (!color) return null
+
+  const normalizedColor = color.trim()
+
+  const hexMatch = normalizedColor.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i)
+  if (hexMatch) {
+    const hex = hexMatch[1]
+
+    if (hex.length === 3) {
+      return {
+        r: parseInt(hex[0] + hex[0], 16),
+        g: parseInt(hex[1] + hex[1], 16),
+        b: parseInt(hex[2] + hex[2], 16),
+      }
+    }
+
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16),
+    }
+  }
+
+  const rgbMatch = normalizedColor.match(
+    /^rgba?\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i,
+  )
+  if (rgbMatch) {
+    return {
+      r: Math.min(255, Number(rgbMatch[1])),
+      g: Math.min(255, Number(rgbMatch[2])),
+      b: Math.min(255, Number(rgbMatch[3])),
+    }
+  }
+
+  return null
+}
+
+const getStatusBarStyleForBackground = (backgroundColor?: string): StatusBarStyle => {
+  const rgb = parseColorToRgb(backgroundColor)
+  if (!rgb) return 'light-content'
+
+  const toLinear = (value: number) => {
+    const normalized = value / 255
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4
+  }
+
+  const luminance =
+    0.2126 * toLinear(rgb.r) +
+    0.7152 * toLinear(rgb.g) +
+    0.0722 * toLinear(rgb.b)
+
+  return luminance > 0.52 ? 'dark-content' : 'light-content'
+}
+
+const fallbackThemes: Theme[] = [
   {
     id: "dark",
     name: "Dark Theme",
@@ -52,7 +127,8 @@ const themes: Theme[] = [
       error: "#EF4444"
     },
     unlocked: true,
-    icon: "moon"
+    icon: "moon",
+    statusBarStyle: 'light-content'
   },
   {
     id: "light",
@@ -71,7 +147,8 @@ const themes: Theme[] = [
       error: "#DC2626"
     },
     unlocked: true,
-    icon: "sunny"
+    icon: "sunny",
+    statusBarStyle: 'dark-content'
   },
   {
     id: "ocean",
@@ -90,7 +167,8 @@ const themes: Theme[] = [
       error: "#EF4444"
     },
     unlocked: true,
-    icon: "water"
+    icon: "water",
+    statusBarStyle: 'light-content'
   },
   {
     id: "forest",
@@ -109,7 +187,8 @@ const themes: Theme[] = [
       error: "#EF4444"
     },
     unlocked: true,
-    icon: "leaf"
+    icon: "leaf",
+    statusBarStyle: 'light-content'
   },
   {
     id: "sunset",
@@ -129,7 +208,8 @@ const themes: Theme[] = [
     },
     unlocked: true, // Changed to true for testing
     requirement: "Reach level 10",
-    icon: "sunset"
+    icon: "sunset",
+    statusBarStyle: 'light-content'
   },
   {
     id: "royal",
@@ -149,7 +229,8 @@ const themes: Theme[] = [
     },
     unlocked: true, // Changed to true for testing
     requirement: "Complete 50 tasks",
-    icon: "diamond"
+    icon: "diamond",
+    statusBarStyle: 'light-content'
   },
   {
     id: "cyber",
@@ -169,7 +250,8 @@ const themes: Theme[] = [
     },
     unlocked: true, // Changed to true for testing
     requirement: "Join 5 challenges",
-    icon: "flash"
+    icon: "flash",
+    statusBarStyle: 'light-content'
   },
   {
     id: "rose",
@@ -189,7 +271,8 @@ const themes: Theme[] = [
     },
     unlocked: true, // Changed to true for testing
     requirement: "Earn 3 group badges",
-    icon: "rose"
+    icon: "rose",
+    statusBarStyle: 'dark-content'
   },
   {
     id: "paper",
@@ -208,7 +291,8 @@ const themes: Theme[] = [
       error: "#8B1A1A"
     },
     unlocked: true,
-    icon: "document-text"
+    icon: "document-text",
+    statusBarStyle: 'dark-content'
   },
   {
     id: "vintage-paper",
@@ -228,7 +312,8 @@ const themes: Theme[] = [
     },
     unlocked: false,
     requirement: "Reach level 10",
-    icon: "library"
+    icon: "library",
+    statusBarStyle: 'dark-content'
   },
   {
     id: "notebook",
@@ -247,7 +332,8 @@ const themes: Theme[] = [
       error: "#DC2626"
     },
     unlocked: true,
-    icon: "book"
+    icon: "book",
+    statusBarStyle: 'dark-content'
   },
   {
     id: "christmas",
@@ -266,7 +352,8 @@ const themes: Theme[] = [
       error: "#7C2D12"         // Dark burgundy red
     },
     unlocked: true,
-    icon: "sunny"
+    icon: "sunny",
+    statusBarStyle: 'dark-content'
   },
   {
     id: "solo-leveling",
@@ -285,40 +372,221 @@ const themes: Theme[] = [
       error: "#FF6B6B"        // Red (danger/boss warning)
     },
     unlocked: true,
-    icon: "flash"
+    icon: "flash",
+    statusBarStyle: 'light-content'
   },
 ]
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
+const defaultThemeColors: ThemeColors = fallbackThemes[0].colors
+
+const normalizeThemeColors = (colors?: Partial<ThemeColors>): ThemeColors => ({
+  background: colors?.background ?? defaultThemeColors.background,
+  card: colors?.card ?? defaultThemeColors.card,
+  cardSecondary: colors?.cardSecondary ?? defaultThemeColors.cardSecondary,
+  accent: colors?.accent ?? defaultThemeColors.accent,
+  text: colors?.text ?? defaultThemeColors.text,
+  textSecondary: colors?.textSecondary ?? defaultThemeColors.textSecondary,
+  success: colors?.success ?? defaultThemeColors.success,
+  warning: colors?.warning ?? defaultThemeColors.warning,
+  error: colors?.error ?? defaultThemeColors.error,
+})
+
+const normalizeUnlockType = (
+  unlockType?: string,
+  unlockLevel?: number,
+): UnlockType => {
+  const normalizedType = `${unlockType || ''}`.trim().toLowerCase()
+  if (
+    normalizedType === 'none' ||
+    normalizedType === 'level' ||
+    normalizedType === 'tasks_completed' ||
+    normalizedType === 'streak' ||
+    normalizedType === 'focus_minutes'
+  ) {
+    return normalizedType
+  }
+
+  return Number(unlockLevel) > 1 ? 'level' : 'none'
+}
+
+const buildUnlockRequirement = (unlockType: UnlockType, unlockValue: number) => {
+  if (unlockType === 'none') return undefined
+  if (unlockType === 'level') return `Reach level ${unlockValue}`
+  if (unlockType === 'tasks_completed') return `Complete ${unlockValue} tasks`
+  if (unlockType === 'streak') return `Reach a ${unlockValue}-day streak`
+  if (unlockType === 'focus_minutes') return `Focus for ${unlockValue} minutes`
+  return undefined
+}
+
+const evaluateThemeUnlock = (
+  unlockType: UnlockType,
+  unlockValue: number,
+  userProgress: UserProgress,
+) => {
+  if (unlockType === 'none') return true
+  if (unlockType === 'level') return userProgress.level >= unlockValue
+  if (unlockType === 'tasks_completed') {
+    return userProgress.total_tasks_completed >= unlockValue
+  }
+  if (unlockType === 'streak') return userProgress.current_streak >= unlockValue
+  if (unlockType === 'focus_minutes') return userProgress.focus_minutes >= unlockValue
+  return true
+}
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedThemeId, setSelectedThemeId] = useState<string>("dark")
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [availableThemes, setAvailableThemes] = useState<Theme[]>(fallbackThemes)
 
-  // Load saved theme on app start
+  const mapBackendThemes = useCallback((rawThemes: any[], userProgress: UserProgress): Theme[] => {
+    return rawThemes
+      .map((theme: any) => {
+        let parsedColors = theme.colors
+        if (typeof parsedColors === 'string') {
+          try {
+            parsedColors = JSON.parse(parsedColors)
+          } catch {
+            parsedColors = undefined
+          }
+        }
+
+        const unlockType = normalizeUnlockType(theme.unlock_type, theme.unlock_level)
+
+        const unlockValue = (() => {
+          const rawUnlockValue = Number(theme.unlock_value)
+          if (Number.isFinite(rawUnlockValue)) {
+            return unlockType === 'none'
+              ? 0
+              : Math.max(Math.floor(rawUnlockValue), 1)
+          }
+
+          const fallbackUnlockLevel = Number(theme.unlock_level)
+          if (unlockType === 'level' && Number.isFinite(fallbackUnlockLevel)) {
+            return Math.max(Math.floor(fallbackUnlockLevel), 1)
+          }
+
+          return unlockType === 'none' ? 0 : 1
+        })()
+
+        const unlockRequirement = `${theme.unlock_requirement || ''}`.trim()
+        const normalizedColors = normalizeThemeColors(parsedColors)
+
+        return {
+          id: theme.theme_id,
+          name: theme.name,
+          description: unlockRequirement || 'Available in HUBLE',
+          category: theme.category,
+          colors: normalizedColors,
+          unlocked: evaluateThemeUnlock(unlockType, unlockValue, userProgress),
+          requirement: unlockRequirement || buildUnlockRequirement(unlockType, unlockValue),
+          icon: theme.is_premium ? 'diamond' : 'color-palette',
+          unlockType,
+          unlockValue,
+          visualEffect: (`${theme.visual_effect || 'none'}`.trim().toLowerCase() === 'glow' ? 'glow' : 'none') as VisualEffect,
+          statusBarStyle: getStatusBarStyleForBackground(normalizedColors.background),
+        }
+      })
+      .filter((theme) => Boolean(theme.id))
+  }, [])
+
+  const refreshThemes = useCallback(async (preferredThemeId?: string | null) => {
+    try {
+      const [response, statsResponse]: [any, any] = await Promise.all([
+        configAPI.getThemes(),
+        statsAPI.getStats().catch(() => null),
+      ])
+
+      if (!response?.themes?.length) {
+        return
+      }
+
+      const userProgress: UserProgress = {
+        level: Number(statsResponse?.stats?.level) || 1,
+        total_tasks_completed: Number(statsResponse?.stats?.total_tasks_completed) || 0,
+        current_streak: Number(statsResponse?.stats?.current_streak) || 0,
+        focus_minutes: Number(statsResponse?.stats?.focus_minutes) || 0,
+      }
+
+      const mappedThemes = mapBackendThemes(response.themes, userProgress)
+      if (!mappedThemes.length) {
+        return
+      }
+
+      setAvailableThemes(mappedThemes)
+
+      setSelectedThemeId((currentThemeId) => {
+        const desiredTheme = preferredThemeId || currentThemeId || "dark"
+        const desiredThemeData = mappedThemes.find((theme) => theme.id === desiredTheme)
+        if (desiredThemeData?.unlocked) {
+          return desiredThemeData.id
+        }
+
+        const unlockedDarkTheme = mappedThemes.find(
+          (theme) => theme.id === "dark" && theme.unlocked,
+        )
+        if (unlockedDarkTheme) {
+          return unlockedDarkTheme.id
+        }
+
+        const firstUnlockedTheme = mappedThemes.find((theme) => theme.unlocked)
+        return firstUnlockedTheme?.id || mappedThemes[0]?.id || "dark"
+      })
+    } catch (themeError) {
+      console.error("Failed to load themes from backend:", themeError)
+    }
+  }, [mapBackendThemes])
+
+  // Hydrate from storage immediately, then update from backend in background.
   useEffect(() => {
-    const loadSavedTheme = async () => {
+    let isMounted = true
+
+    const loadThemeState = async () => {
+      let savedTheme: string | null = null
+
       try {
-        const savedTheme = await AsyncStorage.getItem("selectedTheme")
-        console.log("Loaded saved theme:", savedTheme) // Debug log
-        if (savedTheme && themes.find(t => t.id === savedTheme)) {
+        savedTheme = await AsyncStorage.getItem("selectedTheme")
+        console.log("Loaded saved theme:", savedTheme)
+        if (isMounted && savedTheme) {
           setSelectedThemeId(savedTheme)
         }
-      } catch (error) {
-        console.error("Failed to load saved theme:", error)
-      } finally {
-        setIsLoaded(true)
+      } catch (storageError) {
+        console.error("Failed to load saved theme:", storageError)
+      }
+
+      try {
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Theme config request timed out")), 4000)
+        })
+
+        await Promise.race([
+          refreshThemes(savedTheme),
+          timeoutPromise,
+        ])
+      } catch (themeError) {
+        console.error("Failed to load themes from backend:", themeError)
       }
     }
-    loadSavedTheme()
+
+    loadThemeState()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const setTheme = async (themeId: string) => {
-    const theme = themes.find(t => t.id === themeId)
+    const theme = availableThemes.find(t => t.id === themeId)
     console.log("Setting theme:", themeId, theme) // Debug log
     if (theme && theme.unlocked) {
       setSelectedThemeId(themeId)
       try {
+        try {
+          await authAPI.updateProfile({ theme: themeId })
+        } catch (profileUpdateError) {
+          console.error("Failed to persist selected theme to backend:", profileUpdateError)
+        }
+
         await AsyncStorage.setItem("selectedTheme", themeId)
         console.log("Theme saved to storage:", themeId) // Debug log
       } catch (error) {
@@ -327,19 +595,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }
 
-  const currentTheme = themes.find(t => t.id === selectedThemeId) || themes[0]
+  const currentTheme = availableThemes.find(t => t.id === selectedThemeId) || availableThemes[0]
+  const isGlowEnabled = false
 
   const value: ThemeContextType = {
     currentTheme,
     selectedThemeId,
-    themes,
+    themes: availableThemes,
     setTheme,
-    colors: currentTheme.colors
-  }
-
-  // Don't render until theme is loaded
-  if (!isLoaded) {
-    return null
+    refreshThemes,
+    colors: currentTheme.colors,
+    isGlowEnabled,
   }
 
   return (
@@ -357,4 +623,4 @@ export const useTheme = (): ThemeContextType => {
   return context
 }
 
-export { themes }
+export { fallbackThemes as themes }

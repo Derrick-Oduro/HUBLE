@@ -7,7 +7,7 @@ import { useTheme } from "../../contexts/ThemeProvider"
 import React from "react"
 
 export default function TabsLayout() {
-  const { colors, currentTheme } = useTheme()
+  const { colors } = useTheme()
 
   return (
     <Tabs

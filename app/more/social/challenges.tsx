@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../../contexts/ThemeProvider"
 import tw from "../../../lib/tailwind"
 import { challengesAPI } from "../../../lib/api"
-import React from "react"
+
 
 export default function Challenges() {
   const router = useRouter()
@@ -19,31 +19,32 @@ export default function Challenges() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        if (activeTab === 'active' || activeTab === 'completed') {
+          const data = await challengesAPI.getUserChallenges()
+          const challenges = data.challenges || []
+          setActiveChallenges(challenges.filter(c => !c.completed))
+          setCompletedChallenges(challenges.filter(c => c.completed))
+        } else {
+          const data = await challengesAPI.getActiveChallenges()
+          setAvailableChallenges(data.challenges || [])
+        }
+      } catch (error) {
+        console.error("Error loading challenges:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     loadData()
   }, [activeTab])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      if (activeTab === 'active' || activeTab === 'completed') {
-        const data = await challengesAPI.getUserChallenges()
-        const challenges = data.challenges || []
-        setActiveChallenges(challenges.filter(c => !c.completed))
-        setCompletedChallenges(challenges.filter(c => c.completed))
-      } else {
-        const data = await challengesAPI.getActiveChallenges()
-        setAvailableChallenges(data.challenges || [])
-      }
-    } catch (error) {
-      console.error("Error loading challenges:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const ChallengeCard = ({ challenge, type = "active" }) => {
     const emoji = challenge.emoji || "🏆"
     const color = challenge.color || "#3B82F6"
+    const isCooperative = `${challenge.mode || ""}`.toLowerCase() === "cooperative"
     const difficulty = challenge.difficulty || "Medium"
     const participantCount = challenge.participant_count || challenge.participants || 0
     
@@ -77,7 +78,14 @@ export default function Challenges() {
           </View>
           
           <View style={tw`flex-1`}>
-            <Text style={[tw`font-bold text-base mb-1`, { color: colors.text }]}>{challenge.title}</Text>
+            <View style={tw`flex-row items-center mb-1`}>
+              <Text style={[tw`font-bold text-base mr-2`, { color: colors.text }]}>{challenge.title}</Text>
+              {isCooperative && (
+                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: `${colors.success}20` }]}>
+                  <Text style={[tw`text-xs font-bold`, { color: colors.success }]}>CO-OP</Text>
+                </View>
+              )}
+            </View>
             <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{challenge.description}</Text>
           </View>
           
@@ -180,7 +188,7 @@ export default function Challenges() {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.id === 'light' || currentTheme.id === 'rose' ? "dark-content" : "light-content"} />
+      <StatusBar barStyle={currentTheme.statusBarStyle} />
       <View style={tw`flex-1 px-5 pt-2 pb-4`}>
         
         {/* Header */}

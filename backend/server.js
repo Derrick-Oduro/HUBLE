@@ -1,5 +1,7 @@
 require("dotenv").config();
 const app = require("./src/app");
+const database = require("./src/config/database");
+const Achievement = require("./src/models/Achievement");
 const os = require("os");
 
 const PORT = process.env.PORT || 3000;
@@ -19,14 +21,41 @@ const getNetworkIP = () => {
 
 const networkIP = getNetworkIP();
 
-// Listen on all network interfaces (0.0.0.0) instead of just localhost
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 HUBLE Backend Server Started!`);
-  console.log(`📍 Local access: http://localhost:${PORT}`);
-  console.log(`🌐 Network access: http://${networkIP}:${PORT}`);
-  console.log(`🏥 Health check: http://${networkIP}:${PORT}/health`);
-  console.log(`📱 Use this IP in your frontend: ${networkIP}`);
-});
+// Start server only after database is connected
+const startServer = async () => {
+  try {
+    // Wait for database to connect first
+    await database.connect();
+    console.log("✅ Database connected successfully");
+
+    // Seed default achievements
+    try {
+      await Achievement.createTable();
+      await Achievement.seedDefaults();
+      console.log("✅ Default achievements seeded");
+    } catch (error) {
+      console.log(
+        "⚠️ Achievements already exist or error seeding:",
+        error.message,
+      );
+    }
+
+    // Then start listening on all network interfaces (0.0.0.0)
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 HUBLE Backend Server Started!`);
+      console.log(`📍 Local access: http://localhost:${PORT}`);
+      console.log(`🌐 Network access: http://${networkIP}:${PORT}`);
+      console.log(`🏥 Health check: http://${networkIP}:${PORT}/health`);
+      console.log(`📱 Use this IP in your frontend: ${networkIP}`);
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (err) => {
