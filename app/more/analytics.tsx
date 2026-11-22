@@ -115,7 +115,7 @@ export default function Analytics() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center justify-between mb-6 mt-2`}>
           <View style={tw`flex-row items-center`}>
@@ -149,7 +149,7 @@ export default function Analytics() {
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {weeklyFocusInsight && (
-            <View style={[tw`rounded-2xl p-5 mb-4`, { backgroundColor: colors.card }]}> 
+            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}> 
               <View style={tw`flex-row items-center mb-2`}>
                 <Ionicons name="bulb-outline" size={20} color={colors.accent} style={tw`mr-2`} />
                 <Text style={[tw`text-base font-bold`, { color: colors.text }]}>Weekly Insight</Text>
@@ -161,7 +161,7 @@ export default function Analytics() {
           )}
 
           {/* Productivity Score */}
-          <View style={[tw`rounded-2xl p-6 mb-4`, { backgroundColor: colors.card }]}>
+          <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Productivity Score</Text>
             <View style={tw`items-center`}>
               <View style={[tw`w-32 h-32 rounded-full items-center justify-center`, { backgroundColor: colors.accent + '20' }]}>
@@ -175,7 +175,7 @@ export default function Analytics() {
 
           {/* Streak Stats */}
           {analytics?.streakData && (
-            <View style={[tw`rounded-2xl p-5 mb-4`, { backgroundColor: colors.card }]}>
+            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
               <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Streak Performance</Text>
               <View style={tw`flex-row justify-around`}>
                 <View style={tw`items-center`}>
@@ -198,7 +198,7 @@ export default function Analytics() {
 
           {/* Focus Analysis */}
           {analytics?.focusAnalysis && analytics.focusAnalysis.length > 0 && (
-            <View style={[tw`rounded-2xl p-5 mb-4`, { backgroundColor: colors.card }]}>
+            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
               <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Focus Time</Text>
               <View style={tw`flex-row justify-between items-center mb-3`}>
                 <Text style={[{ color: colors.textSecondary }]}>Total Minutes</Text>
@@ -217,7 +217,7 @@ export default function Analytics() {
 
           {/* Category Breakdown */}
           {analytics?.categoryBreakdown && analytics.categoryBreakdown.length > 0 && (
-            <View style={[tw`rounded-2xl p-5 mb-4`, { backgroundColor: colors.card }]}>
+            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
               <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Task Categories</Text>
               {(() => {
                 const totalCategories = analytics.categoryBreakdown.reduce((sum: number, item: AnalyticsCategory) => sum + item.count, 0)

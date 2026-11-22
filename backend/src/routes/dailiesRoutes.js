@@ -38,6 +38,7 @@ router.post("/", authenticateToken, async (req, res) => {
       difficulty,
       category,
       due_date,
+      reminder_time,
       tags,
     } = req.body;
 
@@ -58,6 +59,10 @@ router.post("/", authenticateToken, async (req, res) => {
       difficulty: difficulty || "medium",
       category: category || "General",
       due_date: due_date,
+      reminder_time:
+        typeof reminder_time === "string" && reminder_time.trim()
+          ? reminder_time.trim()
+          : null,
       tags: tags || "[]",
     };
 
@@ -88,6 +93,61 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+// Update daily
+router.put("/:id", authenticateToken, async (req, res) => {
+  try {
+    const dailyId = parseInt(req.params.id);
+    const {
+      title,
+      description,
+      priority,
+      difficulty,
+      category,
+      due_date,
+      reminder_time,
+      tags,
+    } = req.body;
+
+    const daily = await Daily.findById(dailyId);
+    if (!daily || daily.user_id !== req.user.id) {
+      return res.status(404).json({
+        success: false,
+        error: "Daily task not found",
+      });
+    }
+
+    await daily.update({
+      title: title?.trim() || daily.title,
+      description: description ?? daily.description,
+      priority: priority || daily.priority,
+      difficulty: difficulty || daily.difficulty,
+      category: category || daily.category,
+      due_date: due_date === undefined ? daily.due_date : due_date,
+      reminder_time:
+        reminder_time === undefined
+          ? daily.reminder_time || null
+          : typeof reminder_time === "string" && reminder_time.trim()
+            ? reminder_time.trim()
+            : null,
+      tags: tags === undefined ? daily.tags : tags,
+    });
+
+    const updatedDaily = await Daily.findById(dailyId);
+
+    res.json({
+      success: true,
+      message: "Daily task updated successfully",
+      daily: updatedDaily,
+    });
+  } catch (error) {
+    console.error("❌ Error updating daily:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update daily",
+    });
+  }
+});
+
 // Complete daily
 router.post("/:id/complete", authenticateToken, async (req, res) => {
   try {
@@ -96,7 +156,7 @@ router.post("/:id/complete", authenticateToken, async (req, res) => {
       "📥 POST /dailies/:id/complete - Daily ID:",
       dailyId,
       "User ID:",
-      req.user.id
+      req.user.id,
     );
 
     // Check if daily belongs to user
@@ -149,7 +209,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
       "📥 DELETE /dailies/:id - Daily ID:",
       dailyId,
       "User ID:",
-      req.user.id
+      req.user.id,
     );
 
     const daily = await Daily.findById(dailyId);

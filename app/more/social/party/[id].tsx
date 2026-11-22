@@ -16,6 +16,7 @@ export default function PartyDetails() {
   const [contributing, setContributing] = useState(false)
   const [party, setParty] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
+  const partyAccent = colors.accent
 
   const partyId = Number(Array.isArray(id) ? id[0] : id)
 
@@ -131,7 +132,7 @@ export default function PartyDetails() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -150,9 +151,9 @@ export default function PartyDetails() {
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={[tw`rounded-2xl p-6 mb-4`, { backgroundColor: colors.card }]}> 
+            <View style={[tw`rounded-2xl p-4 mb-3`, { backgroundColor: colors.card }]}> 
               <View style={tw`flex-row items-center mb-4`}>
-                <View style={[tw`w-14 h-14 rounded-xl items-center justify-center mr-3`, { backgroundColor: `${party.color || colors.accent}20` }]}>
+                <View style={[tw`w-14 h-14 rounded-xl items-center justify-center mr-3`, { backgroundColor: colors.cardSecondary }]}>
                   <Text style={tw`text-2xl`}>{party.emoji || '🎉'}</Text>
                 </View>
                 <View style={tw`flex-1`}>
@@ -165,7 +166,7 @@ export default function PartyDetails() {
                 <View style={tw`mb-4`}>
                   <View style={tw`flex-row justify-between items-center mb-1`}>
                     <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{weeklyGoalLabel}</Text>
-                    <Text style={[tw`text-sm font-bold`, { color: party.color || colors.accent }]}>
+                    <Text style={[tw`text-sm font-bold`, { color: colors.text }]}>
                       {weeklyPoints}/{weeklyGoalTarget} pts
                     </Text>
                   </View>
@@ -173,7 +174,7 @@ export default function PartyDetails() {
                     <View
                       style={[
                         tw`h-full rounded-full`,
-                        { width: `${weeklyProgress}%`, backgroundColor: party.color || colors.accent },
+                        { width: `${weeklyProgress}%`, backgroundColor: partyAccent },
                       ]}
                     />
                   </View>
@@ -186,7 +187,7 @@ export default function PartyDetails() {
                   style={[
                     tw`flex-1 py-3 rounded-xl mr-2`,
                     {
-                      backgroundColor: party.color || colors.accent,
+                      backgroundColor: partyAccent,
                       opacity: contributing ? 0.8 : 1,
                     },
                   ]}
@@ -225,7 +226,7 @@ export default function PartyDetails() {
               </View>
             </View>
 
-            <View style={[tw`rounded-2xl p-5 mb-4`, { backgroundColor: colors.card }]}> 
+            <View style={[tw`rounded-2xl p-4 mb-3`, { backgroundColor: colors.card }]}> 
               <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Weekly Contributions</Text>
 
               {contributors.length === 0 ? (
@@ -242,13 +243,13 @@ export default function PartyDetails() {
                       </View>
                       <Text style={[tw`font-medium`, { color: colors.text }]}>{contributor.username}</Text>
                     </View>
-                    <Text style={[tw`font-bold`, { color: party.color || colors.accent }]}>{Number(contributor.points || 0)} pts</Text>
+                    <Text style={[tw`font-bold`, { color: colors.text }]}>{Number(contributor.points || 0)} pts</Text>
                   </View>
                 ))
               )}
             </View>
 
-            <View style={[tw`rounded-2xl p-5 mb-4`, { backgroundColor: colors.card }]}> 
+            <View style={[tw`rounded-2xl p-4 mb-3`, { backgroundColor: colors.card }]}> 
               <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Members ({members.length})</Text>
               {members.map((member) => (
                 <View
@@ -266,8 +267,8 @@ export default function PartyDetails() {
                     <Text style={[tw`font-semibold`, { color: colors.text }]}>{member.username}</Text>
                     <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Level {member.level || 1}</Text>
                   </View>
-                  <View style={[tw`px-2 py-1 rounded`, { backgroundColor: member.role === 'admin' ? '#F59E0B20' : colors.cardSecondary }]}>
-                    <Text style={[tw`text-xs font-semibold`, { color: member.role === 'admin' ? '#F59E0B' : colors.textSecondary }]}>
+                  <View style={[tw`px-2 py-1 rounded`, { backgroundColor: colors.cardSecondary }]}> 
+                    <Text style={[tw`text-xs font-semibold`, { color: colors.textSecondary }]}> 
                       {member.role || 'member'}
                     </Text>
                   </View>

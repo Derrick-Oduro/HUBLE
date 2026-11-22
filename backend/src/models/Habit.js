@@ -8,6 +8,8 @@ class Habit {
     this.description = data.description;
     this.difficulty = data.difficulty;
     this.color = data.color;
+    this.due_time = data.due_time || null;
+    this.reminder_time = data.reminder_time || null;
     this.target_days =
       typeof data.target_days === "string"
         ? JSON.parse(data.target_days)
@@ -24,8 +26,8 @@ class Habit {
       console.log("🔄 Creating habit in database:", habitData);
 
       const result = await database.run(
-        `INSERT INTO habits (user_id, title, description, difficulty, color, target_days)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO habits (user_id, title, description, difficulty, color, target_days, due_time, reminder_time)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           habitData.user_id,
           habitData.title,
@@ -33,7 +35,9 @@ class Habit {
           habitData.difficulty || "medium",
           habitData.color || "#3B82F6",
           JSON.stringify(habitData.target_days || [1, 2, 3, 4, 5, 6, 0]),
-        ]
+          habitData.due_time || null,
+          habitData.reminder_time || null,
+        ],
       );
 
       console.log("✅ Habit created with ID:", result.lastID);
@@ -59,7 +63,7 @@ class Habit {
          FROM habits h 
          WHERE h.user_id = ?
          ORDER BY h.created_at DESC`,
-        [userId]
+        [userId],
       );
 
       console.log("✅ Found habits:", habits.length);
@@ -69,7 +73,7 @@ class Habit {
           new Habit({
             ...habit,
             is_completed_today: Boolean(habit.is_completed_today),
-          })
+          }),
       );
     } catch (error) {
       console.error("❌ Error finding habits:", error);
@@ -89,7 +93,7 @@ class Habit {
          ) as is_completed_today
          FROM habits h 
          WHERE h.id = ?`,
-        [id]
+        [id],
       );
 
       if (!habit) return null;
@@ -113,7 +117,7 @@ class Habit {
       await database.run(
         `INSERT OR IGNORE INTO habit_completions (habit_id, user_id, completion_date)
          VALUES (?, ?, ?)`,
-        [habitId, userId, today]
+        [habitId, userId, today],
       );
 
       // Update streak
@@ -121,7 +125,7 @@ class Habit {
       await database.run(
         `UPDATE habits SET streak = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE id = ?`,
-        [streak, habitId]
+        [streak, habitId],
       );
 
       return streak;
@@ -138,7 +142,7 @@ class Habit {
         `SELECT completion_date FROM habit_completions 
          WHERE habit_id = ? 
          ORDER BY completion_date DESC`,
-        [habitId]
+        [habitId],
       );
 
       if (completions.length === 0) return 0;
@@ -166,6 +170,44 @@ class Habit {
   }
 
   // Delete habit
+  async update(updateData) {
+    try {
+      await database.run(
+        `UPDATE habits
+         SET title = ?,
+             description = ?,
+             difficulty = ?,
+             color = ?,
+             target_days = ?,
+             due_time = ?,
+           reminder_time = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          updateData.title ?? this.title,
+          updateData.description ?? this.description ?? "",
+          updateData.difficulty ?? this.difficulty ?? "medium",
+          updateData.color ?? this.color ?? "#3B82F6",
+          JSON.stringify(
+            updateData.target_days ?? this.target_days ?? [1, 2, 3, 4, 5, 6, 0],
+          ),
+          updateData.due_time === undefined
+            ? this.due_time
+            : updateData.due_time,
+          updateData.reminder_time === undefined
+            ? this.reminder_time
+            : updateData.reminder_time,
+          this.id,
+        ],
+      );
+
+      return true;
+    } catch (error) {
+      console.error("❌ Error updating habit:", error);
+      throw error;
+    }
+  }
+
   async delete() {
     try {
       await database.run("DELETE FROM habits WHERE id = ?", [this.id]);

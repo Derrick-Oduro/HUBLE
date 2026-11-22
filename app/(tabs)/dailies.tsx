@@ -5,7 +5,6 @@ import { View, Text, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert,
 import { Ionicons } from "@expo/vector-icons"
 import tw from "../../lib/tailwind"
 import AddDailyModal from "../../components/AddDailyModal"
-import EditDailyModal from "../../components/EditDailyModal"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
@@ -22,6 +21,7 @@ interface DailyTask {
   difficulty: 'easy' | 'medium' | 'hard'
   category: string
   dueDate?: string
+  reminderTime?: string | null
   completed: boolean
   dateCreated: string
   tags?: string[]
@@ -38,9 +38,7 @@ export default function DailiesScreen() {
   
   const [dailies, setDailies] = useState<DailyTask[]>([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false)
   const [editingDaily, setEditingDaily] = useState<DailyTask | null>(null)
-  const [expandedMenuId, setExpandedMenuId] = useState<number | null>(null)
 
   // Load dailies from storage
   useEffect(() => {
@@ -66,6 +64,7 @@ export default function DailiesScreen() {
                 difficulty: backendDaily.difficulty || 'medium',
                 category: backendDaily.category || 'General',
                 dueDate: backendDaily.due_date,
+                reminderTime: backendDaily.reminder_time || null,
                 completed: backendDaily.is_completed_today || false,
                 dateCreated: backendDaily.created_at ? new Date(backendDaily.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 tags: typeof backendDaily.tags === 'string' 
@@ -122,6 +121,7 @@ export default function DailiesScreen() {
               difficulty: response.daily.difficulty || 'medium',
               category: response.daily.category || 'General',
               dueDate: response.daily.due_date,
+              reminderTime: response.daily.reminder_time || newDaily.reminderTime || null,
               completed: false,
               dateCreated: new Date().toISOString().split('T')[0],
               tags: typeof response.daily.tags === 'string' 
@@ -148,6 +148,7 @@ export default function DailiesScreen() {
       const taskToAdd: DailyTask = {
         ...newDaily,
         id: Date.now(),
+        reminderTime: newDaily.reminderTime || null,
         completed: false,
         dateCreated: new Date().toISOString().split('T')[0],
       }
@@ -275,19 +276,28 @@ export default function DailiesScreen() {
         try {
           const response = await dailiesAPI.updateDaily(id, updatedData)
           
-          if (response.success) {
-            // Update local state with backend response
+          if (response.success && response.daily) {
+            const updatedDaily = {
+              id: response.daily.id,
+              title: response.daily.title,
+              description: response.daily.description || '',
+              priority: response.daily.priority || 'medium',
+              difficulty: response.daily.difficulty || 'medium',
+              category: response.daily.category || 'General',
+              dueDate: response.daily.due_date,
+              reminderTime: response.daily.reminder_time || null,
+              completed: response.daily.is_completed_today || false,
+              dateCreated: response.daily.created_at
+                ? new Date(response.daily.created_at).toISOString().split('T')[0]
+                : new Date().toISOString().split('T')[0],
+              tags: typeof response.daily.tags === 'string'
+                ? JSON.parse(response.daily.tags || '[]')
+                : (response.daily.tags || []),
+            }
+
             const updatedDailies = dailies.map(d => 
               d.id === id 
-                ? { 
-                  ...d, 
-                  ...updatedData,
-                  title: updatedData.title,
-                  description: updatedData.description,
-                  priority: updatedData.priority,
-                  difficulty: updatedData.difficulty,
-                  category: updatedData.category
-                } 
+                ? { ...d, ...updatedDaily } 
                 : d
             )
             
@@ -385,6 +395,19 @@ export default function DailiesScreen() {
     }
   }
 
+  const formatReminderTime = (value?: string | null) => {
+    if (!value || typeof value !== 'string') return null
+
+    const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)$/)
+    if (!match) return null
+
+    const hour24 = Number(match[1])
+    const minute = Number(match[2])
+    const meridiem = hour24 >= 12 ? 'PM' : 'AM'
+    const hour = hour24 % 12 === 0 ? 12 : hour24 % 12
+    return `${hour}:${minute.toString().padStart(2, '0')} ${meridiem}`
+  }
+
   // Calculate stats
   // Calculate daily completion stats
   const completedDailies = dailies.filter(daily => daily.completed).length
@@ -395,7 +418,7 @@ export default function DailiesScreen() {
       <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <FlatList
-        style={tw`flex-1 px-5 pt-2`}
+        style={tw`flex-1 px-2 pt-2`}
         data={dailies}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
@@ -434,16 +457,15 @@ export default function DailiesScreen() {
         renderItem={({ item }) => {
           const priorityColor = getPriorityColor(item.priority)
           const difficultyInfo = getDifficultyInfo(item.difficulty)
-          const isExpanded = expandedMenuId === item.id
-          
-          const handleExpand = () => {
-            setExpandedMenuId(isExpanded ? null : item.id)
-          }
+          const reminderLabel = formatReminderTime(item.reminderTime)
           
           return (
             <View style={tw`mb-2.5`}>
               <Pressable
-                onPress={handleExpand}
+                onPress={() => {
+                  setEditingDaily(item)
+                  setIsAddModalVisible(true)
+                }}
                 style={[
                   tw`rounded-xl p-2`,
                   { 
@@ -468,7 +490,11 @@ export default function DailiesScreen() {
                           { backgroundColor: `${difficultyInfo.color}20` }
                         ]}
                       >
-                        <Ionicons name={difficultyInfo.icon} size={16} color={difficultyInfo.color} />
+                        <Ionicons
+                          name={difficultyInfo.icon as keyof typeof Ionicons.glyphMap}
+                          size={16}
+                          color={difficultyInfo.color}
+                        />
                       </View>
                       
                       <View style={tw`flex-1`}>
@@ -498,6 +524,10 @@ export default function DailiesScreen() {
                   {/* Right side buttons */}
                   <View style={tw`flex-row items-center`}>
                     <TouchableOpacity
+                      onPress={(event) => {
+                        event.stopPropagation()
+                        void toggleDaily(item.id)
+                      }}
                       style={[
                         tw`w-6 h-6 rounded-lg items-center justify-center mr-1.5`,
                         { 
@@ -506,79 +536,22 @@ export default function DailiesScreen() {
                           borderColor: item.completed ? colors.success : colors.textSecondary,
                         }
                       ]}
-                      onPress={() => toggleDaily(item.id)}
                     >
                       {item.completed && (
                         <Ionicons name="checkmark" size={12} color="white" />
                       )}
                     </TouchableOpacity>
-                    
-                    {/* Expand Arrow */}
-                    <TouchableOpacity onPress={handleExpand}>
-                      <Ionicons 
-                        name={isExpanded ? "chevron-up" : "chevron-down"} 
-                        size={16} 
-                        color={colors.textSecondary} 
-                      />
-                    </TouchableOpacity>
                   </View>
                 </View>
-              </Pressable>
-              
-              {/* Expanded Actions - Edit and Delete Only */}
-              {isExpanded && (
-                <View style={[
-                  tw`overflow-hidden rounded-b-xl mt-1`,
-                  {
-                    backgroundColor: colors.cardSecondary,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isGlowEnabled ? 0.1 : 0,
-                    shadowRadius: isGlowEnabled ? 4 : 0,
-                    elevation: isGlowEnabled ? 3 : 0,
-                  }
-                ]}>
-                  <View style={[
-                    tw`px-2 py-1.5 flex-row justify-around`,
-                    { 
-                      backgroundColor: colors.cardSecondary,
-                      borderBottomLeftRadius: 12, 
-                      borderBottomRightRadius: 12 
-                    }
-                  ]}>
-                    {/* Edit Button */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        setExpandedMenuId(null)
-                        setEditingDaily(item)
-                        setIsEditModalVisible(true)
-                      }}
-                      style={[
-                        tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
-                        { backgroundColor: colors.textSecondary + '25' }
-                      ]}
-                    >
-                      <Ionicons name="pencil" size={14} color={colors.textSecondary} />
-                      <Text style={[tw`text-xs mt-0.5 font-medium`, { color: colors.textSecondary }]}>Edit</Text>
-                    </TouchableOpacity>
 
-                    {/* Delete Button */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        setExpandedMenuId(null)
-                        deleteDaily(item.id)
-                      }}
-                      style={[
-                        tw`flex-1 py-1.5 rounded-lg mx-0.5 items-center`,
-                        { backgroundColor: colors.error + '25' }
-                      ]}
-                    >
-                      <Ionicons name="trash" size={14} color={colors.error} />
-                      <Text style={[tw`text-xs mt-0.5 font-medium`, { color: colors.error }]}>Delete</Text>
-                    </TouchableOpacity>
+                {reminderLabel && (
+                  <View style={tw`mt-1.5 ml-9 mr-1`}> 
+                    <Text style={[tw`text-xs`, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {`Reminder ${reminderLabel}`}
+                    </Text>
                   </View>
-                </View>
-              )}
+                )}
+              </Pressable>
             </View>
           )
         }}
@@ -611,27 +584,40 @@ export default function DailiesScreen() {
               marginLeft: 2, // Fine adjustment for centering
             }
           ]}
-          onPress={() => setIsAddModalVisible(true)}
+          onPress={() => {
+            setEditingDaily(null)
+            setIsAddModalVisible(true)
+          }}
         >
           <Ionicons name="add" size={32} color="white" />
         </TouchableOpacity>
       </View>
 
-      <AddDailyModal
-        isVisible={isAddModalVisible}
-        onClose={() => setIsAddModalVisible(false)}
-        onAdd={addDaily}
-      />
-
-      <EditDailyModal
-        isVisible={isEditModalVisible}
-        onClose={() => {
-          setIsEditModalVisible(false)
-          setEditingDaily(null)
-        }}
-        daily={editingDaily}
-        onSave={updateDaily}
-      />
+      {editingDaily ? (
+        <AddDailyModal
+          isVisible={isAddModalVisible}
+          onClose={() => {
+            setIsAddModalVisible(false)
+            setEditingDaily(null)
+          }}
+          onAdd={(updatedDaily) => updateDaily(editingDaily.id, updatedDaily)}
+          initialValues={editingDaily}
+          onDelete={(dailyId) => {
+            setIsAddModalVisible(false)
+            setEditingDaily(null)
+            deleteDaily(dailyId)
+          }}
+        />
+      ) : (
+        <AddDailyModal
+          isVisible={isAddModalVisible}
+          onClose={() => {
+            setIsAddModalVisible(false)
+            setEditingDaily(null)
+          }}
+          onAdd={addDaily}
+        />
+      )}
     </SafeAreaView>
   )
 }

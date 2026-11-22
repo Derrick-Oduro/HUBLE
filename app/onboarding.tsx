@@ -251,7 +251,7 @@ export default function OnboardingScreen() {
         </View>
       </View>
 
-      <ScrollView style={tw`flex-1 px-6 pt-4`} showsVerticalScrollIndicator={false}>
+      <ScrollView style={tw`flex-1 px-2 pt-4`} showsVerticalScrollIndicator={false}>
         {step === 0 && (
           <View>
             <Text style={[tw`text-lg font-bold mb-2`, { color: colors.text }]}>What are you optimizing for?</Text>
@@ -343,7 +343,7 @@ export default function OnboardingScreen() {
             <Text style={[tw`text-lg font-bold mb-2`, { color: colors.text }]}>You are ready</Text>
             <Text style={[tw`mb-4`, { color: colors.textSecondary }]}>We will create your starter setup now:</Text>
 
-            <View style={[tw`rounded-2xl p-5`, { backgroundColor: colors.card }]}> 
+            <View style={[tw`rounded-2xl p-4`, { backgroundColor: colors.card }]}> 
               <Text style={[tw`text-sm mb-1`, { color: colors.textSecondary }]}>Goal</Text>
               <Text style={[tw`font-bold text-base mb-3`, { color: colors.text }]}>{selectedGoal.title}</Text>
 

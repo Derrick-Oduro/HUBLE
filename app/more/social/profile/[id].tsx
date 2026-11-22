@@ -95,7 +95,7 @@ export default function FriendProfile() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -114,7 +114,7 @@ export default function FriendProfile() {
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={[tw`rounded-2xl p-6 mb-4`, { backgroundColor: colors.card }]}> 
+            <View style={[tw`rounded-2xl p-4 mb-3`, { backgroundColor: colors.card }]}> 
               <View style={tw`items-center mb-4`}>
                 <View style={[tw`w-24 h-24 rounded-2xl items-center justify-center mb-3`, { backgroundColor: colors.cardSecondary }]}>
                   {friend.avatar ? (

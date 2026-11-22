@@ -48,9 +48,9 @@ const GameProgressBar = ({ value, max, color, label, icon, showLevel = false, co
               backgroundColor: color,
               shadowColor: color,
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.8,
+              shadowOpacity: 0,
               shadowRadius: 4,
-              elevation: 8,
+              elevation: 0,
             }
           ]}
         />
@@ -69,9 +69,9 @@ const StatCard = ({ icon, label, value, color, subtitle, colors }) => (
       borderColor: color + '30',
       shadowColor: color,
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
+      shadowOpacity: 0,
       shadowRadius: 4,
-      elevation: 3,
+      elevation: 0,
     }
   ]}>
     <View style={[
@@ -189,16 +189,16 @@ export default function Stats() {
       >
         {/* Character Level Card */}
         <View style={[
-          tw`mx-5 mb-6 rounded-2xl p-6`,
+          tw`mx-2 mb-6 rounded-2xl p-4`,
           {
             backgroundColor: colors.card,
             borderWidth: 3,
             borderColor: '#8B5CF6',
             shadowColor: '#8B5CF6',
             shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.3,
+            shadowOpacity: 0,
             shadowRadius: 16,
-            elevation: 12,
+            elevation: 0,
           }
         ]}>
           <View style={tw`flex-row items-center mb-4`}>
@@ -242,9 +242,9 @@ export default function Stats() {
                   backgroundColor: '#8B5CF6',
                   shadowColor: '#8B5CF6',
                   shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 1,
+                  shadowOpacity: 0,
                   shadowRadius: 8,
-                  elevation: 8,
+                  elevation: 0,
                 }
               ]}>
                 <View style={[
@@ -283,7 +283,7 @@ export default function Stats() {
 
         {/* Daily Quest Progress */}
         <View style={[
-          tw`mx-5 mb-6 rounded-2xl p-5`,
+          tw`mx-2 mb-6 rounded-2xl p-4`,
           { 
             backgroundColor: colors.card,
             borderWidth: 2,
@@ -325,7 +325,7 @@ export default function Stats() {
 
         {/* Combat Stats */}
         <View style={[
-          tw`mx-5 mb-6 rounded-2xl p-5`,
+          tw`mx-2 mb-6 rounded-2xl p-4`,
           { 
             backgroundColor: colors.card,
             borderWidth: 2,
@@ -378,7 +378,7 @@ export default function Stats() {
 
         {/* Achievement Unlocks */}
         <View style={[
-          tw`mx-5 rounded-2xl p-5`,
+          tw`mx-2 rounded-2xl p-4`,
           { 
             backgroundColor: colors.card,
             borderWidth: 2,

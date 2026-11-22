@@ -613,7 +613,7 @@ export default function Routines() {
       <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <ScrollView 
-        style={tw`flex-1 px-5 pt-2`}
+        style={tw`flex-1 px-2 pt-2`}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={tw`pb-20`}
         refreshControl={

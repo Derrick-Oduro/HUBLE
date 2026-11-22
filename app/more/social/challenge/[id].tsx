@@ -175,7 +175,7 @@ export default function ChallengeDetails() {
 
   const progressPercent = Math.min(100, Math.round((userProgress / goalValue) * 100))
   const isCompleted = hasJoined && userProgress >= goalValue
-  const challengeColor = challenge?.color || colors.accent
+  const challengeColor = colors.accent
   const challengeMode = `${challenge?.mode || "competitive"}`.toLowerCase()
   const teamTarget = Math.max(goalValue, normalizeNumber(challenge?.team_target, goalValue))
   const groupProgress = normalizeNumber(challenge?.group_progress, 0)
@@ -320,7 +320,7 @@ export default function ChallengeDetails() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}> 
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -334,7 +334,7 @@ export default function ChallengeDetails() {
         <ScrollView showsVerticalScrollIndicator={false}>
           <View
             style={[
-              tw`rounded-2xl p-6 mb-6`,
+              tw`rounded-2xl p-4 mb-4`,
               { backgroundColor: colors.card },
             ]}
           >
@@ -352,8 +352,8 @@ export default function ChallengeDetails() {
                 <View style={tw`flex-row items-center mb-1`}>
                   <Text style={[tw`text-xl font-bold mr-2`, { color: colors.text }]}>{challenge.title}</Text>
                   {challengeMode === "cooperative" && (
-                    <View style={[tw`px-2 py-1 rounded`, { backgroundColor: `${colors.success}20` }]}>
-                      <Text style={[tw`text-xs font-bold`, { color: colors.success }]}>CO-OP</Text>
+                    <View style={[tw`px-2 py-1 rounded`, { backgroundColor: colors.cardSecondary }]}>
+                      <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>CO-OP</Text>
                     </View>
                   )}
                 </View>
@@ -384,13 +384,13 @@ export default function ChallengeDetails() {
           {challengeMode === "cooperative" && (
             <View
               style={[
-                tw`rounded-2xl p-5 mb-6`,
+                tw`rounded-2xl p-4 mb-4`,
                 { backgroundColor: colors.card },
               ]}
             >
               <View style={tw`flex-row justify-between items-center mb-2`}>
                 <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>Team Progress</Text>
-                <Text style={[tw`font-bold`, { color: colors.success }]}>
+                <Text style={[tw`font-bold`, { color: challengeColor }]}>
                   {groupProgress}/{teamTarget}
                 </Text>
               </View>
@@ -400,7 +400,7 @@ export default function ChallengeDetails() {
                     tw`h-full rounded-full`,
                     {
                       width: `${cooperativeProgressPercent}%`,
-                      backgroundColor: colors.success,
+                      backgroundColor: challengeColor,
                     },
                   ]}
                 />
@@ -414,7 +414,7 @@ export default function ChallengeDetails() {
           {hasJoined && (
             <View
               style={[
-                tw`rounded-2xl p-5 mb-6`,
+                tw`rounded-2xl p-4 mb-4`,
                 { backgroundColor: colors.card },
               ]}
             >
@@ -443,7 +443,7 @@ export default function ChallengeDetails() {
 
           <View
             style={[
-              tw`rounded-2xl p-5 mb-6`,
+              tw`rounded-2xl p-4 mb-4`,
               { backgroundColor: colors.card },
             ]}
           >
@@ -458,7 +458,7 @@ export default function ChallengeDetails() {
 
           <View
             style={[
-              tw`rounded-2xl p-5 mb-6`,
+              tw`rounded-2xl p-4 mb-4`,
               { backgroundColor: colors.card },
             ]}
           >
@@ -484,7 +484,7 @@ export default function ChallengeDetails() {
             {challengeMode === "cooperative" && (
               <View style={tw`mb-3`}>
                 <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Mode</Text>
-                <Text style={[tw`font-semibold`, { color: colors.success }]}>Cooperative Team Challenge</Text>
+                <Text style={[tw`font-semibold`, { color: colors.text }]}>Cooperative Team Challenge</Text>
               </View>
             )}
 
@@ -508,9 +508,9 @@ export default function ChallengeDetails() {
                 backgroundColor: isCompleted ? colors.success : challengeColor,
                 shadowColor: isCompleted ? colors.success : challengeColor,
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
+                shadowOpacity: 0,
                 shadowRadius: 8,
-                elevation: 8,
+                elevation: 0,
                 opacity: submitting ? 0.8 : 1,
               },
             ]}

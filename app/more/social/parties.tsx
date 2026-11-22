@@ -98,7 +98,7 @@ export default function Parties() {
     return (
       <TouchableOpacity 
         style={[
-          tw`rounded-2xl p-4 mb-3`,
+          tw`rounded-2xl p-3 mb-2`,
           { backgroundColor: colors.card }
         ]}
         onPress={() => router.push(`/more/social/party/${party.id}`)}
@@ -115,13 +115,13 @@ export default function Parties() {
             <View style={tw`flex-row items-center mb-1`}>
               <Text style={[tw`font-bold text-base mr-2`, { color: colors.text }]}>{party.name}</Text>
               {isCooperative && (
-                <View style={[tw`px-2 py-1 rounded mr-2`, { backgroundColor: `${colors.success}20` }]}>
-                  <Text style={[tw`text-xs font-bold`, { color: colors.success }]}>CO-OP</Text>
+                <View style={[tw`px-2 py-1 rounded mr-2`, { backgroundColor: colors.cardSecondary }]}>
+                  <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>CO-OP</Text>
                 </View>
               )}
               {party.role === 'admin' && (
-                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: '#F59E0B20' }]}>
-                  <Text style={tw`text-yellow-400 text-xs font-bold`}>ADMIN</Text>
+                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: colors.cardSecondary }]}>
+                  <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>ADMIN</Text>
                 </View>
               )}
             </View>
@@ -141,13 +141,13 @@ export default function Parties() {
           <View style={tw`mb-3`}>
             <View style={tw`flex-row justify-between items-center mb-1`}>
               <Text style={[tw`text-sm`, { color: colors.text }]}>{weeklyGoalLabel}</Text>
-              <Text style={[tw`text-sm font-bold`, { color: color }]}>{weeklyPoints}/{weeklyGoalTarget} pts</Text>
+              <Text style={[tw`text-sm font-bold`, { color: colors.text }]}>{weeklyPoints}/{weeklyGoalTarget} pts</Text>
             </View>
             <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
               <View 
                 style={[
                   tw`h-full rounded-full`,
-                  { width: `${progress}%`, backgroundColor: color }
+                  { width: `${progress}%`, backgroundColor: colors.accent }
                 ]} 
               />
             </View>
@@ -157,10 +157,10 @@ export default function Parties() {
 
         <View style={[tw`flex-row justify-between items-center pt-3 border-t`, { borderColor: colors.cardSecondary }]}>
           <TouchableOpacity 
-            style={[tw`flex-1 mr-2 py-2 rounded-lg`, { backgroundColor: `${color}20` }]}
+            style={[tw`flex-1 mr-2 py-2 rounded-lg`, { backgroundColor: colors.cardSecondary }]}
             onPress={() => router.push(`/more/social/party/${party.id}`)}
           >
-            <Text style={[tw`text-center font-semibold`, { color: color }]}>
+            <Text style={[tw`text-center font-semibold`, { color: colors.text }]}>
               View Details
             </Text>
           </TouchableOpacity>
@@ -196,7 +196,7 @@ export default function Parties() {
     
     return (
       <View style={[
-        tw`rounded-2xl p-4 mb-3`,
+        tw`rounded-2xl p-3 mb-2`,
         { backgroundColor: colors.card }
       ]}>
         <View style={tw`flex-row items-center mb-3`}>
@@ -243,7 +243,7 @@ export default function Parties() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
@@ -308,9 +308,9 @@ export default function Parties() {
                     backgroundColor: colors.accent,
                     shadowColor: colors.accent,
                     shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
+                    shadowOpacity: 0,
                     shadowRadius: 8,
-                    elevation: 8,
+                    elevation: 0,
                   }
                 ]} 
                 onPress={() => router.push('/more/social/create-party')}

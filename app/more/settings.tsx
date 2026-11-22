@@ -177,7 +177,7 @@ export default function Settings() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
@@ -238,7 +238,7 @@ export default function Settings() {
           ))}
 
           {/* App Info */}
-          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+          <View style={[tw`rounded-2xl p-4 mb-6`, { backgroundColor: colors.card }]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>About</Text>
             <View style={tw`space-y-3`}>
               <View style={tw`flex-row justify-between`}>

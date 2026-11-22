@@ -10,6 +10,7 @@ class Daily {
     this.difficulty = data.difficulty;
     this.category = data.category;
     this.due_date = data.due_date;
+    this.reminder_time = data.reminder_time || null;
     this.tags =
       typeof data.tags === "string"
         ? data.tags
@@ -25,8 +26,8 @@ class Daily {
       console.log("🔄 Creating daily in database:", dailyData);
 
       const result = await database.run(
-        `INSERT INTO dailies (user_id, title, description, priority, difficulty, category, due_date, tags)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO dailies (user_id, title, description, priority, difficulty, category, due_date, reminder_time, tags)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dailyData.user_id,
           dailyData.title,
@@ -35,10 +36,11 @@ class Daily {
           dailyData.difficulty || "medium",
           dailyData.category || "General",
           dailyData.due_date,
+          dailyData.reminder_time || null,
           typeof dailyData.tags === "string"
             ? dailyData.tags
             : JSON.stringify(dailyData.tags || []),
-        ]
+        ],
       );
 
       console.log("✅ Daily created with ID:", result.lastID);
@@ -64,7 +66,7 @@ class Daily {
          FROM dailies d 
          WHERE d.user_id = ?
          ORDER BY d.created_at DESC`,
-        [userId]
+        [userId],
       );
 
       console.log("✅ Found dailies:", dailies.length);
@@ -74,7 +76,7 @@ class Daily {
           new Daily({
             ...daily,
             is_completed_today: Boolean(daily.is_completed_today),
-          })
+          }),
       );
     } catch (error) {
       console.error("❌ Error finding dailies:", error);
@@ -94,7 +96,7 @@ class Daily {
          ) as is_completed_today
          FROM dailies d 
          WHERE d.id = ?`,
-        [id]
+        [id],
       );
 
       if (!daily) return null;
@@ -118,19 +120,67 @@ class Daily {
       await database.run(
         `INSERT OR IGNORE INTO daily_completions (daily_id, user_id, completion_date)
          VALUES (?, ?, ?)`,
-        [dailyId, userId, today]
+        [dailyId, userId, today],
       );
 
       // Update timestamp
       await database.run(
         `UPDATE dailies SET updated_at = CURRENT_TIMESTAMP 
          WHERE id = ?`,
-        [dailyId]
+        [dailyId],
       );
 
       return true;
     } catch (error) {
       console.error("❌ Error marking daily completed:", error);
+      throw error;
+    }
+  }
+
+  // Update daily
+  async update(updateData) {
+    try {
+      await database.run(
+        `UPDATE dailies
+         SET title = ?,
+             description = ?,
+             priority = ?,
+             difficulty = ?,
+             category = ?,
+             due_date = ?,
+             reminder_time = ?,
+             tags = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          updateData.title ?? this.title,
+          updateData.description ?? this.description ?? "",
+          updateData.priority ?? this.priority ?? "medium",
+          updateData.difficulty ?? this.difficulty ?? "medium",
+          updateData.category ?? this.category ?? "General",
+          updateData.due_date === undefined
+            ? this.due_date
+            : updateData.due_date,
+          updateData.reminder_time === undefined
+            ? this.reminder_time
+            : updateData.reminder_time,
+          typeof (updateData.tags === undefined
+            ? this.tags
+            : updateData.tags) === "string"
+            ? updateData.tags === undefined
+              ? this.tags
+              : updateData.tags
+            : JSON.stringify(
+                (updateData.tags === undefined ? this.tags : updateData.tags) ||
+                  [],
+              ),
+          this.id,
+        ],
+      );
+
+      return true;
+    } catch (error) {
+      console.error("❌ Error updating daily:", error);
       throw error;
     }
   }

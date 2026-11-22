@@ -149,11 +149,9 @@ export default function GroupBadges() {
   const EarnedBadgeCard = ({ badge }: { badge: SocialBadge }) => (
     <View
       style={[
-        tw`rounded-2xl p-5 mb-4`,
+        tw`rounded-2xl p-4 mb-3`,
         {
           backgroundColor: colors.card,
-          borderWidth: 2,
-          borderColor: `${getRarityColor(badge.rarity)}40`,
         },
       ]}
     >
@@ -162,13 +160,11 @@ export default function GroupBadges() {
           style={[
             tw`w-16 h-16 rounded-2xl items-center justify-center mr-4`,
             {
-              backgroundColor: `${badge.color}20`,
-              borderWidth: 2,
-              borderColor: badge.color,
+              backgroundColor: colors.cardSecondary,
             },
           ]}
         >
-          <Ionicons name={badge.icon as any} size={28} color={badge.color} />
+          <Ionicons name={badge.icon as any} size={28} color={colors.textSecondary} />
         </View>
 
         <View style={tw`flex-1`}>
@@ -177,13 +173,13 @@ export default function GroupBadges() {
             <View
               style={[
                 tw`px-2 py-1 rounded`,
-                { backgroundColor: `${getRarityColor(badge.rarity)}20` },
+                { backgroundColor: colors.cardSecondary },
               ]}
             >
               <Text
                 style={[
                   tw`text-xs font-bold uppercase`,
-                  { color: getRarityColor(badge.rarity) },
+                  { color: colors.textSecondary },
                 ]}
               >
                 {badge.rarity}
@@ -209,7 +205,7 @@ export default function GroupBadges() {
     return (
       <View
         style={[
-          tw`rounded-2xl p-5 mb-4`,
+          tw`rounded-2xl p-4 mb-3`,
           { backgroundColor: colors.card },
         ]}
       >
@@ -217,10 +213,10 @@ export default function GroupBadges() {
           <View
             style={[
               tw`w-16 h-16 rounded-2xl items-center justify-center mr-4`,
-              { backgroundColor: `${badge.color}20` },
+              { backgroundColor: colors.cardSecondary },
             ]}
           >
-            <Ionicons name={badge.icon as any} size={28} color={badge.color} />
+            <Ionicons name={badge.icon as any} size={28} color={colors.textSecondary} />
           </View>
 
           <View style={tw`flex-1`}>
@@ -229,13 +225,13 @@ export default function GroupBadges() {
               <View
                 style={[
                   tw`px-2 py-1 rounded`,
-                  { backgroundColor: `${getRarityColor(badge.rarity)}20` },
+                  { backgroundColor: colors.cardSecondary },
                 ]}
               >
                 <Text
                   style={[
                     tw`text-xs font-bold uppercase`,
-                    { color: getRarityColor(badge.rarity) },
+                    { color: colors.textSecondary },
                   ]}
                 >
                   {badge.rarity}
@@ -249,14 +245,14 @@ export default function GroupBadges() {
         <View style={tw`mb-4`}>
           <View style={tw`flex-row justify-between items-center mb-2`}>
             <Text style={[tw`font-medium`, { color: colors.text }]}>Progress</Text>
-            <Text style={[tw`font-bold`, { color: badge.color }]}>{progressPercent}%</Text>
+            <Text style={[tw`font-bold`, { color: colors.text }]}>{progressPercent}%</Text>
           </View>
 
           <View style={[tw`h-3 rounded-full overflow-hidden mb-2`, { backgroundColor: colors.cardSecondary }]}>
             <View
               style={[
                 tw`h-full rounded-full`,
-                { width: `${progressPercent}%`, backgroundColor: badge.color },
+                { width: `${progressPercent}%`, backgroundColor: colors.accent },
               ]}
             />
           </View>
@@ -292,7 +288,7 @@ export default function GroupBadges() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -303,7 +299,7 @@ export default function GroupBadges() {
         <ScrollView showsVerticalScrollIndicator={false}>
           <View
             style={[
-              tw`rounded-2xl p-5 mb-6`,
+              tw`rounded-2xl p-4 mb-4`,
               { backgroundColor: colors.card },
             ]}
           >
@@ -361,7 +357,7 @@ export default function GroupBadges() {
 
           <View
             style={[
-              tw`rounded-2xl p-5`,
+              tw`rounded-2xl p-4`,
               { backgroundColor: colors.card },
             ]}
           >

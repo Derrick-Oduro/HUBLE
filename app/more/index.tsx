@@ -222,7 +222,7 @@ export default function More() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-6`}>
         
         {/* Profile Card - Compact Premium Design */}
-        <View style={tw`mx-5 mb-5`}>
+        <View style={tw`mx-2 mb-5`}>
           <View style={[
             tw`rounded-2xl overflow-hidden`,
             {
@@ -462,8 +462,8 @@ export default function More() {
           </View>
         </View>
 
-        {/* Account Section - slightly more compact */}
-        <View style={tw`px-5 mb-5`}> {/* mb-6 → mb-5 */}
+        {/* Account Section */}
+        <View style={tw`px-2 mb-3`}>
           <Text style={[tw`text-xl font-bold mb-3`, { color: colors.text }]}>Account</Text> {/* mb-4 → mb-3 */}
           <View style={tw`space-y-2`}> {/* space-y-3 → space-y-2 */}
             {accountItems.map((item, index) => (
@@ -499,8 +499,8 @@ export default function More() {
           </View>
         </View>
 
-        {/* App Settings Section - slightly more compact */}
-        <View style={tw`px-5 mb-5`}> {/* mb-6 → mb-5 */}
+        {/* App Settings Section */}
+        <View style={tw`px-2 mb-3`}>
           <Text style={[tw`text-xl font-bold mb-3`, { color: colors.text }]}>App Settings</Text> {/* mb-4 → mb-3 */}
           <View style={[tw`rounded-xl overflow-hidden`, { backgroundColor: colors.card }]}> {/* rounded-2xl → rounded-xl */}
             {appItems.map((item, index) => (
@@ -530,7 +530,7 @@ export default function More() {
         </View>
 
         {/* Logout Section - keep the same */}
-        <View style={tw`px-5`}>
+        <View style={tw`px-2`}>
           <TouchableOpacity 
             style={[
               tw`rounded-2xl p-4 flex-row items-center justify-center`,

@@ -206,7 +206,7 @@ export default function Leaderboards() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -242,7 +242,7 @@ export default function Leaderboards() {
         </View>
 
         {leaderboard.length === 0 ? (
-          <View style={[tw`rounded-2xl p-6 items-center`, { backgroundColor: colors.card }]}> 
+          <View style={[tw`rounded-2xl p-4 items-center`, { backgroundColor: colors.card }]}> 
             <Ionicons name="podium-outline" size={40} color={colors.textSecondary} />
             <Text style={[tw`mt-3 text-base`, { color: colors.textSecondary }]}>No leaderboard data available yet.</Text>
           </View>

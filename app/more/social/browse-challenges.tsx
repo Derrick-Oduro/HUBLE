@@ -152,7 +152,7 @@ export default function BrowseChallenges() {
     return (
       <TouchableOpacity
         style={[
-          tw`rounded-2xl p-4 mb-3`,
+          tw`rounded-2xl p-3 mb-2`,
           { backgroundColor: colors.card },
         ]}
         onPress={() => router.push(`/more/social/challenge/${challenge.id}`)}
@@ -171,8 +171,8 @@ export default function BrowseChallenges() {
             <View style={tw`flex-row items-center mb-1`}>
               <Text style={[tw`font-bold text-base mr-2`, { color: colors.text }]}>{challenge.title}</Text>
               {mode === "cooperative" && (
-                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: `${colors.success}20` }]}>
-                  <Text style={[tw`text-xs font-bold`, { color: colors.success }]}>CO-OP</Text>
+                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: colors.cardSecondary }]}>
+                  <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>CO-OP</Text>
                 </View>
               )}
             </View>
@@ -182,27 +182,13 @@ export default function BrowseChallenges() {
           <View
             style={[
               tw`px-2 py-1 rounded`,
-              {
-                backgroundColor:
-                  difficulty === "hard"
-                    ? "#EF444420"
-                    : difficulty === "medium"
-                      ? "#F59E0B20"
-                      : "#10B98120",
-              },
+              { backgroundColor: colors.cardSecondary },
             ]}
           >
             <Text
               style={[
                 tw`text-xs font-bold capitalize`,
-                {
-                  color:
-                    difficulty === "hard"
-                      ? "#EF4444"
-                      : difficulty === "medium"
-                        ? "#F59E0B"
-                        : "#10B981",
-                },
+                { color: colors.textSecondary },
               ]}
             >
               {difficulty}
@@ -217,7 +203,7 @@ export default function BrowseChallenges() {
           </View>
 
           <View style={tw`items-end`}>
-            <Text style={[tw`text-sm font-semibold`, { color }]}>🏆 {challenge.reward || "Challenge reward"}</Text>
+            <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>🏆 {challenge.reward || "Challenge reward"}</Text>
             <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>⏰ {getTimeLabel(challenge)}</Text>
           </View>
         </View>
@@ -228,7 +214,7 @@ export default function BrowseChallenges() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}> 
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -262,9 +248,9 @@ export default function BrowseChallenges() {
                   style={[
                     tw`mr-3 px-4 py-2 rounded-xl flex-row items-center`,
                     {
-                      backgroundColor: selectedCategory === category.id ? `${category.color}20` : colors.cardSecondary,
+                      backgroundColor: selectedCategory === category.id ? `${colors.accent}14` : colors.cardSecondary,
                       borderWidth: selectedCategory === category.id ? 1 : 0,
-                      borderColor: selectedCategory === category.id ? category.color : "transparent",
+                      borderColor: selectedCategory === category.id ? colors.accent : "transparent",
                     },
                   ]}
                   onPress={() => setSelectedCategory(category.id)}
@@ -273,7 +259,7 @@ export default function BrowseChallenges() {
                   <Text
                     style={[
                       tw`font-semibold`,
-                      { color: selectedCategory === category.id ? category.color : colors.textSecondary },
+                      { color: selectedCategory === category.id ? colors.accent : colors.textSecondary },
                     ]}
                   >
                     {category.name}

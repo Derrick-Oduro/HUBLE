@@ -84,7 +84,9 @@ export const habitsAPI = {
       description: habitData.description,
       difficulty: habitData.difficulty,
       color: habitData.color,
-      target_days: habitData.targetDays || [1, 2, 3, 4, 5, 6, 0]
+      target_days: habitData.targetDays || [1, 2, 3, 4, 5, 6, 0],
+      due_time: habitData.dueTime || null,
+      reminder_time: habitData.reminderTime || null,
     }),
   }),
 
@@ -96,7 +98,9 @@ export const habitsAPI = {
       description: habitData.description,
       difficulty: habitData.difficulty,
       color: habitData.color,
-      target_days: habitData.targetDays
+      target_days: habitData.targetDays,
+      due_time: habitData.dueTime ?? null,
+      reminder_time: habitData.reminderTime ?? null,
     }),
   }),
 
@@ -126,6 +130,7 @@ export const dailiesAPI = {
       difficulty: dailyData.difficulty,
       category: dailyData.category,
       due_date: dailyData.dueDate,
+      reminder_time: dailyData.reminderTime || null,
       tags: JSON.stringify(dailyData.tags || [])
     }),
   }),
@@ -140,6 +145,7 @@ export const dailiesAPI = {
       difficulty: dailyData.difficulty,
       category: dailyData.category,
       due_date: dailyData.dueDate,
+      reminder_time: dailyData.reminderTime ?? null,
       tags: JSON.stringify(dailyData.tags || [])
     }),
   }),

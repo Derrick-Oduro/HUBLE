@@ -51,6 +51,7 @@ class Database {
           `ALTER TABLE dailies ADD COLUMN priority TEXT DEFAULT "medium"`,
           `ALTER TABLE dailies ADD COLUMN category TEXT DEFAULT "General"`,
           `ALTER TABLE dailies ADD COLUMN due_date TEXT`,
+          `ALTER TABLE dailies ADD COLUMN reminder_time TEXT`,
           `ALTER TABLE dailies ADD COLUMN tags TEXT DEFAULT "[]"`,
         ];
 
@@ -150,6 +151,48 @@ class Database {
       }
     } catch (error) {
       console.error("❌ Error fixing users table:", error);
+      throw error;
+    }
+  }
+
+  async fixHabitsTable() {
+    try {
+      console.log("🔧 Fixing habits table...");
+      const tableInfo = await this.all("PRAGMA table_info(habits)");
+
+      const hasDueTime = tableInfo.some((column) => column.name === "due_time");
+      if (!hasDueTime) {
+        await this.run("ALTER TABLE habits ADD COLUMN due_time TEXT");
+        console.log("✅ Added habits column: due_time");
+      }
+
+      const hasReminderTime = tableInfo.some(
+        (column) => column.name === "reminder_time",
+      );
+      if (!hasReminderTime) {
+        await this.run("ALTER TABLE habits ADD COLUMN reminder_time TEXT");
+        console.log("✅ Added habits column: reminder_time");
+      }
+    } catch (error) {
+      console.error("❌ Error fixing habits table:", error);
+      throw error;
+    }
+  }
+
+  async fixDailiesTable() {
+    try {
+      console.log("🔧 Fixing dailies table...");
+      const tableInfo = await this.all("PRAGMA table_info(dailies)");
+
+      const hasReminderTime = tableInfo.some(
+        (column) => column.name === "reminder_time",
+      );
+      if (!hasReminderTime) {
+        await this.run("ALTER TABLE dailies ADD COLUMN reminder_time TEXT");
+        console.log("✅ Added dailies column: reminder_time");
+      }
+    } catch (error) {
+      console.error("❌ Error fixing dailies table:", error);
       throw error;
     }
   }
@@ -361,6 +404,8 @@ class Database {
         difficulty TEXT DEFAULT 'medium',
         color TEXT DEFAULT '#3B82F6',
         target_days TEXT DEFAULT '[1,2,3,4,5,6,0]',
+        due_time TEXT,
+        reminder_time TEXT,
         streak INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -389,6 +434,7 @@ class Database {
         difficulty TEXT DEFAULT 'medium',
         category TEXT DEFAULT 'General',
         due_date TEXT,
+        reminder_time TEXT,
         tags TEXT DEFAULT '[]',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -657,6 +703,8 @@ class Database {
       }
     }
 
+    await this.fixHabitsTable();
+    await this.fixDailiesTable();
     await this.fixUsersTable();
     await this.fixPartiesTable();
     await this.fixChallengesTable();

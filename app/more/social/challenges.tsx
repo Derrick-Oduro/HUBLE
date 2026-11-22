@@ -64,7 +64,7 @@ export default function Challenges() {
     return (
       <TouchableOpacity 
         style={[
-          tw`rounded-2xl p-4 mb-3`,
+          tw`rounded-2xl p-3 mb-2`,
           { backgroundColor: colors.card }
         ]}
         onPress={() => router.push(`/more/social/challenge/${challenge.id}`)}
@@ -81,8 +81,8 @@ export default function Challenges() {
             <View style={tw`flex-row items-center mb-1`}>
               <Text style={[tw`font-bold text-base mr-2`, { color: colors.text }]}>{challenge.title}</Text>
               {isCooperative && (
-                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: `${colors.success}20` }]}>
-                  <Text style={[tw`text-xs font-bold`, { color: colors.success }]}>CO-OP</Text>
+                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: colors.cardSecondary }]}>
+                  <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>CO-OP</Text>
                 </View>
               )}
             </View>
@@ -91,17 +91,11 @@ export default function Challenges() {
           
           <View style={[
             tw`px-2 py-1 rounded`,
-            { 
-              backgroundColor: difficulty === 'Hard' ? '#EF444420' : 
-                               difficulty === 'Medium' ? '#F59E0B20' : '#10B98120'
-            }
+            { backgroundColor: colors.cardSecondary }
           ]}>
             <Text style={[
               tw`text-xs font-bold`,
-              { 
-                color: difficulty === 'Hard' ? '#EF4444' : 
-                       difficulty === 'Medium' ? '#F59E0B' : '#10B981'
-              }
+              { color: colors.textSecondary }
             ]}>
               {difficulty}
             </Text>
@@ -112,7 +106,7 @@ export default function Challenges() {
           <View style={tw`mb-3`}>
             <View style={tw`flex-row justify-between items-center mb-1`}>
               <Text style={[tw`text-sm`, { color: colors.text }]}>Your Progress</Text>
-              <Text style={[tw`text-sm font-bold`, { color: color }]}>
+              <Text style={[tw`text-sm font-bold`, { color: colors.accent }]}>
                 {challenge.progress}%
               </Text>
             </View>
@@ -120,7 +114,7 @@ export default function Challenges() {
               <View 
                 style={[
                   tw`h-full rounded-full`,
-                  { width: `${challenge.progress}%`, backgroundColor: color }
+                  { width: `${challenge.progress}%`, backgroundColor: colors.accent }
                 ]} 
               />
             </View>
@@ -172,7 +166,7 @@ export default function Challenges() {
           
           <View style={tw`items-end`}>
             {(challenge.reward_xp || challenge.reward_coins) && (
-              <Text style={[tw`text-sm font-semibold`, { color: color }]}>
+              <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>
                 {challenge.reward_xp > 0 && `⭐${challenge.reward_xp} XP `}
                 {challenge.reward_coins > 0 && `💰${challenge.reward_coins}`}
               </Text>
@@ -189,10 +183,10 @@ export default function Challenges() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         
         {/* Header */}
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
+        <View style={tw`flex-row items-center mb-3 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -207,7 +201,7 @@ export default function Challenges() {
 
         {/* Tab Navigation */}
         <View style={[
-          tw`rounded-2xl p-1 mb-6 flex-row`,
+          tw`rounded-2xl p-1 mb-3 flex-row`,
           { backgroundColor: colors.card }
         ]}>
           {[

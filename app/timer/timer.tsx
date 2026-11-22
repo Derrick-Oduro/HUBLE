@@ -895,9 +895,9 @@ export default function Timer() {
                   transform: [{ scale: pulseAnim }],
                   shadowColor: selectedHabit?.color || colors.accent,
                   shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.2,
+                  shadowOpacity: 0,
                   shadowRadius: 20,
-                  elevation: 10,
+                  elevation: 0,
                 }
               ]}
             >
@@ -990,9 +990,9 @@ export default function Timer() {
                 backgroundColor: selectedHabit?.color || colors.accent,
                 shadowColor: selectedHabit?.color || colors.accent,
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
+                shadowOpacity: 0,
                 shadowRadius: 8,
-                elevation: 8,
+                elevation: 0,
               }
             ]} 
             onPress={toggleTimer}

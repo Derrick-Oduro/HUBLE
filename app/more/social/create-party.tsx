@@ -78,7 +78,7 @@ export default function CreateParty() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -87,7 +87,7 @@ export default function CreateParty() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+          <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Basic Information</Text>
 
             <View style={tw`mb-4`}>
@@ -128,7 +128,7 @@ export default function CreateParty() {
             </View>
           </View>
 
-          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+          <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Weekly Shared Goal</Text>
 
             <View style={tw`mb-4`}>
@@ -175,7 +175,7 @@ export default function CreateParty() {
             </View>
           </View>
 
-          <View style={[tw`rounded-2xl p-5 mb-6`, { backgroundColor: colors.card }]}>
+          <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Party Settings</Text>
 
             <View style={tw`flex-row justify-between items-center mb-4`}>

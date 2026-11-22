@@ -120,7 +120,7 @@ export default function Achievements() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
@@ -132,14 +132,14 @@ export default function Achievements() {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Overall Progress */}
           <View style={[
-            tw`rounded-2xl p-6 mb-6`,
+            tw`rounded-2xl p-4 mb-6`,
             {
               backgroundColor: colors.card,
               shadowColor: '#F59E0B',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
+              shadowOpacity: 0,
               shadowRadius: 12,
-              elevation: 8,
+              elevation: 0,
             }
           ]}>
             <View style={tw`flex-row items-center mb-4`}>
@@ -176,9 +176,9 @@ export default function Achievements() {
                       width: `${totalAchievements > 0 ? (unlockedAchievements / totalAchievements) * 100 : 0}%`,
                       shadowColor: '#F59E0B',
                       shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.6,
+                      shadowOpacity: 0,
                       shadowRadius: 4,
-                      elevation: 3,
+                      elevation: 0,
                     }
                   ]}
                 />
@@ -189,7 +189,7 @@ export default function Achievements() {
           {/* Achievement Categories */}
           {achievementCategories.map((category) => (
             <View key={category.id} style={[
-              tw`rounded-2xl p-5 mb-6`,
+              tw`rounded-2xl p-4 mb-6`,
               { backgroundColor: colors.card }
             ]}>
               <View style={tw`flex-row items-center mb-4`}>

@@ -142,9 +142,9 @@ export default function Avatar() {
           borderColor: selectedColor,
           shadowColor: selectedColor,
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.8,
+          shadowOpacity: 0,
           shadowRadius: 8,
-          elevation: 8,
+          elevation: 0,
         }
       case "rainbow":
         return {
@@ -159,9 +159,9 @@ export default function Avatar() {
           borderWidth: 4,
           shadowColor: "#FFD700",
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 1,
+          shadowOpacity: 0,
           shadowRadius: 12,
-          elevation: 12,
+          elevation: 0,
         }
       default:
         return {
@@ -192,10 +192,10 @@ export default function Avatar() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={tw`flex-1 px-5`} showsVerticalScrollIndicator={false}>
+      <ScrollView style={tw`flex-1 px-2`} showsVerticalScrollIndicator={false}>
         {/* Avatar Preview */}
         <View style={[
-          tw`rounded-2xl p-6 mb-6 items-center`,
+          tw`rounded-2xl p-4 mb-6 items-center`,
           { 
             backgroundColor: colors.card,
             ...getBorderStyle(selectedBorder),

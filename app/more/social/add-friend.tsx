@@ -58,12 +58,12 @@ export default function AddFriend() {
       <View style={tw`flex-row items-center`}>
         <View style={[
           tw`w-12 h-12 rounded-xl items-center justify-center mr-3`,
-          { backgroundColor: colors.accent + '20', borderWidth: 1, borderColor: colors.accent }
+          { backgroundColor: colors.cardSecondary }
         ]}>
           {user.avatar ? (
             <Text style={tw`text-lg`}>{user.avatar}</Text>
           ) : (
-            <Ionicons name="person" size={24} color={colors.accent} />
+            <Ionicons name="person" size={24} color={colors.textSecondary} />
           )}
         </View>
         
@@ -73,9 +73,9 @@ export default function AddFriend() {
             {user.level && (
               <View style={[
                 tw`px-2 py-1 rounded`,
-                { backgroundColor: colors.accent + '30' }
+                { backgroundColor: colors.cardSecondary }
               ]}>
-                <Text style={[tw`text-xs font-semibold`, { color: colors.accent }]}>Lvl {user.level}</Text>
+                <Text style={[tw`text-xs font-semibold`, { color: colors.textSecondary }]}>Lvl {user.level}</Text>
               </View>
             )}
           </View>
@@ -83,7 +83,7 @@ export default function AddFriend() {
             <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{user.email}</Text>
           )}
           {showReason && user.reason && (
-            <Text style={[tw`text-sm mt-1`, { color: colors.accent }]}>💡 {user.reason}</Text>
+            <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>{user.reason}</Text>
           )}
         </View>
         
@@ -100,10 +100,10 @@ export default function AddFriend() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         
         {/* Header */}
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
+        <View style={tw`flex-row items-center mb-3 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -112,7 +112,7 @@ export default function AddFriend() {
 
         {/* Tab Navigation */}
         <View style={[
-          tw`rounded-2xl p-1 mb-6 flex-row`,
+          tw`rounded-2xl p-1 mb-3 flex-row`,
           { backgroundColor: colors.card }
         ]}>
           <TouchableOpacity

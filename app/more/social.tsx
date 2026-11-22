@@ -167,7 +167,7 @@ export default function Social() {
       title: "Friends",
       description: "Add friends and view their progress",
       count: socialStats.friends,
-      color: "#10B981",
+      color: colors.accent,
       action: () => router.push('/more/social/friends')
     },
     {
@@ -175,7 +175,7 @@ export default function Social() {
       title: "Parties",
       description: "Join groups for shared goals",
       count: socialStats.parties,
-      color: "#8B5CF6",
+      color: colors.accent,
       action: () => router.push('/more/social/parties')
     },
     {
@@ -183,7 +183,7 @@ export default function Social() {
       title: "Challenges",
       description: "Compete in community challenges",
       count: socialStats.activeChallenges,
-      color: "#F59E0B",
+      color: colors.accent,
       action: () => router.push('/more/social/challenges')
     },
     {
@@ -191,7 +191,7 @@ export default function Social() {
       title: "Group Badges",
       description: "Achievements earned with others",
       count: socialStats.groupBadges,
-      color: "#EC4899",
+      color: colors.accent,
       action: () => router.push('/more/social/group-badges')
     }
   ]
@@ -199,7 +199,7 @@ export default function Social() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         
         {/* Header */}
         <View style={tw`flex-row items-center justify-between mb-6 mt-2`}>
@@ -221,26 +221,15 @@ export default function Social() {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Social Stats Overview */}
           <View style={[
-            tw`rounded-2xl p-6 mb-6`,
-            {
-              backgroundColor: colors.card, // ← THEME: Use theme card color
-              shadowColor: '#EC4899',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
-              shadowRadius: 12,
-              elevation: 8,
-            }
+            tw`rounded-2xl p-4 mb-4`,
+            { backgroundColor: colors.card }
           ]}>
             <View style={tw`flex-row items-center mb-4`}>
               <View style={[
                 tw`w-16 h-16 rounded-2xl items-center justify-center mr-4`,
-                {
-                  backgroundColor: '#EC489920',
-                  borderWidth: 2,
-                  borderColor: '#EC4899',
-                }
+                { backgroundColor: colors.cardSecondary }
               ]}>
-                <Ionicons name="people" size={28} color="#EC4899" />
+                <Ionicons name="people" size={28} color={colors.textSecondary} />
               </View>
               <View style={tw`flex-1`}>
                 <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Social Profile</Text>
@@ -279,29 +268,22 @@ export default function Social() {
                   key={index}
                   style={[
                     tw`w-40 rounded-2xl p-4 mb-4`,
-                    {
-                      backgroundColor: colors.card, // ← THEME: Use theme card color
-                      shadowColor: feature.color,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 8,
-                      elevation: 4,
-                    }
+                    { backgroundColor: colors.card }
                   ]}
                   onPress={feature.action}
                 >
                   <View style={[
                     tw`w-12 h-12 rounded-xl items-center justify-center mb-3`,
-                    { backgroundColor: `${feature.color}20` }
+                    { backgroundColor: colors.cardSecondary }
                   ]}>
-                    <Ionicons name={feature.icon} size={24} color={feature.color} />
+                    <Ionicons name={feature.icon} size={24} color={colors.textSecondary} />
                   </View>
                   
                   <Text style={[tw`font-bold text-base mb-1`, { color: colors.text }]}>{feature.title}</Text>
                   <Text style={[tw`text-sm mb-3`, { color: colors.textSecondary }]}>{feature.description}</Text>
                   
                   <View style={tw`flex-row items-center justify-between`}>
-                    <Text style={[tw`font-bold text-lg`, { color: feature.color }]}>
+                    <Text style={[tw`font-bold text-lg`, { color: colors.text }]}>
                       {feature.count}
                     </Text>
                     <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
@@ -313,13 +295,13 @@ export default function Social() {
 
           {/* Recent Activity */}
           <View style={[
-            tw`rounded-2xl p-5 mb-6`,
+            tw`rounded-2xl p-4 mb-4`,
             { backgroundColor: colors.card } // ← THEME: Use theme card color
           ]}>
             <View style={tw`flex-row justify-between items-center mb-4`}>
               <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>Recent Activity</Text>
               <TouchableOpacity>
-                <Text style={tw`text-pink-400 font-semibold`}>View All</Text>
+                <Text style={[tw`font-semibold`, { color: colors.textSecondary }]}>View All</Text>
               </TouchableOpacity>
             </View>
             
@@ -327,12 +309,12 @@ export default function Social() {
               <View key={activity.id} style={[tw`flex-row items-center py-3 border-b last:border-b-0`, { borderColor: colors.cardSecondary }]}>
                 <View style={[
                   tw`w-10 h-10 rounded-lg items-center justify-center mr-3`,
-                  { backgroundColor: `${activity.color}20` }
+                  { backgroundColor: colors.cardSecondary }
                 ]}>
                   <Ionicons
                     name={activity.icon as keyof typeof Ionicons.glyphMap}
                     size={20}
-                    color={activity.color}
+                    color={colors.textSecondary}
                   />
                 </View>
                 
@@ -348,7 +330,7 @@ export default function Social() {
                   <Ionicons
                     name={activity.hasCheered ? "heart" : "heart-outline"}
                     size={18}
-                    color={activity.hasCheered ? "#EC4899" : colors.textSecondary}
+                    color={activity.hasCheered ? colors.accent : colors.textSecondary}
                   />
                   <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>{activity.cheersCount}</Text>
                 </TouchableOpacity>
@@ -358,7 +340,7 @@ export default function Social() {
 
           {/* Quick Actions */}
           <View style={[
-            tw`rounded-2xl p-5 mb-6`,
+            tw`rounded-2xl p-4 mb-4`,
             { backgroundColor: colors.card } // ← THEME: Use theme card color
           ]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Quick Actions</Text>
@@ -366,31 +348,19 @@ export default function Social() {
             <View style={tw`flex-row justify-between`}>
               <TouchableOpacity 
                 style={[
-                  tw`flex-1 bg-green-600 rounded-xl p-4 mr-2 items-center`,
-                  {
-                    shadowColor: '#10B981',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 4,
-                    elevation: 4,
-                  }
+                  tw`flex-1 rounded-xl p-4 mr-2 items-center`,
+                  { backgroundColor: colors.cardSecondary }
                 ]}
                 onPress={() => router.push('/more/social/add-friend')}
               >
-                <Ionicons name="person-add" size={24} color="white" style={tw`mb-2`} />
-                <Text style={tw`text-white font-bold text-sm`}>Add Friend</Text>
+                <Ionicons name="person-add" size={24} color={colors.text} style={tw`mb-2`} />
+                <Text style={[tw`font-bold text-sm`, { color: colors.text }]}>Add Friend</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={[
-                  tw`flex-1 bg-violet-600 rounded-xl p-4 ml-2 items-center`,
-                  {
-                    shadowColor: '#8B5CF6',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 4,
-                    elevation: 4,
-                  }
+                  tw`flex-1 rounded-xl p-4 ml-2 items-center`,
+                  { backgroundColor: colors.accent }
                 ]}
                 onPress={() => router.push('/more/social/create-party')}
               >
@@ -402,7 +372,7 @@ export default function Social() {
 
           {/* Privacy Settings */}
           <View style={[
-            tw`rounded-2xl p-5`,
+            tw`rounded-2xl p-4`,
             { backgroundColor: colors.card } // ← THEME: Use theme card color
           ]}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Privacy & Visibility</Text>

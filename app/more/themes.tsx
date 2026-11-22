@@ -57,7 +57,7 @@ export default function Themes() {
     return (
     <TouchableOpacity
       style={[
-        tw`rounded-2xl p-5 mb-4`,
+        tw`rounded-2xl p-4 mb-4`,
         {
           backgroundColor: theme.colors.background,
           borderWidth: isSelected ? 3 : 1,
@@ -233,7 +233,7 @@ export default function Themes() {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-5 pt-2 pb-4`}>
+      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6 mt-2`}>
           <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
@@ -262,7 +262,7 @@ export default function Themes() {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Current Theme Info */}
           <View style={[
-            tw`rounded-2xl p-5 mb-6`,
+            tw`rounded-2xl p-4 mb-6`,
             { backgroundColor: colors.card }
           ]}>
             <View style={tw`flex-row items-center mb-3`}>
@@ -308,7 +308,7 @@ export default function Themes() {
 
           {/* How to Unlock */}
           <View style={[
-            tw`rounded-2xl p-5 mb-4`,
+            tw`rounded-2xl p-4 mb-4`,
             { backgroundColor: colors.card }
           ]}>
             <View style={tw`flex-row items-center mb-3`}>
@@ -338,7 +338,7 @@ export default function Themes() {
 
           {/* Unlock Progress */}
           <View style={[
-            tw`rounded-2xl p-5`,
+            tw`rounded-2xl p-4`,
             { backgroundColor: colors.card }
           ]}>
             <View style={tw`flex-row items-center mb-3`}>

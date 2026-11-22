@@ -391,10 +391,10 @@ export default function RoutineDetail() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={tw`flex-1 px-5 pt-4`} showsVerticalScrollIndicator={false}>
+      <ScrollView style={tw`flex-1 px-2 pt-4`} showsVerticalScrollIndicator={false}>
         {/* Enhanced Routine Info Card */}
         <View style={[
-          tw`rounded-2xl p-5 mb-6`,
+          tw`rounded-2xl p-4 mb-6`,
           {
             backgroundColor: colors.card,
             shadowColor: colors.accent,
@@ -573,7 +573,7 @@ export default function RoutineDetail() {
         {/* Completion Celebration */}
         {completionPercentage === 100 && tasks.length > 0 && (
           <View style={[
-            tw`rounded-2xl p-6 mb-6 items-center`,
+            tw`rounded-2xl p-4 mb-6 items-center`,
             {
               backgroundColor: colors.success + '20',
               borderWidth: 2,

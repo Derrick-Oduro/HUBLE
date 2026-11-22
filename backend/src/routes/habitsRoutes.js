@@ -31,7 +31,15 @@ router.post("/", authenticateToken, async (req, res) => {
     console.log("📥 POST /habits - Request body:", req.body);
     console.log("📥 User ID:", req.user.id);
 
-    const { title, description, difficulty, color, target_days } = req.body;
+    const {
+      title,
+      description,
+      difficulty,
+      color,
+      target_days,
+      due_time,
+      reminder_time,
+    } = req.body;
 
     // Validate required fields
     if (!title || !title.trim()) {
@@ -49,6 +57,14 @@ router.post("/", authenticateToken, async (req, res) => {
       difficulty: difficulty || "medium",
       color: color || "#3B82F6",
       target_days: target_days || [1, 2, 3, 4, 5, 6, 0],
+      due_time:
+        typeof due_time === "string" && due_time.trim()
+          ? due_time.trim()
+          : null,
+      reminder_time:
+        typeof reminder_time === "string" && reminder_time.trim()
+          ? reminder_time.trim()
+          : null,
     };
 
     console.log("📤 Creating habit with data:", habitData);
@@ -78,6 +94,68 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+// Update habit
+router.put("/:id", authenticateToken, async (req, res) => {
+  try {
+    const habitId = parseInt(req.params.id);
+    const {
+      title,
+      description,
+      difficulty,
+      color,
+      target_days,
+      due_time,
+      reminder_time,
+    } = req.body;
+
+    const habit = await Habit.findById(habitId);
+    if (!habit || habit.user_id !== req.user.id) {
+      return res.status(404).json({
+        success: false,
+        error: "Habit not found",
+      });
+    }
+
+    const normalizedDueTime =
+      due_time === undefined
+        ? habit.due_time || null
+        : typeof due_time === "string" && due_time.trim()
+          ? due_time.trim()
+          : null;
+
+    const normalizedReminderTime =
+      reminder_time === undefined
+        ? habit.reminder_time || null
+        : typeof reminder_time === "string" && reminder_time.trim()
+          ? reminder_time.trim()
+          : null;
+
+    await habit.update({
+      title: title?.trim() || habit.title,
+      description: description ?? habit.description,
+      difficulty: difficulty || habit.difficulty,
+      color: color || habit.color,
+      target_days: Array.isArray(target_days) ? target_days : habit.target_days,
+      due_time: normalizedDueTime,
+      reminder_time: normalizedReminderTime,
+    });
+
+    const updatedHabit = await Habit.findById(habitId);
+
+    res.json({
+      success: true,
+      message: "Habit updated successfully",
+      habit: updatedHabit,
+    });
+  } catch (error) {
+    console.error("❌ Error updating habit:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update habit",
+    });
+  }
+});
+
 // Complete habit
 router.post("/:id/complete", authenticateToken, async (req, res) => {
   try {
@@ -86,7 +164,7 @@ router.post("/:id/complete", authenticateToken, async (req, res) => {
       "📥 POST /habits/:id/complete - Habit ID:",
       habitId,
       "User ID:",
-      req.user.id
+      req.user.id,
     );
 
     // Check if habit belongs to user
@@ -139,7 +217,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
       "📥 DELETE /habits/:id - Habit ID:",
       habitId,
       "User ID:",
-      req.user.id
+      req.user.id,
     );
 
     const habit = await Habit.findById(habitId);
