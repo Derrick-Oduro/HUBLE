@@ -1,5 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { API_URL } from './config';
+
+// When the server rejects our saved token (expired/invalid), clear the stale
+// session once and send the user back to login instead of failing every call.
+let isHandlingAuthFailure = false;
+const handleAuthFailure = async () => {
+  if (isHandlingAuthFailure) return;
+  isHandlingAuthFailure = true;
+  try {
+    await AsyncStorage.multiRemove(['userToken', 'userData', 'isLoggedIn', 'isGuest']);
+    router.replace('/(auth)/login');
+  } catch (error) {
+    console.error('Failed to reset expired session:', error);
+  } finally {
+    setTimeout(() => {
+      isHandlingAuthFailure = false;
+    }, 2000);
+  }
+};
 
 const API_BASE_URL = API_URL;
 const API_ROOT_URL = API_BASE_URL.replace('/api', '');
@@ -52,6 +71,9 @@ const apiCall = async (endpoint: string, options: any = {}) => {
 
     if (!response.ok) {
       console.log('❌ Error response:', responseData);
+      if (response.status === 401 && headers.Authorization) {
+        handleAuthFailure();
+      }
       const errorMessage =
         responseData?.message ||
         responseData?.error ||
@@ -260,6 +282,8 @@ export const focusAPI = {
       duration_planned: sessionData.duration_planned, // in seconds
       duration_actual: sessionData.duration_actual, // in seconds
       habit_id: sessionData.habit_id || null,
+      task_type: sessionData.task_type || null, // 'habit' | 'daily' | 'routine'
+      task_id: sessionData.task_id ?? null,
       focus_topic: sessionData.focus_topic || null,
       completed: sessionData.completed,
       experience_gained: sessionData.experience_gained || 0,
@@ -269,6 +293,9 @@ export const focusAPI = {
 
   // Get session history
   getSessions: (period?: string) => apiCall(`/focus/sessions${period ? `?period=${period}` : ''}`),
+
+  // Focus minutes per linked task: { totals: [{ task_type, task_id, minutes }] }
+  getTaskTotals: (period: 'today' | 'week' | 'all' = 'today') => apiCall(`/focus/task-totals?period=${period}`),
 
   // Sync timer preferences
   syncPreferences: (preferences: any) => apiCall('/focus/preferences', {

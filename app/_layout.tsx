@@ -3,6 +3,7 @@ import { Stack } from "expo-router"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { StatsProvider } from "../contexts/StatsProvider"
 import { ThemeProvider, useTheme } from "../contexts/ThemeProvider"
+import { MenuProvider } from "../contexts/MenuContext"
 import React, { useEffect } from "react"
 import { bootstrapNotificationSchedules } from "../lib/notificationService"
 
@@ -26,6 +27,7 @@ function RootNavigator() {
         <Stack.Screen name="dailies" />
         <Stack.Screen name="routines" />
         <Stack.Screen name="timer" />
+        <Stack.Screen name="inbox" />
       </Stack>
     </SafeAreaView>
   )
@@ -42,7 +44,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <StatsProvider>
         <SafeAreaProvider>
-          <RootNavigator />
+          <MenuProvider>
+            <RootNavigator />
+          </MenuProvider>
         </SafeAreaProvider>
       </StatsProvider>
     </ThemeProvider>
