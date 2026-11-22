@@ -22,15 +22,17 @@ class FocusSession {
 
       const result = await database.run(
         `INSERT INTO focus_sessions (
-          user_id, session_type, duration_planned, duration_actual, 
-          habit_id, focus_topic, completed, experience_gained, coins_gained
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          user_id, session_type, duration_planned, duration_actual,
+          habit_id, task_type, task_id, focus_topic, completed, experience_gained, coins_gained
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           sessionData.user_id,
           sessionData.session_type,
           sessionData.duration_planned,
           sessionData.duration_actual,
           sessionData.habit_id,
+          sessionData.task_type || null,
+          sessionData.task_id ?? null,
           sessionData.focus_topic,
           sessionData.completed ? 1 : 0,
           sessionData.experience_gained,
@@ -44,6 +46,30 @@ class FocusSession {
       console.error("❌ Error creating focus session:", error);
       throw error;
     }
+  }
+
+  // Minutes of work sessions linked to each task. period: 'today' | 'week' | 'all'
+  static async getTaskTotals(userId, period = "today") {
+    let periodClause = "";
+    if (period === "today") {
+      periodClause = `AND date(created_at, 'localtime') = date('now', 'localtime')`;
+    } else if (period === "week") {
+      periodClause = `AND created_at >= datetime('now', '-7 days')`;
+    }
+
+    const rows = await database.all(
+      `SELECT task_type, task_id, SUM(duration_actual) AS seconds
+       FROM focus_sessions
+       WHERE user_id = ? AND session_type = 'work' AND task_id IS NOT NULL ${periodClause}
+       GROUP BY task_type, task_id`,
+      [userId],
+    );
+
+    return rows.map((row) => ({
+      task_type: row.task_type,
+      task_id: row.task_id,
+      minutes: Math.round((row.seconds || 0) / 60),
+    }));
   }
 
   // Find sessions by user ID

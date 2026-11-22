@@ -197,6 +197,70 @@ class Database {
     }
   }
 
+  async fixFocusSessionsTable() {
+    try {
+      console.log("🔧 Fixing focus_sessions table...");
+      let tableInfo = await this.all("PRAGMA table_info(focus_sessions)");
+      let columns = new Set(tableInfo.map((column) => column.name));
+
+      // Older databases have a legacy focus_sessions table
+      // (title, duration_minutes, completed_at) that the app code no longer
+      // matches, so every insert failed. Rebuild it, keeping any old rows.
+      if (!columns.has("session_type")) {
+        console.log("🔧 Rebuilding legacy focus_sessions table...");
+        await this.run("ALTER TABLE focus_sessions RENAME TO focus_sessions_legacy");
+        await this.run(`CREATE TABLE focus_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          session_type TEXT NOT NULL,
+          duration_planned INTEGER NOT NULL,
+          duration_actual INTEGER NOT NULL,
+          habit_id INTEGER,
+          task_type TEXT,
+          task_id INTEGER,
+          focus_topic TEXT,
+          completed BOOLEAN DEFAULT 1,
+          experience_gained INTEGER DEFAULT 0,
+          coins_gained INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE SET NULL
+        )`);
+
+        const legacyColumns = new Set(columns);
+        const pick = (name, fallback) => (legacyColumns.has(name) ? name : fallback);
+        await this.run(`INSERT INTO focus_sessions (
+            user_id, session_type, duration_planned, duration_actual,
+            task_type, task_id, focus_topic, completed, created_at
+          )
+          SELECT user_id, 'work',
+            COALESCE(${pick("duration_minutes", "0")}, 0) * 60,
+            COALESCE(${pick("duration_minutes", "0")}, 0) * 60,
+            ${pick("task_type", "NULL")}, ${pick("task_id", "NULL")},
+            ${pick("title", "'Focus Session'")}, 1,
+            COALESCE(${pick("completed_at", "CURRENT_TIMESTAMP")}, CURRENT_TIMESTAMP)
+          FROM focus_sessions_legacy`);
+        await this.run("DROP TABLE focus_sessions_legacy");
+        console.log("✅ Rebuilt focus_sessions table");
+
+        tableInfo = await this.all("PRAGMA table_info(focus_sessions)");
+        columns = new Set(tableInfo.map((column) => column.name));
+      }
+
+      if (!columns.has("task_type")) {
+        await this.run("ALTER TABLE focus_sessions ADD COLUMN task_type TEXT");
+        console.log("✅ Added focus_sessions column: task_type");
+      }
+      if (!columns.has("task_id")) {
+        await this.run("ALTER TABLE focus_sessions ADD COLUMN task_id INTEGER");
+        console.log("✅ Added focus_sessions column: task_id");
+      }
+    } catch (error) {
+      console.error("❌ Error fixing focus_sessions table:", error);
+      throw error;
+    }
+  }
+
   async fixPartiesTable() {
     try {
       console.log("🔧 Fixing parties table...");
@@ -486,6 +550,8 @@ class Database {
         duration_planned INTEGER NOT NULL, -- in seconds
         duration_actual INTEGER NOT NULL, -- in seconds
         habit_id INTEGER, -- if linked to a habit
+        task_type TEXT, -- linked task: 'habit' | 'daily' | 'routine'
+        task_id INTEGER, -- id of the linked task
         focus_topic TEXT, -- what they focused on
         completed BOOLEAN DEFAULT 1,
         experience_gained INTEGER DEFAULT 0,
@@ -705,6 +771,7 @@ class Database {
 
     await this.fixHabitsTable();
     await this.fixDailiesTable();
+    await this.fixFocusSessionsTable();
     await this.fixUsersTable();
     await this.fixPartiesTable();
     await this.fixChallengesTable();

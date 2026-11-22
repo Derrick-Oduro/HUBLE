@@ -3,6 +3,8 @@ const router = express.Router();
 const FocusSession = require("../models/FocusSession");
 const authenticateToken = require("../middleware/auth");
 
+const LINKABLE_TASK_TYPES = new Set(["habit", "daily", "routine"]);
+
 // Record focus session
 router.post("/sessions", authenticateToken, async (req, res) => {
   try {
@@ -14,18 +16,27 @@ router.post("/sessions", authenticateToken, async (req, res) => {
       duration_planned,
       duration_actual,
       habit_id,
+      task_type,
+      task_id,
       focus_topic,
       completed,
       experience_gained,
       coins_gained,
     } = req.body;
 
+    // A session may be linked to one habit, daily or routine.
+    const linkedType = LINKABLE_TASK_TYPES.has(task_type) ? task_type : null;
+    const linkedId = linkedType && Number.isInteger(Number(task_id)) ? Number(task_id) : null;
+    const numericHabitId = Number.isInteger(Number(habit_id)) && habit_id !== null ? Number(habit_id) : null;
+
     const sessionData = {
       user_id: req.user.id,
       session_type: session_type || "work",
       duration_planned: duration_planned || 0,
       duration_actual: duration_actual || 0,
-      habit_id: habit_id || null,
+      habit_id: linkedType === "habit" ? linkedId : numericHabitId,
+      task_type: linkedId !== null ? linkedType : null,
+      task_id: linkedId,
       focus_topic: focus_topic || "Focus Session",
       completed: completed ?? true,
       experience_gained: experience_gained || 0,
@@ -48,6 +59,18 @@ router.post("/sessions", authenticateToken, async (req, res) => {
       success: false,
       error: "Failed to record focus session",
     });
+  }
+});
+
+// Focus minutes per linked task (habit / daily / routine)
+router.get("/task-totals", authenticateToken, async (req, res) => {
+  try {
+    const period = ["today", "week", "all"].includes(req.query.period) ? req.query.period : "today";
+    const totals = await FocusSession.getTaskTotals(req.user.id, period);
+    res.json({ success: true, period, totals });
+  } catch (error) {
+    console.error("❌ Error fetching focus task totals:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch focus totals" });
   }
 });
 

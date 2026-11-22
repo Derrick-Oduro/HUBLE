@@ -38,6 +38,34 @@ class Achievement {
 
     await db.run(achievementsQuery);
     await db.run(progressQuery);
+    await Achievement.removeDuplicates();
+  }
+
+  // seedDefaults() runs on every server start. Without a unique key its
+  // INSERT OR IGNORE never ignored anything, so each restart added another
+  // copy of every achievement. Collapse copies onto the oldest row (moving
+  // any user progress with it) and add the missing unique key.
+  static async removeDuplicates() {
+    const { n: duplicates } = await db.get(
+      `SELECT COUNT(*) - COUNT(DISTINCT category || '|' || title) AS n FROM achievements`,
+    );
+
+    if (duplicates > 0) {
+      console.log(`🔧 Removing ${duplicates} duplicate achievements...`);
+      const keeper = `(SELECT MIN(a2.id) FROM achievements a1
+                        JOIN achievements a2 ON a2.category = a1.category AND a2.title = a1.title
+                        WHERE a1.id = user_achievements.achievement_id)`;
+      await db.run(`UPDATE OR IGNORE user_achievements SET achievement_id = ${keeper}`);
+      await db.run(
+        `DELETE FROM achievements WHERE id NOT IN (SELECT MIN(id) FROM achievements GROUP BY category, title)`,
+      );
+      await db.run(`DELETE FROM user_achievements WHERE achievement_id NOT IN (SELECT id FROM achievements)`);
+      console.log("✅ Duplicate achievements removed");
+    }
+
+    await db.run(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_achievements_category_title ON achievements(category, title)`,
+    );
   }
 
   // Seed default achievements
