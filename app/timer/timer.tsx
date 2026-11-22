@@ -20,7 +20,7 @@ import {
   Platform,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { Audio } from 'expo-av'
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio'
 import tw from "../../lib/tailwind"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
@@ -105,7 +105,7 @@ export default function Timer() {
   const [backgroundSoundEnabled, setBackgroundSoundEnabled] = useState(false)
   const [selectedSound, setSelectedSound] = useState('none')
   const [soundVolume, setSoundVolume] = useState(0.5)
-  const soundRef = useRef(null)
+  const soundRef = useRef<AudioPlayer | null>(null)
 
   // Keep your animation refs
   const pulseAnim = useRef(new Animated.Value(1)).current
@@ -419,26 +419,22 @@ export default function Timer() {
     const playSound = async () => {
       try {
         // Set audio mode for background playback
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          shouldDuckAndroid: true,
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          interruptionMode: 'duckOthers',
         })
-        
+
         if (backgroundSoundEnabled && isRunning && selectedSound && ambientSounds[selectedSound]) {
           console.log('🎵 Loading ambient sound:', selectedSound)
-          
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri: ambientSounds[selectedSound] },
-            { 
-              isLooping: true, 
-              volume: soundVolume,
-              shouldPlay: true
-            }
-          )
+
+          const newSound = createAudioPlayer({ uri: ambientSounds[selectedSound] })
+          newSound.loop = true
+          newSound.volume = soundVolume
+          newSound.play()
 
           soundRef.current = newSound
-          
+
           console.log('✅ Sound playing')
         }
       } catch (error) {
@@ -454,8 +450,8 @@ export default function Timer() {
       try {
         if (soundRef.current) {
           console.log('⏹️ Stopping sound')
-          await soundRef.current.stopAsync()
-          await soundRef.current.unloadAsync()
+          soundRef.current.pause()
+          soundRef.current.remove()
           soundRef.current = null
         }
       } catch (error) {
@@ -480,7 +476,7 @@ export default function Timer() {
     const updateVolume = async () => {
       try {
         if (soundRef.current) {
-          await soundRef.current.setVolumeAsync(soundVolume)
+          soundRef.current.volume = soundVolume
         }
       } catch (error) {
         console.error('Failed to update volume:', error)
