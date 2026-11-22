@@ -1,32 +1,34 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from "react-native"
+import { TouchableOpacity } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useTheme } from "../../../contexts/ThemeProvider"
-import tw from "../../../lib/tailwind"
 import { challengesAPI } from "../../../lib/api"
+import ChallengeCard from "../../../components/social/ChallengeCard"
+import { Button, EmptyState, LoadingState, Screen, Segmented, RADIUS } from "../../../components/ui"
 
+type Tab = "active" | "available" | "completed"
 
 export default function Challenges() {
   const router = useRouter()
-  const { colors, currentTheme } = useTheme()
-  const [activeTab, setActiveTab] = useState("active")
-  const [activeChallenges, setActiveChallenges] = useState([])
-  const [availableChallenges, setAvailableChallenges] = useState([])
-  const [completedChallenges, setCompletedChallenges] = useState([])
+  const { colors } = useTheme()
+  const [activeTab, setActiveTab] = useState<Tab>("active")
+  const [activeChallenges, setActiveChallenges] = useState<any[]>([])
+  const [availableChallenges, setAvailableChallenges] = useState<any[]>([])
+  const [completedChallenges, setCompletedChallenges] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true)
-        if (activeTab === 'active' || activeTab === 'completed') {
+        if (activeTab === "active" || activeTab === "completed") {
           const data = await challengesAPI.getUserChallenges()
           const challenges = data.challenges || []
-          setActiveChallenges(challenges.filter(c => !c.completed))
-          setCompletedChallenges(challenges.filter(c => c.completed))
+          setActiveChallenges(challenges.filter((c: any) => !c.completed))
+          setCompletedChallenges(challenges.filter((c: any) => c.completed))
         } else {
           const data = await challengesAPI.getActiveChallenges()
           setAvailableChallenges(data.challenges || [])
@@ -37,263 +39,58 @@ export default function Challenges() {
         setLoading(false)
       }
     }
-
     loadData()
   }, [activeTab])
 
-  const ChallengeCard = ({ challenge, type = "active" }) => {
-    const emoji = challenge.emoji || "🏆"
-    const color = challenge.color || "#3B82F6"
-    const isCooperative = `${challenge.mode || ""}`.toLowerCase() === "cooperative"
-    const difficulty = challenge.difficulty || "Medium"
-    const participantCount = challenge.participant_count || challenge.participants || 0
-    
-    // Calculate time left
-    const getTimeLeft = () => {
-      if (type === 'completed') return null
-      const endDate = new Date(challenge.end_date)
-      const now = new Date()
-      const diffTime = endDate - now
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      if (diffDays < 0) return "Ended"
-      if (diffDays === 0) return "Today"
-      if (diffDays === 1) return "1 day left"
-      return `${diffDays} days left`
-    }
-    
-    return (
-      <TouchableOpacity 
-        style={[
-          tw`rounded-2xl p-3 mb-2`,
-          { backgroundColor: colors.card }
-        ]}
-        onPress={() => router.push(`/more/social/challenge/${challenge.id}`)}
-      >
-        <View style={tw`flex-row items-center mb-3`}>
-          <View style={[
-            tw`w-12 h-12 rounded-xl items-center justify-center mr-3`,
-            { backgroundColor: `${color}20` }
-          ]}>
-            <Text style={tw`text-xl`}>{emoji}</Text>
-          </View>
-          
-          <View style={tw`flex-1`}>
-            <View style={tw`flex-row items-center mb-1`}>
-              <Text style={[tw`font-bold text-base mr-2`, { color: colors.text }]}>{challenge.title}</Text>
-              {isCooperative && (
-                <View style={[tw`px-2 py-1 rounded`, { backgroundColor: colors.cardSecondary }]}>
-                  <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>CO-OP</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{challenge.description}</Text>
-          </View>
-          
-          <View style={[
-            tw`px-2 py-1 rounded`,
-            { backgroundColor: colors.cardSecondary }
-          ]}>
-            <Text style={[
-              tw`text-xs font-bold`,
-              { color: colors.textSecondary }
-            ]}>
-              {difficulty}
-            </Text>
-          </View>
-        </View>
-        
-        {type === 'active' && challenge.progress !== undefined && (
-          <View style={tw`mb-3`}>
-            <View style={tw`flex-row justify-between items-center mb-1`}>
-              <Text style={[tw`text-sm`, { color: colors.text }]}>Your Progress</Text>
-              <Text style={[tw`text-sm font-bold`, { color: colors.accent }]}>
-                {challenge.progress}%
-              </Text>
-            </View>
-            <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
-              <View 
-                style={[
-                  tw`h-full rounded-full`,
-                  { width: `${challenge.progress}%`, backgroundColor: colors.accent }
-                ]} 
-              />
-            </View>
-          </View>
-        )}
-        
-        <View style={[tw`flex-row justify-between items-center pt-3 border-t`, { borderColor: colors.cardSecondary }]}>
-          <View>
-            {type === 'active' && (
-              <>
-                <View style={tw`flex-row items-center mb-1`}>
-                  <Ionicons name="people" size={14} color={colors.textSecondary} style={tw`mr-1`} />
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{participantCount} joined</Text>
-                </View>
-                {challenge.myRank && (
-                  <View style={tw`flex-row items-center`}>
-                    <Ionicons name="trophy" size={14} color={colors.textSecondary} style={tw`mr-1`} />
-                    <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Rank #{challenge.myRank}</Text>
-                  </View>
-                )}
-              </>
-            )}
-            {type === 'available' && (
-              <>
-                <View style={tw`flex-row items-center mb-1`}>
-                  <Ionicons name="people" size={14} color={colors.textSecondary} style={tw`mr-1`} />
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{participantCount} joined</Text>
-                </View>
-                <View style={tw`flex-row items-center`}>
-                  <Ionicons name="time" size={14} color={colors.textSecondary} style={tw`mr-1`} />
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{getTimeLeft()}</Text>
-                </View>
-              </>
-            )}
-            {type === 'completed' && (
-              <>
-                <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
-                  Finished {new Date(challenge.completed_at).toLocaleDateString()}
-                </Text>
-                {challenge.finalRank && (
-                  <View style={tw`flex-row items-center mt-1`}>
-                    <Ionicons name="trophy" size={14}    color={colors.textSecondary} style={tw`mr-1`} />
-                    <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Final Rank #{challenge.finalRank}</Text>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-          
-          <View style={tw`items-end`}>
-            {(challenge.reward_xp || challenge.reward_coins) && (
-              <Text style={[tw`text-sm font-semibold`, { color: colors.text }]}>
-                {challenge.reward_xp > 0 && `⭐${challenge.reward_xp} XP `}
-                {challenge.reward_coins > 0 && `💰${challenge.reward_coins}`}
-              </Text>
-            )}
-            {type === 'active' && (
-              <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>⏰ {getTimeLeft()}</Text>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    )
-  }
+  const list = activeTab === "active" ? activeChallenges : activeTab === "available" ? availableChallenges : completedChallenges
+
+  const empty = {
+    active: { icon: "flag-outline" as const, title: "No active challenges", message: "Join a challenge to compete and earn rewards." },
+    available: { icon: "search-outline" as const, title: "Nothing to join right now", message: "Check back soon, or browse all challenges." },
+    completed: { icon: "medal-outline" as const, title: "No finished challenges yet", message: "Challenges you complete will be listed here." },
+  }[activeTab]
+
+  const browseButton = (
+    <TouchableOpacity
+      onPress={() => router.push("/more/social/browse-challenges")}
+      accessibilityLabel="Browse challenges"
+      style={{ width: 40, height: 40, borderRadius: RADIUS.inner, alignItems: "center", justifyContent: "center", backgroundColor: colors.card }}
+    >
+      <Ionicons name="search" size={18} color={colors.text} />
+    </TouchableOpacity>
+  )
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
-        
-        {/* Header */}
-        <View style={tw`flex-row items-center mb-3 mt-2`}>
-          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[tw`text-2xl font-bold flex-1`, { color: colors.text }]}>Challenges</Text>
-          <TouchableOpacity 
-            style={[tw`p-2 rounded-xl`, { backgroundColor: colors.accent }]}
-            onPress={() => router.push('/more/social/browse-challenges')}
-          >
-            <Ionicons name="search" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
+    <Screen title="Challenges" subtitle={`${activeChallenges.length} active`} right={browseButton}>
+      <Segmented<Tab>
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+          { value: "active", label: "Active" },
+          { value: "available", label: "Available" },
+          { value: "completed", label: "Completed" },
+        ]}
+      />
 
-        {/* Tab Navigation */}
-        <View style={[
-          tw`rounded-2xl p-1 mb-3 flex-row`,
-          { backgroundColor: colors.card }
-        ]}>
-          {[
-            { id: 'active', label: 'Active', count: activeChallenges.length },
-            { id: 'available', label: 'Available', count: availableChallenges.length },
-            { id: 'completed', label: 'Completed', count: completedChallenges.length }
-          ].map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[
-                tw`flex-1 py-3 rounded-xl`,
-                activeTab === tab.id && { backgroundColor: colors.accent }
-              ]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Text style={[
-                tw`text-center font-semibold text-sm`,
-                { color: activeTab === tab.id ? 'white' : colors.textSecondary }
-              ]}>
-                {tab.label} {tab.count > 0 && `(${tab.count})`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {loading ? (
-            <View style={tw`items-center py-12`}>
-              <ActivityIndicator size="large" color={colors.accent} />
-              <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading...</Text>
-            </View>
-          ) : (
-            <>
-              {activeTab === 'active' && (
-                <View>
-                  <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-                    Active Challenges ({activeChallenges.length})
-                  </Text>
-                  
-                  {activeChallenges.map((challenge) => (
-                    <ChallengeCard key={challenge.id} challenge={challenge} type="active" />
-                  ))}
-                  
-                  {activeChallenges.length === 0 && (
-                    <View style={tw`items-center py-12`}>
-                      <Ionicons name="trophy-outline" size={64} color={colors.textSecondary} />
-                      <Text style={[tw`text-lg mt-4`, { color: colors.textSecondary }]}>No active challenges</Text>
-                      <Text style={[tw`text-center mt-2`, { color: colors.textSecondary }]}>
-                        Join challenges to compete and earn rewards
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {activeTab === 'available' && (
-                <View>
-                  <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-                    Available Challenges ({availableChallenges.length})
-                  </Text>
-                  
-                  {availableChallenges.map((challenge) => (
-                    <ChallengeCard key={challenge.id} challenge={challenge} type="available" />
-                  ))}
-                </View>
-              )}
-
-              {activeTab === 'completed' && (
-                <View>
-                  <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-                    Completed Challenges ({completedChallenges.length})
-                  </Text>
-                  
-                  {completedChallenges.map((challenge) => (
-                    <ChallengeCard key={challenge.id} challenge={challenge} type="completed" />
-                  ))}
-                  
-                  {completedChallenges.length === 0 && (
-                    <View style={tw`items-center py-12`}>
-                      <Ionicons name="medal-outline" size={64} color={colors.textSecondary} />
-                      <Text style={[tw`text-lg mt-4`, { color: colors.textSecondary }]}>No completed challenges</Text>
-                      <Text style={[tw`text-center mt-2`, { color: colors.textSecondary }]}>
-                        Complete challenges to see your achievements here
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </>
-          )}
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+      {loading ? (
+        <LoadingState />
+      ) : list.length === 0 ? (
+        <EmptyState
+          icon={empty.icon}
+          title={empty.title}
+          message={empty.message}
+          action={activeTab !== "completed" ? <Button label="Browse challenges" small icon="search" onPress={() => router.push("/more/social/browse-challenges")} /> : undefined}
+        />
+      ) : (
+        list.map((challenge) => (
+          <ChallengeCard
+            key={challenge.id}
+            challenge={challenge}
+            type={activeTab}
+            onPress={() => router.push(`/more/social/challenge/${challenge.id}`)}
+          />
+        ))
+      )}
+    </Screen>
   )
 }

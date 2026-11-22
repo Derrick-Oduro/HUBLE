@@ -12,6 +12,9 @@ import { useTheme } from "../../contexts/ThemeProvider"
 
 import { habitsAPI } from "../../lib/api"
 import { maybePromptForReview } from "../../lib/reviewPrompt"
+import { useLocalSearchParams, useRouter } from "expo-router"
+import { focusLinkParams, useFocusMinutes } from "../../lib/focusLinks"
+import { EmptyState } from "../../components/ui"
 import CharacterPanel from "../../components/CharacterPanel"
 
 // Enhanced habit interface with streak tracking
@@ -165,6 +168,10 @@ export default function HabitsScreen() {
   const [editingHabit, setEditingHabit] = useState<EnhancedHabit | null>(null)
   const [loading, setLoading] = useState(true)
   const habitsRef = useRef<EnhancedHabit[]>(defaultHabits)
+  const router = useRouter()
+  const { completeId } = useLocalSearchParams<{ completeId?: string }>()
+  const handledCompleteId = useRef<string | null>(null)
+  const focusMinutes = useFocusMinutes("habit")
 
   useEffect(() => {
     habitsRef.current = habits
@@ -592,6 +599,18 @@ export default function HabitsScreen() {
     )
   }
 
+  // The Focus tab sends ?completeId=<id> when the user chose "Mark as done"
+  // after a linked session. Complete it once, with the normal XP/streak logic.
+  useEffect(() => {
+    if (loading || !completeId || handledCompleteId.current === completeId) return
+    handledCompleteId.current = completeId
+    const habit = habits.find((h) => h.id === Number(completeId))
+    if (habit && !habit.completed) {
+      handleHabitComplete(habit.id)
+    }
+    router.setParams({ completeId: undefined })
+  }, [loading, completeId, habits])
+
   const handleHabitComplete = async (id: number) => {
     const habit = habits.find((h) => h.id === id)
     if (!habit) return
@@ -835,7 +854,7 @@ export default function HabitsScreen() {
       <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <FlatList
-        style={tw`flex-1 px-2 pt-2`}
+        style={tw`flex-1 px-4 pt-1`}
         data={habits}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
@@ -863,22 +882,18 @@ export default function HabitsScreen() {
           </View>
         )}
         ListEmptyComponent={() => (
-          <View style={tw`items-center py-8`}>
-            <Ionicons name="leaf-outline" size={40} color={colors.textSecondary} />
-            <Text style={[tw`text-sm font-medium mt-3`, { color: colors.text }]}>No habits yet</Text>
-            <Text style={[tw`text-sm text-center mt-1`, { color: colors.textSecondary }]}>
-              Add your first habit to get started
-            </Text>
-          </View>
+          <EmptyState icon="leaf-outline" title="No habits yet" message="Add your first habit to get started." />
         )}
         renderItem={({ item }) => (
           <HabitItem
             id={item.id}
             title={item.title}
             color={item.color}
-            subtext={`${item.description}${(item.streak || 0) > 0 ? ` \u2022 ${item.streak} day streak` : ""}`}
+            subtext={item.description}
             completed={item.completed}
             streak={item.streak}
+            focusMinutes={focusMinutes[item.id] || 0}
+            onFocus={(id) => router.navigate({ pathname: "/timer", params: focusLinkParams("habit", id) })}
             onEdit={editHabit}
             onComplete={handleHabitComplete}
             onFail={handleHabitFail}

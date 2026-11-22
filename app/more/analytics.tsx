@@ -1,46 +1,35 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Alert } from "react-native"
+import { Alert, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
 import { useTheme } from "../../contexts/ThemeProvider"
 import { dataAPI } from "../../lib/api"
-import tw from "../../lib/tailwind"
+import { Card, EmptyState, LoadingState, ProgressBar, Screen, Section, Segmented, StatTile, RADIUS } from "../../components/ui"
 
-
-type AnalyticsCategory = {
-  category: string
-  count: number
-}
-
+type AnalyticsCategory = { category: string; count: number }
+type FocusDay = { date?: string; total_minutes?: number; session_count?: number }
 type AnalyticsData = {
   productivityScore?: number
-  streakData?: {
-    current_streak?: number
-    longest_streak?: number
-  }
-  focusAnalysis?: {
-    total_minutes?: number
-    session_count?: number
-  }[]
+  streakData?: { current_streak?: number; longest_streak?: number }
+  focusAnalysis?: FocusDay[]
   categoryBreakdown?: AnalyticsCategory[]
 }
+type Period = "7" | "30" | "90"
+
+const dayKey = (date: Date) => date.toISOString().split("T")[0]
 
 export default function Analytics() {
-  const router = useRouter()
-  const { colors, currentTheme } = useTheme()
+  const { colors } = useTheme()
   const [loading, setLoading] = useState(true)
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
-  const [period, setPeriod] = useState(30) // 7, 30, or 90 days
+  const [period, setPeriod] = useState<Period>("30")
 
   const loadAnalytics = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await dataAPI.getAnalytics(period)
-      if (data.success) {
-        setAnalytics(data.analytics)
-      }
+      const data = await dataAPI.getAnalytics(Number(period))
+      if (data.success) setAnalytics(data.analytics)
     } catch (error) {
       console.error("Failed to load analytics:", error)
     } finally {
@@ -52,47 +41,40 @@ export default function Analytics() {
     loadAnalytics()
   }, [loadAnalytics])
 
-  const weeklyFocusInsight = useMemo(() => {
-    const focusSeries = analytics?.focusAnalysis || []
-    if (!focusSeries.length) return null
+  const focusDays = analytics?.focusAnalysis || []
+  const totalMinutes = Math.round(focusDays.reduce((sum, day) => sum + Number(day.total_minutes || 0), 0))
+  const totalSessions = focusDays.reduce((sum, day) => sum + Number(day.session_count || 0), 0)
 
-    const minuteSeries = focusSeries.map((day) => {
-      const parsed = Number(day.total_minutes || 0)
-      return Number.isFinite(parsed) ? parsed : 0
+  // Last 14 days (7 for the weekly view) as bars, filling days without sessions with 0.
+  const chart = useMemo(() => {
+    const days = period === "7" ? 7 : 14
+    const byDate = new Map(focusDays.map((d) => [String(d.date || "").slice(0, 10), Number(d.total_minutes || 0)]))
+    const series = Array.from({ length: days }, (_, i) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (days - 1 - i))
+      return { key: dayKey(date), label: date.toLocaleDateString(undefined, { weekday: "narrow" }), minutes: byDate.get(dayKey(date)) || 0 }
     })
+    const max = Math.max(1, ...series.map((d) => d.minutes))
+    return { series, max, days }
+  }, [focusDays, period])
 
-    const currentWeek = minuteSeries.slice(-7).reduce((sum, value) => sum + value, 0)
-    const previousWeek = minuteSeries.slice(-14, -7).reduce((sum, value) => sum + value, 0)
-
-    if (previousWeek === 0) {
-      return {
-        message:
-          currentWeek > 0
-            ? `You focused ${Math.round(currentWeek)} minutes this week. Great baseline to build from.`
-            : "No focus sessions tracked this week yet. Start one session to generate insights.",
-      }
+  const insight = useMemo(() => {
+    const minutes = focusDays.map((d) => Number(d.total_minutes || 0))
+    if (!minutes.length) return null
+    const thisWeek = minutes.slice(-7).reduce((s, v) => s + v, 0)
+    const lastWeek = minutes.slice(-14, -7).reduce((s, v) => s + v, 0)
+    if (lastWeek === 0) {
+      return thisWeek > 0 ? `You focused ${Math.round(thisWeek)} minutes this week — a good baseline to build on.` : null
     }
-
-    const delta = ((currentWeek - previousWeek) / previousWeek) * 100
-    const roundedDelta = Math.round(Math.abs(delta))
-
-    if (delta >= 0) {
-      return {
-        message: `You focused ${roundedDelta}% more than last week (${Math.round(currentWeek)}m vs ${Math.round(previousWeek)}m).`,
-      }
-    }
-
-    return {
-      message: `You focused ${roundedDelta}% less than last week (${Math.round(currentWeek)}m vs ${Math.round(previousWeek)}m).`,
-    }
-  }, [analytics])
+    const delta = Math.round(((thisWeek - lastWeek) / lastWeek) * 100)
+    return `You focused ${Math.abs(delta)}% ${delta >= 0 ? "more" : "less"} than last week (${Math.round(thisWeek)}m vs ${Math.round(lastWeek)}m).`
+  }, [focusDays])
 
   const exportData = async () => {
     try {
       const data = await dataAPI.exportData()
       if (data.success) {
-        // In a real app, save this file
-        Alert.alert("Success", "Data exported successfully!")
+        Alert.alert("Export ready", "Your data was exported successfully.")
         console.log("Exported data:", data.data)
       }
     } catch (error) {
@@ -100,153 +82,108 @@ export default function Analytics() {
     }
   }
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={currentTheme.statusBarStyle} />
-        <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[tw`mt-4`, { color: colors.text }]}>Loading analytics...</Text>
-        </View>
-      </SafeAreaView>
-    )
-  }
+  const exportButton = (
+    <TouchableOpacity
+      onPress={exportData}
+      accessibilityLabel="Export data"
+      style={{ width: 40, height: 40, borderRadius: RADIUS.inner, alignItems: "center", justifyContent: "center", backgroundColor: colors.card }}
+    >
+      <Ionicons name="download-outline" size={19} color={colors.text} />
+    </TouchableOpacity>
+  )
+
+  const categories = analytics?.categoryBreakdown || []
+  const categoryTotal = categories.reduce((sum, c) => sum + c.count, 0)
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
-        {/* Header */}
-        <View style={tw`flex-row items-center justify-between mb-6 mt-2`}>
-          <View style={tw`flex-row items-center`}>
-            <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Analytics</Text>
-          </View>
-          <TouchableOpacity onPress={exportData} style={[tw`px-4 py-2 rounded-lg`, { backgroundColor: colors.accent }]}>
-            <Text style={tw`text-white font-semibold`}>Export</Text>
-          </TouchableOpacity>
-        </View>
+    <Screen title="Analytics" subtitle="Trends over time" right={exportButton}>
+      <Segmented<Period>
+        value={period}
+        onChange={setPeriod}
+        options={[
+          { value: "7", label: "7 days" },
+          { value: "30", label: "30 days" },
+          { value: "90", label: "90 days" },
+        ]}
+      />
 
-        {/* Period Selector */}
-        <View style={tw`flex-row mb-6`}>
-          {[7, 30, 90].map((days) => (
-            <TouchableOpacity
-              key={days}
-              onPress={() => setPeriod(days)}
-              style={[
-                tw`flex-1 py-3 rounded-lg mr-2`,
-                { backgroundColor: period === days ? colors.accent : colors.card }
-              ]}
-            >
-              <Text style={[tw`text-center font-semibold`, { color: period === days ? '#FFF' : colors.text }]}>
-                {days} Days
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {weeklyFocusInsight && (
-            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}> 
-              <View style={tw`flex-row items-center mb-2`}>
-                <Ionicons name="bulb-outline" size={20} color={colors.accent} style={tw`mr-2`} />
-                <Text style={[tw`text-base font-bold`, { color: colors.text }]}>Weekly Insight</Text>
-              </View>
-              <Text style={[tw`text-sm leading-5`, { color: colors.textSecondary }]}>
-                {weeklyFocusInsight.message}
-              </Text>
-            </View>
+      {loading ? (
+        <LoadingState label="Crunching your numbers…" />
+      ) : !analytics ? (
+        <EmptyState icon="analytics-outline" title="No data yet" message="Complete tasks and focus sessions to see your trends." />
+      ) : (
+        <>
+          {insight && (
+            <Card style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
+              <Ionicons name="bulb-outline" size={20} color={colors.accent} />
+              <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, color: colors.text }}>{insight}</Text>
+            </Card>
           )}
 
-          {/* Productivity Score */}
-          <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Productivity Score</Text>
-            <View style={tw`items-center`}>
-              <View style={[tw`w-32 h-32 rounded-full items-center justify-center`, { backgroundColor: colors.accent + '20' }]}>
-                <Text style={[tw`text-4xl font-bold`, { color: colors.accent }]}>
-                  {analytics?.productivityScore || 0}%
-                </Text>
-              </View>
-              <Text style={[tw`mt-3`, { color: colors.textSecondary }]}>Completion Rate</Text>
-            </View>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <StatTile icon="checkmark-done-outline" color={colors.success} value={`${analytics.productivityScore || 0}%`} label="Completion" />
+            <StatTile icon="flame-outline" color={colors.warning} value={analytics.streakData?.current_streak || 0} label="Streak" />
+            <StatTile icon="trophy-outline" color={colors.accent} value={analytics.streakData?.longest_streak || 0} label="Best streak" />
           </View>
 
-          {/* Streak Stats */}
-          {analytics?.streakData && (
-            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
-              <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Streak Performance</Text>
-              <View style={tw`flex-row justify-around`}>
-                <View style={tw`items-center`}>
-                  <Ionicons name="flame" size={32} color="#F97316" />
-                  <Text style={[tw`text-2xl font-bold mt-2`, { color: colors.text }]}>
-                    {analytics.streakData?.current_streak || 0}
-                  </Text>
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Current</Text>
+          <Section title="Focus">
+            <Card style={{ gap: 16 }}>
+              <View style={{ flexDirection: "row", gap: 24 }}>
+                <View>
+                  <Text style={{ fontSize: 24, fontWeight: "800", color: colors.text }}>{totalMinutes}m</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>Focused</Text>
                 </View>
-                <View style={tw`items-center`}>
-                  <Ionicons name="trophy" size={32} color="#F59E0B" />
-                  <Text style={[tw`text-2xl font-bold mt-2`, { color: colors.text }]}>
-                    {analytics.streakData?.longest_streak || 0}
-                  </Text>
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Longest</Text>
+                <View>
+                  <Text style={{ fontSize: 24, fontWeight: "800", color: colors.text }}>{totalSessions}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>Sessions</Text>
                 </View>
               </View>
-            </View>
-          )}
 
-          {/* Focus Analysis */}
-          {analytics?.focusAnalysis && analytics.focusAnalysis.length > 0 && (
-            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
-              <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Focus Time</Text>
-              <View style={tw`flex-row justify-between items-center mb-3`}>
-                <Text style={[{ color: colors.textSecondary }]}>Total Minutes</Text>
-                <Text style={[tw`font-bold text-lg`, { color: colors.accent }]}>
-                  {Math.round(analytics.focusAnalysis.reduce((sum: number, day) => sum + (day.total_minutes || 0), 0))}m
-                </Text>
-              </View>
-              <View style={tw`flex-row justify-between items-center`}>
-                <Text style={[{ color: colors.textSecondary }]}>Total Sessions</Text>
-                <Text style={[tw`font-bold text-lg`, { color: colors.accent }]}>
-                  {analytics.focusAnalysis.reduce((sum: number, day) => sum + (day.session_count || 0), 0)}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Category Breakdown */}
-          {analytics?.categoryBreakdown && analytics.categoryBreakdown.length > 0 && (
-            <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: colors.card }]}>
-              <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Task Categories</Text>
-              {(() => {
-                const totalCategories = analytics.categoryBreakdown.reduce((sum: number, item: AnalyticsCategory) => sum + item.count, 0)
-
-                return analytics.categoryBreakdown.map((category: AnalyticsCategory, index: number) => (
-                  <View key={index} style={tw`mb-3`}>
-                    <View style={tw`flex-row justify-between mb-1`}>
-                      <Text style={[{ color: colors.text }]}>{category.category}</Text>
-                      <Text style={[tw`font-semibold`, { color: colors.accent }]}>{category.count}</Text>
-                    </View>
-                    <View style={[tw`h-2 rounded-full`, { backgroundColor: colors.cardSecondary }]}>
-                      <View 
-                        style={[
-                          tw`h-2 rounded-full`,
-                          { 
-                            backgroundColor: colors.accent,
-                            width: `${(category.count / totalCategories) * 100}%`
-                          }
-                        ]} 
+              <View>
+                <View style={{ flexDirection: "row", alignItems: "flex-end", height: 96, gap: chart.days > 7 ? 4 : 8 }}>
+                  {chart.series.map((day) => (
+                    <View key={day.key} style={{ flex: 1, height: "100%", justifyContent: "flex-end" }}>
+                      <View
+                        style={{
+                          height: `${Math.max(day.minutes > 0 ? 6 : 3, (day.minutes / chart.max) * 100)}%`,
+                          borderRadius: 4,
+                          backgroundColor: day.minutes > 0 ? colors.accent : colors.cardSecondary,
+                        }}
                       />
                     </View>
+                  ))}
+                </View>
+                <View style={{ flexDirection: "row", gap: chart.days > 7 ? 4 : 8, marginTop: 6 }}>
+                  {chart.series.map((day) => (
+                    <Text key={day.key} style={{ flex: 1, textAlign: "center", fontSize: 10, color: colors.textSecondary }}>
+                      {day.label}
+                    </Text>
+                  ))}
+                </View>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 8 }}>
+                  Minutes per day · last {chart.days} days
+                </Text>
+              </View>
+            </Card>
+          </Section>
+
+          {categories.length > 0 && (
+            <Section title="Task categories">
+              <Card style={{ gap: 14 }}>
+                {categories.map((category) => (
+                  <View key={category.category} style={{ gap: 6 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>{category.category}</Text>
+                      <Text style={{ fontSize: 13, color: colors.textSecondary }}>{category.count}</Text>
+                    </View>
+                    <ProgressBar value={categoryTotal > 0 ? category.count / categoryTotal : 0} />
                   </View>
-                ))
-              })()}
-            </View>
+                ))}
+              </Card>
+            </Section>
           )}
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+        </>
+      )}
+    </Screen>
   )
 }
-

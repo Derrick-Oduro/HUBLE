@@ -613,7 +613,7 @@ export default function Routines() {
       <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <ScrollView 
-        style={tw`flex-1 px-2 pt-2`}
+        style={tw`flex-1 px-4 pt-1`}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={tw`pb-20`}
         refreshControl={
@@ -647,7 +647,7 @@ export default function Routines() {
 
         {/* Enhanced Routine Cards */}
         <View style={tw`mb-8`}>
-          <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>
+          <Text style={[tw`text-xs font-bold mb-2`, { color: colors.textSecondary, letterSpacing: 0.8, textTransform: "uppercase" }]}>
             Your Routines ({orderedRoutines.length})
           </Text>
           

@@ -1,250 +1,98 @@
 "use client"
 
 import React, { useState } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Linking } from "react-native"
+import { Linking, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
-import tw from "../../lib/tailwind"
 import { useTheme } from "../../contexts/ThemeProvider"
+import { Card, Divider, ListRow, Screen, Section } from "../../components/ui"
 
+// Where "Email support" sends people. Change this to your real support inbox.
+const SUPPORT_EMAIL = "support@huble.app"
+
+const FAQ = [
+  {
+    question: "How do I earn XP and level up?",
+    answer: "Complete habits, dailies, routines and focus sessions. Harder tasks and longer focus sessions earn more XP.",
+  },
+  {
+    question: "What happens when I lose health?",
+    answer: "Missing or failing tasks costs health. Completing tasks consistently and keeping streaks helps you recover.",
+  },
+  {
+    question: "Where are Social, Stats and Settings?",
+    answer: "Tap ☰ at the top-left of any tab. The side menu has your inbox, progress, social, leaderboards, avatar, themes and settings.",
+  },
+  {
+    question: "How do I link a focus session to a task?",
+    answer: "Tap the timer button on a habit or daily, or use Link Task in the Focus tab. Focused minutes show on the task, and you can mark it done when the session ends.",
+  },
+  {
+    question: "How do I unlock new themes and avatars?",
+    answer: "Level up and complete achievements. Locked items show the level or goal needed to unlock them.",
+  },
+  {
+    question: "Can I back up my data?",
+    answer: "Turn on Settings › Data › Auto backup, or export a copy any time from Settings › Privacy & security › Export data.",
+  },
+]
 
 export default function Help() {
-  const router = useRouter()
-  const { colors, currentTheme } = useTheme()
-  const [expandedFAQ, setExpandedFAQ] = useState(null)
-
-  const faqData = [
-    {
-      id: 1,
-      question: "How do I earn XP and level up?",
-      answer: "Complete habits, daily tasks, routines, and focus sessions to earn XP. Different activities give different amounts of XP based on difficulty and completion time.",
-    },
-    {
-      id: 2,
-      question: "What happens when I lose health?",
-      answer: "Health decreases when you miss important tasks or break streaks. You can restore health by completing tasks consistently and maintaining good habits.",
-    },
-    {
-      id: 3,
-      question: "How do I unlock new themes and avatars?",
-      answer: "Level up and complete achievements to unlock new customization options. Check the Achievements page to see what you need to unlock.",
-    },
-    {
-      id: 4,
-      question: "Can I backup my data?",
-      answer: "Yes! Go to Settings > Data & Privacy > Auto Backup to enable automatic data backup to the cloud.",
-    },
-    {
-      id: 5,
-      question: "How do focus sessions work?",
-      answer: "Set a timer, choose your activity, and focus! Completed sessions earn XP and contribute to your daily focus goals.",
-    },
-  ]
-
-  const contactOptions = [
-    {
-      icon: "mail-outline",
-      title: "Email Support",
-      description: "Get help via email",
-      action: () => Linking.openURL("mailto:support@huble.app"),
-      color: "#3B82F6",
-    },
-    {
-      icon: "chatbubble-outline",
-      title: "Live Chat",
-      description: "Chat with our team",
-      action: () => {}, // Implement chat
-      color: "#10B981",
-    },
-    {
-      icon: "logo-twitter",
-      title: "Twitter",
-      description: "@HubleApp",
-      action: () => Linking.openURL("https://twitter.com/hubleapp"),
-      color: "#06B6D4",
-    },
-    {
-      icon: "globe-outline",
-      title: "Website",
-      description: "Visit our website",
-      action: () => Linking.openURL("https://huble.app"),
-      color: colors.accent,
-    },
-  ]
-
-  const toggleFAQ = (id) => {
-    setExpandedFAQ(expandedFAQ === id ? null : id)
-  }
+  const { colors } = useTheme()
+  const [expanded, setExpanded] = useState<number | null>(0)
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
-        {/* Header */}
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
-          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Help & Support</Text>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Quick Actions */}
-          <View style={[tw`rounded-2xl p-4 mb-6`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-              Need Quick Help?
-            </Text>
-            <View style={tw`flex-row justify-between`}>
-              <TouchableOpacity
-                style={[
-                  tw`flex-1 rounded-xl p-4 mr-2 items-center`,
-                  {
-                    backgroundColor: colors.accent,
-                    shadowColor: colors.accent,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0,
-                    shadowRadius: 4,
-                    elevation: 0,
-                  },
-                ]}
-                onPress={() => Linking.openURL("mailto:support@huble.app")}
-              >
-                <Ionicons
-                  name="mail"
-                  size={24}
-                  color="white"
-                  style={tw`mb-2`}
-                />
-                <Text style={tw`text-white font-bold text-sm`}>Email Us</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  tw`flex-1 rounded-xl p-4 ml-2 items-center`,
-                  {
-                    backgroundColor: colors.success,
-                    shadowColor: colors.success,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0,
-                    shadowRadius: 4,
-                    elevation: 0,
-                  },
-                ]}
-                onPress={() => {}} // Implement tutorial
-              >
-                <Ionicons
-                  name="play-circle"
-                  size={24}
-                  color="white"
-                  style={tw`mb-2`}
-                />
-                <Text style={tw`text-white font-bold text-sm`}>Tutorial</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* FAQ Section */}
-          <View style={[tw`rounded-2xl p-4 mb-6`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-              Frequently Asked Questions
-            </Text>
-
-            {faqData.map((faq) => (
-              <TouchableOpacity
-                key={faq.id}
-                style={[
-                  tw`p-4 rounded-xl mb-3`,
-                  { backgroundColor: colors.cardSecondary }
-                ]}
-                onPress={() => toggleFAQ(faq.id)}
-              >
-                <View style={tw`flex-row justify-between items-center`}>
-                  <Text style={[tw`font-semibold flex-1 mr-3`, { color: colors.text }]}>
-                    {faq.question}
-                  </Text>
-                  <Ionicons
-                    name={
-                      expandedFAQ === faq.id ? "chevron-up" : "chevron-down"
-                    }
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </View>
-
-                {expandedFAQ === faq.id && (
-                  <Text style={[tw`mt-3 leading-5`, { color: colors.textSecondary }]}>
-                    {faq.answer}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Contact Options */}
-          <View style={[tw`rounded-2xl p-4 mb-6`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Get In Touch</Text>
-
-            {contactOptions.map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  tw`flex-row items-center p-4 rounded-xl mb-3`,
-                  { backgroundColor: colors.cardSecondary },
-                ]}
-                onPress={option.action}
-              >
-                <View
-                  style={[
-                    tw`w-12 h-12 rounded-xl items-center justify-center mr-4`,
-                    { backgroundColor: `${option.color}20` },
-                  ]}
+    <Screen title="Help & support">
+      <Section title="Frequently asked">
+        <Card padded={false}>
+          {FAQ.map((item, i) => {
+            const open = expanded === i
+            return (
+              <View key={item.question}>
+                {i > 0 && <Divider inset={14} />}
+                <TouchableOpacity
+                  onPress={() => setExpanded(open ? null : i)}
+                  accessibilityState={{ expanded: open }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 14, gap: 8 }}
                 >
-                  <Ionicons name={option.icon} size={24} color={option.color} />
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>
-                    {option.title}
-                  </Text>
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>
-                    {option.description}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Tips */}
-          <View style={[tw`rounded-2xl p-4`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Pro Tips</Text>
-
-            <View style={tw`space-y-3`}>
-              <View style={tw`flex-row items-start`}>
-                <Ionicons name="bulb" size={20} color="#F59E0B" style={tw`mr-3 mt-1`} />
-                <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
-                  Set realistic goals and build habits gradually for long-term
-                  success.
-                </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <Text style={{ flex: 1, fontSize: 15, fontWeight: "600", color: colors.text }}>{item.question}</Text>
+                    <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
+                  </View>
+                  {open && <Text style={{ fontSize: 14, lineHeight: 20, color: colors.textSecondary }}>{item.answer}</Text>}
+                </TouchableOpacity>
               </View>
+            )
+          })}
+        </Card>
+      </Section>
 
-              <View style={tw`flex-row items-start`}>
-                <Ionicons name="target" size={20} color="#10B981" style={tw`mr-3 mt-1`} />
-                <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
-                  Use focus sessions to improve concentration and earn more XP.
-                </Text>
-              </View>
+      <Section title="Contact">
+        <Card padded={false}>
+          <ListRow
+            icon="mail-outline"
+            iconColor={colors.accent}
+            title="Email support"
+            subtitle={SUPPORT_EMAIL}
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            chevron
+          />
+        </Card>
+      </Section>
 
-              <View style={tw`flex-row items-start`}>
-                <Ionicons name="stats-chart" size={20} color="#3B82F6" style={tw`mr-3 mt-1`} />
-                <Text style={[tw`flex-1`, { color: colors.textSecondary }]}>
-                  Check your stats regularly to track progress and stay motivated.
-                </Text>
-              </View>
+      <Section title="Tips">
+        <Card style={{ gap: 14 }}>
+          {[
+            { icon: "trending-up-outline" as const, color: colors.success, text: "Start small. Two or three habits you keep beat ten you drop." },
+            { icon: "timer-outline" as const, color: colors.accent, text: "Link focus sessions to tasks to see where your time actually goes." },
+            { icon: "flame-outline" as const, color: colors.warning, text: "Protect your streak: even a short session counts on busy days." },
+          ].map((tip) => (
+            <View key={tip.text} style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
+              <Ionicons name={tip.icon} size={18} color={tip.color} style={{ marginTop: 1 }} />
+              <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, color: colors.text }}>{tip.text}</Text>
             </View>
-          </View>
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+          ))}
+        </Card>
+      </Section>
+    </Screen>
   )
 }
-

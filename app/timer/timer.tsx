@@ -26,7 +26,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useStats } from "../../contexts/StatsProvider"
 import { useTheme } from "../../contexts/ThemeProvider"
 
-import { focusAPI, dailiesAPI, routinesAPI } from "../../lib/api"
+import { focusAPI, dailiesAPI, routinesAPI, habitsAPI } from "../../lib/api"
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router"
 
 // Keep your existing habits list exactly as is
 const habitsList = [
@@ -97,9 +98,14 @@ export default function Timer() {
   
   // Task Linking State
   const [showTaskSelector, setShowTaskSelector] = useState(false)
-  const [linkedTask, setLinkedTask] = useState(null)
+  // linkedTask: { id: 'habit-3', taskId: 3, type: 'habit' | 'daily' | 'routine', title, data }
+  const [linkedTask, setLinkedTask] = useState<any>(null)
+  const [userHabits, setUserHabits] = useState([])
   const [userDailies, setUserDailies] = useState([])
   const [userRoutines, setUserRoutines] = useState([])
+  const [markLinkedDone, setMarkLinkedDone] = useState(false)
+  const router = useRouter()
+  const { linkType, linkId } = useLocalSearchParams()
   
   // Background Sounds State
   const [backgroundSoundEnabled, setBackgroundSoundEnabled] = useState(false)
@@ -280,29 +286,51 @@ export default function Timer() {
     loadFocusData()
   }, [])
   
-  // Load user tasks (dailies and routines) for task linking
-  useEffect(() => {
-    const loadUserTasks = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken')
-        const isGuest = await AsyncStorage.getItem('isGuest')
-        
-        if (token && isGuest !== 'true') {
-          const [dailies, routines] = await Promise.all([
-            dailiesAPI.getDailies(),
-            routinesAPI.getRoutines()
-          ])
-          
-          setUserDailies(dailies || [])
-          setUserRoutines(routines || [])
+  // Load the user's habits, dailies and routines for task linking.
+  // Refreshes every time the Focus tab is shown so new tasks appear.
+  const [tasksLoaded, setTasksLoaded] = useState(false)
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadUserTasks = async () => {
+        try {
+          const token = await AsyncStorage.getItem('userToken')
+          const isGuest = await AsyncStorage.getItem('isGuest')
+
+          if (token && isGuest !== 'true') {
+            const [habits, dailies, routines] = await Promise.allSettled([
+              habitsAPI.getHabits(),
+              dailiesAPI.getDailies(),
+              routinesAPI.getRoutines()
+            ])
+
+            // Each endpoint returns { success, <list> }.
+            if (habits.status === 'fulfilled') setUserHabits(habits.value?.habits || [])
+            if (dailies.status === 'fulfilled') setUserDailies(dailies.value?.dailies || [])
+            if (routines.status === 'fulfilled') setUserRoutines(routines.value?.routines || [])
+          }
+        } catch (error) {
+          console.error('Failed to load user tasks:', error)
+        } finally {
+          setTasksLoaded(true)
         }
-      } catch (error) {
-        console.error('Failed to load user tasks:', error)
       }
+
+      loadUserTasks()
+    }, [])
+  )
+
+  // Opened from a habit/daily card's ⏱ button: link that task automatically.
+  useEffect(() => {
+    if (!tasksLoaded || !linkType || !linkId) return
+    const type = String(linkType)
+    const id = Number(linkId)
+    const list = type === 'habit' ? userHabits : type === 'daily' ? userDailies : type === 'routine' ? userRoutines : []
+    const task = list.find((item) => Number(item.id) === id)
+    if (task) {
+      setLinkedTask({ id: `${type}-${id}`, taskId: id, type, title: task.title, data: task })
     }
-    
-    loadUserTasks()
-  }, [])
+    router.setParams({ linkType: undefined, linkId: undefined })
+  }, [tasksLoaded, linkType, linkId, userHabits, userDailies, userRoutines])
 
   useEffect(() => {
     let interval
@@ -526,12 +554,15 @@ export default function Timer() {
         habitColor: selectedHabit?.color || colors.accent,
         linkedTask: linkedTask ? {
           id: linkedTask.id,
+          taskId: linkedTask.taskId,
           type: linkedTask.type,
-          title: linkedTask.title
+          title: linkedTask.title,
+          completed: Boolean(linkedTask.data?.is_completed_today || linkedTask.data?.completed)
         } : null
       }
-      
+
       setCompletedSessionData(sessionData)
+      setMarkLinkedDone(false)
       
       // Show session notes modal
       setShowSessionNotes(true)
@@ -547,8 +578,11 @@ export default function Timer() {
             session_type: 'work',
             duration_planned: originalTime,
             duration_actual: originalTime - time,
-            habit_id: selectedHabit?.id || null,
-            focus_topic: selectedHabit?.title || 'Focus Session',
+            // selectedHabit is a timer preset, not a real habit; the backend links
+            // real tasks through task_type / task_id.
+            task_type: linkedTask?.type || null,
+            task_id: linkedTask?.taskId ?? null,
+            focus_topic: linkedTask?.title || selectedHabit?.title || 'Focus Session',
             completed: true,
             experience_gained: xpGain,
             coins_gained: coinsGain
@@ -665,6 +699,20 @@ export default function Timer() {
 
   const progressPercentage = originalTime > 0 ? ((originalTime - time) / originalTime) * 100 : 0
   
+  // If the user ticked "Mark as done" after a linked session, hand off to the
+  // Habits/Dailies tab, which completes it with its normal XP + streak logic.
+  const completeLinkedTaskIfChosen = (sessionData: any) => {
+    const task = sessionData?.linkedTask
+    if (!markLinkedDone || !task || task.completed) return
+    if (task.type !== 'habit' && task.type !== 'daily') return
+    setMarkLinkedDone(false)
+    setLinkedTask(null)
+    router.navigate({
+      pathname: task.type === 'habit' ? '/' : '/dailies',
+      params: { completeId: String(task.taskId) },
+    })
+  }
+
   // NEW FEATURE HANDLERS
   const saveSessionNotes = async() => {
     try {
@@ -700,9 +748,11 @@ export default function Timer() {
         await AsyncStorage.setItem("activityData", JSON.stringify(updatedActivityData))
       }
       
+      const finishedSession = completedSessionData
       setSessionNotes('')
       setShowSessionNotes(false)
       setCompletedSessionData(null)
+      completeLinkedTaskIfChosen(finishedSession)
     } catch (error) {
       console.error("Failed to save session notes:", error)
     }
@@ -720,10 +770,12 @@ export default function Timer() {
       setSessionHistory(updatedHistory)
       AsyncStorage.setItem("sessionHistory", JSON.stringify(updatedHistory))
     }
-    
+
+    const finishedSession = completedSessionData
     setSessionNotes('')
     setShowSessionNotes(false)
     setCompletedSessionData(null)
+    completeLinkedTaskIfChosen(finishedSession)
   }
   
   const addCustomPreset = async (title, minutes) => {
@@ -1157,7 +1209,7 @@ export default function Timer() {
             {linkedTask && (
               <View style={[tw`mt-3 p-3 rounded-xl flex-row items-center`, { backgroundColor: colors.accent + '10' }]}>
                 <Ionicons 
-                  name={linkedTask.type === 'daily' ? "checkbox" : "repeat"} 
+                  name={linkedTask.type === 'habit' ? "checkmark-circle" : linkedTask.type === 'daily' ? "checkbox" : "repeat"}
                   size={20} 
                   color={colors.accent} 
                   style={tw`mr-2`}
@@ -1617,6 +1669,43 @@ export default function Timer() {
                 </TouchableOpacity>
               )}
               
+              {/* Habits */}
+              {userHabits.length > 0 && (
+                <>
+                  <Text style={[tw`text-sm font-bold mb-3 mt-2`, { color: colors.textSecondary }]}>HABITS</Text>
+                  {userHabits.map((habit) => (
+                    <TouchableOpacity
+                      key={`habit-${habit.id}`}
+                      style={[
+                        tw`flex-row items-center p-4 rounded-2xl mb-3`,
+                        {
+                          backgroundColor: linkedTask?.id === `habit-${habit.id}` ? colors.accent + '20' : colors.cardSecondary,
+                          borderLeftWidth: 3,
+                          borderLeftColor: habit.color || colors.accent
+                        }
+                      ]}
+                      onPress={() => {
+                        setLinkedTask({ id: `habit-${habit.id}`, taskId: Number(habit.id), type: 'habit', title: habit.title, data: habit })
+                        setShowTaskSelector(false)
+                      }}
+                    >
+                      <View style={[tw`w-10 h-10 rounded-full items-center justify-center mr-3`, { backgroundColor: colors.accent + '20' }]}>
+                        <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
+                      </View>
+                      <View style={tw`flex-1`}>
+                        <Text style={[tw`font-semibold`, { color: colors.text }]}>{habit.title}</Text>
+                        <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
+                          {habit.is_completed_today ? 'Done today' : `${habit.difficulty || 'medium'} habit`}
+                        </Text>
+                      </View>
+                      {linkedTask?.id === `habit-${habit.id}` && (
+                        <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+
               {/* Dailies */}
               {userDailies.length > 0 && (
                 <>
@@ -1633,7 +1722,7 @@ export default function Timer() {
                         }
                       ]}
                       onPress={() => {
-                        setLinkedTask({ id: `daily-${daily.id}`, type: 'daily', title: daily.title, data: daily })
+                        setLinkedTask({ id: `daily-${daily.id}`, taskId: Number(daily.id), type: 'daily', title: daily.title, data: daily })
                         setShowTaskSelector(false)
                       }}
                     >
@@ -1670,7 +1759,7 @@ export default function Timer() {
                         }
                       ]}
                       onPress={() => {
-                        setLinkedTask({ id: `routine-${routine.id}`, type: 'routine', title: routine.title, data: routine })
+                        setLinkedTask({ id: `routine-${routine.id}`, taskId: Number(routine.id), type: 'routine', title: routine.title, data: routine })
                         setShowTaskSelector(false)
                       }}
                     >
@@ -1691,11 +1780,11 @@ export default function Timer() {
                 </>
               )}
               
-              {userDailies.length === 0 && userRoutines.length === 0 && (
+              {userHabits.length === 0 && userDailies.length === 0 && userRoutines.length === 0 && (
                 <View style={tw`items-center py-8`}>
                   <Ionicons name="list-outline" size={48} color={colors.textSecondary} />
                   <Text style={[tw`mt-4 text-center`, { color: colors.textSecondary }]}>
-                    No tasks found. Create dailies or routines to link them to your focus sessions.
+                    No tasks found. Create habits, dailies or routines to link them to your focus sessions.
                   </Text>
                 </View>
               )}
@@ -1726,7 +1815,42 @@ export default function Timer() {
                   {completedSessionData?.duration} min • +{completedSessionData?.xpGained} XP • +{completedSessionData?.coinsGained} Coins
                 </Text>
               </View>
-              
+
+              {/* Linked task: offer to mark it done (never automatic) */}
+              {completedSessionData?.linkedTask && (
+                completedSessionData.linkedTask.type === 'routine' || completedSessionData.linkedTask.completed ? (
+                  <View style={[tw`flex-row items-center p-3 rounded-xl mb-4`, { backgroundColor: colors.cardSecondary }]}>
+                    <Ionicons name="link" size={18} color={colors.accent} style={tw`mr-2`} />
+                    <Text style={[tw`flex-1 text-sm`, { color: colors.text }]} numberOfLines={2}>
+                      {completedSessionData.duration} min added to {completedSessionData.linkedTask.title}
+                      {completedSessionData.linkedTask.completed ? ' (already done today)' : ''}
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: markLinkedDone }}
+                    onPress={() => setMarkLinkedDone((value) => !value)}
+                    style={[
+                      tw`flex-row items-center p-3 rounded-xl mb-4`,
+                      { backgroundColor: markLinkedDone ? colors.accent + '26' : colors.cardSecondary }
+                    ]}
+                  >
+                    <View
+                      style={[
+                        tw`w-6 h-6 rounded-lg border-2 items-center justify-center mr-3`,
+                        { borderColor: colors.accent, backgroundColor: markLinkedDone ? colors.accent : 'transparent' }
+                      ]}
+                    >
+                      {markLinkedDone && <Ionicons name="checkmark" size={14} color="white" />}
+                    </View>
+                    <Text style={[tw`flex-1 text-sm font-semibold`, { color: colors.text }]} numberOfLines={2}>
+                      Mark “{completedSessionData.linkedTask.title}” as done
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+
               <Text style={[tw`font-semibold mb-2`, { color: colors.text }]}>
                 What did you accomplish?
               </Text>

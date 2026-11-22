@@ -10,8 +10,9 @@ import {
   Pressable,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import tw from "../lib/tailwind"
+import { Pill, tint } from "./ui"
 import { useTheme } from "../contexts/ThemeProvider"
+import { formatFocusMinutes } from "../lib/focusLinks"
 
 
 interface HabitItemProps {
@@ -21,6 +22,8 @@ interface HabitItemProps {
   subtext: string
   completed?: boolean
   streak?: number
+  focusMinutes?: number // minutes focused on this habit today (linked focus sessions)
+  onFocus?: (id: number) => void // open the Focus timer linked to this habit
   onEdit: (id: number) => void
   onComplete: (id: number) => void
   onFail: (id: number) => void
@@ -33,11 +36,13 @@ export default function HabitItem({
   subtext,
   completed = false,
   streak = 0,
+  focusMinutes = 0,
+  onFocus,
   onEdit,
   onComplete,
   onFail,
 }: HabitItemProps) {
-  const { colors, isGlowEnabled } = useTheme()
+  const { colors } = useTheme()
   const [scaleAnim] = useState(new Animated.Value(1))
 
   const getThemeColor = (savedColor: string) => {
@@ -155,138 +160,85 @@ export default function HabitItem({
   }
 
   return (
-    <Animated.View 
-      style={[
-        tw`mb-2.5`,
-        {
-          transform: [{ scale: scaleAnim }],
-        }
-      ]}
-    >
-      {/* Main Card - Compact Design */}
+    <Animated.View style={{ marginBottom: 8, transform: [{ scale: scaleAnim }] }}>
       <Pressable
         onPress={handlePress}
-        style={[
-          tw`rounded-xl p-2`,
-          {
-            borderLeftWidth: 4,
-            borderLeftColor: habitColor,
-            backgroundColor: completed ? colors.cardSecondary : colors.card,
-            opacity: completed ? 0.7 : 1.0,
-            shadowColor: habitColor,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: isGlowEnabled ? (completed ? 0.1 : 0.2) : 0,
-            shadowRadius: isGlowEnabled ? 4 : 0,
-            elevation: isGlowEnabled ? 4 : 0,
-          }
-        ]}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderRadius: 16,
+          backgroundColor: completed ? tint(habitColor, 0.08) : colors.card,
+          borderWidth: 1,
+          borderColor: completed ? tint(habitColor, 0.3) : tint(colors.cardSecondary, 0.6),
+        }}
       >
-        {/* Compact Header Row */}
-        <View style={tw`flex-row items-center justify-between`}>
-          <View style={tw`flex-1 mr-2`}>
-            {/* Title with completion checkbox */}
-            <View style={tw`flex-row items-center`}>
-              <TouchableOpacity
-                onPress={handleComplete}
-                style={[
-                  tw`w-6 h-6 rounded-lg border-2 items-center justify-center mr-2`,
-                  {
-                    backgroundColor: completed ? habitColor : 'transparent',
-                    borderColor: habitColor,
-                  }
-                ]}
-              >
-                {completed && (
-                  <Ionicons name="checkmark" size={14} color="white" />
-                )}
-              </TouchableOpacity>
-              
-              <View style={tw`flex-1`}>
-                <Text
-                  style={[
-                    tw`font-bold text-sm`,
-                    {
-                      color: completed ? colors.textSecondary : colors.text,
-                      textDecorationLine: completed ? 'line-through' : 'none',
-                    }
-                  ]}
-                  numberOfLines={1}
-                >
-                  {title}
-                </Text>
-                
-                {/* Compact subtitle */}
-                <Text
-                  style={[
-                    tw`text-xs mt-0.5`,
-                    { color: colors.textSecondary }
-                  ]}
-                  numberOfLines={1}
-                >
-                  {subtext}
-                </Text>
-              </View>
-            </View>
-          </View>
+        {/* Complete */}
+        <TouchableOpacity
+          onPress={handleComplete}
+          accessibilityLabel={completed ? `${title} completed` : `Complete ${title}`}
+          hitSlop={8}
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            borderWidth: 2,
+            borderColor: habitColor,
+            backgroundColor: completed ? habitColor : "transparent",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {completed && <Ionicons name="checkmark" size={15} color="#FFFFFF" />}
+        </TouchableOpacity>
 
-          {/* Right Side - Compact Status & Actions */}
-          <View style={tw`flex-row items-center`}>
-            {/* Streak Badge */}
-            {streak > 0 && (
-              <View
-                style={[
-                  tw`px-1.5 py-0.5 rounded-full mr-1.5`,
-                  { backgroundColor: `${habitColor}25` }
-                ]}
-              >
-                <Text
-                  style={[
-                    tw`text-xs font-bold`,
-                    { color: habitColor }
-                  ]}
-                >
-                  <View style={tw`flex-row items-center`}>
-                    <Ionicons name="flame" size={12} color={habitColor} style={tw`mr-0.5`} />
-                    <Text style={[tw`text-xs font-bold`, { color: habitColor }]}>{streak}</Text>
-                  </View>
-                </Text>
-              </View>
+        {/* Title + meta */}
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: "600",
+              color: completed ? colors.textSecondary : colors.text,
+              textDecorationLine: completed ? "line-through" : "none",
+            }}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {streak > 0 && <Pill label={streak} icon="flame" color={colors.warning} />}
+            {focusMinutes > 0 && <Pill label={formatFocusMinutes(focusMinutes)} icon="timer-outline" color={colors.accent} />}
+            {!!subtext && (
+              <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>
+                {subtext}
+              </Text>
             )}
-
-            {/* Compact Fail Button */}
-            <TouchableOpacity onPress={handleFail} style={tw`mr-1.5`}>
-              <View
-                style={[
-                  tw`w-6 h-6 rounded-lg border-2 items-center justify-center`,
-                  {
-                    backgroundColor: 'transparent',
-                    borderColor: colors.error,
-                  }
-                ]}
-              >
-                <Ionicons name="remove" size={14} color={colors.error} />
-              </View>
-            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Ultra-Thin Modern Progress Bar */}
-        <View style={tw`mt-1.5 ml-9 mr-1`}>
-          <View style={[
-            tw`h-0.5 rounded-full overflow-hidden`,
-            { backgroundColor: colors.cardSecondary }
-          ]}>
-            <Animated.View
-              style={[
-                tw`h-full rounded-full`,
-                {
-                  backgroundColor: habitColor,
-                  width: completed ? '100%' : '0%',
-                }
-              ]}
-            />
-          </View>
-        </View>
+        {/* Actions */}
+        {onFocus && !completed && (
+          <TouchableOpacity
+            onPress={() => onFocus(id)}
+            accessibilityLabel={`Focus on ${title}`}
+            hitSlop={6}
+            style={{ width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: tint(colors.accent, 0.12) }}
+          >
+            <Ionicons name="timer-outline" size={17} color={colors.accent} />
+          </TouchableOpacity>
+        )}
+        {!completed && (
+          <TouchableOpacity
+            onPress={handleFail}
+            accessibilityLabel={`Mark ${title} as failed`}
+            hitSlop={6}
+            style={{ width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: tint(colors.error, 0.1) }}
+          >
+            <Ionicons name="remove" size={17} color={colors.error} />
+          </TouchableOpacity>
+        )}
       </Pressable>
     </Animated.View>
   )

@@ -1,12 +1,13 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Alert } from "react-native"
+import React, { useEffect, useState } from "react"
+import { Alert, Text, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
 import { useTheme } from "../../../contexts/ThemeProvider"
-import tw from "../../../lib/tailwind"
 import { achievementsAPI, socialAPI } from "../../../lib/api"
+import { Card, Divider, EmptyState, IconTile, LoadingState, Pill, ProgressBar, Screen, Section, tint } from "../../../components/ui"
+
+type Rarity = "common" | "rare" | "epic" | "legendary"
 
 type SocialBadge = {
   id: number
@@ -21,352 +22,175 @@ type SocialBadge = {
   xpReward: number
   coinReward: number
   unlockLevel: number
-  rarity: "common" | "rare" | "epic" | "legendary"
+  rarity: Rarity
 }
 
-type SocialStats = {
-  friends: number
-  parties: number
-  groupBadges: number
+const rarityFromLevel = (level: number): Rarity => (level >= 10 ? "legendary" : level >= 7 ? "epic" : level >= 4 ? "rare" : "common")
+
+const RARITY_COLOR: Record<Rarity, string> = {
+  common: "#10B981",
+  rare: "#3B82F6",
+  epic: "#8B5CF6",
+  legendary: "#F59E0B",
 }
 
-const getRarityFromLevel = (level: number): "common" | "rare" | "epic" | "legendary" => {
-  if (level >= 10) {
-    return "legendary"
-  }
-  if (level >= 7) {
-    return "epic"
-  }
-  if (level >= 4) {
-    return "rare"
-  }
-  return "common"
-}
-
-const getRarityColor = (rarity: string): string => {
-  switch (rarity) {
-    case "common":
-      return "#10B981"
-    case "rare":
-      return "#3B82F6"
-    case "epic":
-      return "#8B5CF6"
-    case "legendary":
-      return "#F59E0B"
-    default:
-      return "#6B7280"
-  }
-}
-
-const normalizeNumber = (value: unknown, fallback = 0): number => {
+const num = (value: unknown, fallback = 0) => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-const formatUnlockedDate = (value?: string): string => {
-  if (!value) {
-    return "Recently"
-  }
-
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) {
-    return "Recently"
-  }
-
-  return parsed.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
+const formatDate = (value?: string) => {
+  const parsed = value ? new Date(value) : null
+  return parsed && !Number.isNaN(parsed.getTime())
+    ? parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "recently"
 }
 
 export default function GroupBadges() {
-  const router = useRouter()
-  const { colors, currentTheme } = useTheme()
+  const { colors } = useTheme()
   const [loading, setLoading] = useState(true)
-  const [earnedBadges, setEarnedBadges] = useState<SocialBadge[]>([])
-  const [inProgressBadges, setInProgressBadges] = useState<SocialBadge[]>([])
-  const [socialStats, setSocialStats] = useState<SocialStats>({
-    friends: 0,
-    parties: 0,
-    groupBadges: 0,
-  })
+  const [badges, setBadges] = useState<SocialBadge[]>([])
+  const [socialStats, setSocialStats] = useState({ friends: 0, parties: 0 })
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true)
-
-        const [achievementsResponse, statsResponse] = await Promise.all([
-          achievementsAPI.getAchievements(),
-          socialAPI.getStats(),
-        ])
-
-        const socialAchievements = achievementsResponse?.achievements?.social || []
-
-        const badges: SocialBadge[] = socialAchievements.map((achievement: any) => {
-          const unlockLevel = normalizeNumber(achievement.unlockLevel, 1)
-          return {
-            id: normalizeNumber(achievement.id, 0),
-            name: String(achievement.title || "Social Badge"),
-            description: String(achievement.description || ""),
-            icon: String(achievement.icon || "star"),
-            color: String(achievement.color || "#14B8A6"),
-            progress: normalizeNumber(achievement.progress, 0),
-            total: Math.max(1, normalizeNumber(achievement.total, 1)),
-            unlocked: Boolean(achievement.unlocked),
-            unlockedAt: achievement.unlockedAt,
-            xpReward: normalizeNumber(achievement.xpReward, 0),
-            coinReward: normalizeNumber(achievement.coinReward, 0),
-            unlockLevel,
-            rarity: getRarityFromLevel(unlockLevel),
-          }
-        })
-
-        setEarnedBadges(badges.filter((badge) => badge.unlocked))
-        setInProgressBadges(badges.filter((badge) => !badge.unlocked))
-
-        setSocialStats({
-          friends: normalizeNumber(statsResponse?.stats?.friends, 0),
-          parties: normalizeNumber(statsResponse?.stats?.parties, 0),
-          groupBadges: normalizeNumber(statsResponse?.stats?.groupBadges, 0),
-        })
+        const [achievementsResponse, statsResponse] = await Promise.all([achievementsAPI.getAchievements(), socialAPI.getStats()])
+        const social = achievementsResponse?.achievements?.social || []
+        setBadges(
+          social.map((achievement: any) => {
+            const unlockLevel = num(achievement.unlockLevel, 1)
+            return {
+              id: num(achievement.id),
+              name: String(achievement.title || "Social badge"),
+              description: String(achievement.description || ""),
+              icon: String(achievement.icon || "star"),
+              color: String(achievement.color || colors.accent),
+              progress: num(achievement.progress),
+              total: Math.max(1, num(achievement.total, 1)),
+              unlocked: Boolean(achievement.unlocked),
+              unlockedAt: achievement.unlockedAt,
+              xpReward: num(achievement.xpReward),
+              coinReward: num(achievement.coinReward),
+              unlockLevel,
+              rarity: rarityFromLevel(unlockLevel),
+            }
+          }),
+        )
+        setSocialStats({ friends: num(statsResponse?.stats?.friends), parties: num(statsResponse?.stats?.parties) })
       } catch (error) {
         console.error("Failed to load group badges:", error)
-        Alert.alert("Error", "Could not load group badge data.")
+        Alert.alert("Couldn't load badges", "Please try again in a moment.")
       } finally {
         setLoading(false)
       }
     }
-
     loadData()
   }, [])
 
-  const totalTrackedBadges = useMemo(() => {
-    return earnedBadges.length + inProgressBadges.length
-  }, [earnedBadges.length, inProgressBadges.length])
-
-  const EarnedBadgeCard = ({ badge }: { badge: SocialBadge }) => (
-    <View
-      style={[
-        tw`rounded-2xl p-4 mb-3`,
-        {
-          backgroundColor: colors.card,
-        },
-      ]}
-    >
-      <View style={tw`flex-row items-center mb-4`}>
-        <View
-          style={[
-            tw`w-16 h-16 rounded-2xl items-center justify-center mr-4`,
-            {
-              backgroundColor: colors.cardSecondary,
-            },
-          ]}
-        >
-          <Ionicons name={badge.icon as any} size={28} color={colors.textSecondary} />
-        </View>
-
-        <View style={tw`flex-1`}>
-          <View style={tw`flex-row items-center mb-1`}>
-            <Text style={[tw`font-bold text-lg mr-2`, { color: colors.text }]}>{badge.name}</Text>
-            <View
-              style={[
-                tw`px-2 py-1 rounded`,
-                { backgroundColor: colors.cardSecondary },
-              ]}
-            >
-              <Text
-                style={[
-                  tw`text-xs font-bold uppercase`,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                {badge.rarity}
-              </Text>
-            </View>
-          </View>
-          <Text style={[tw`text-sm mb-2`, { color: colors.textSecondary }]}>{badge.description}</Text>
-          <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Unlocked on {formatUnlockedDate(badge.unlockedAt)}</Text>
-        </View>
-      </View>
-
-      <View style={[tw`pt-4 border-t flex-row justify-between`, { borderColor: colors.cardSecondary }]}>
-        <Text style={{ color: colors.text }}>⭐ {badge.xpReward} XP</Text>
-        <Text style={{ color: colors.text }}>💰 {badge.coinReward} Coins</Text>
-        <Text style={{ color: colors.text }}>Lvl {badge.unlockLevel}</Text>
-      </View>
-    </View>
-  )
-
-  const ProgressBadgeCard = ({ badge }: { badge: SocialBadge }) => {
-    const progressPercent = Math.min(100, Math.round((badge.progress / badge.total) * 100))
-
+  if (loading) {
     return (
-      <View
-        style={[
-          tw`rounded-2xl p-4 mb-3`,
-          { backgroundColor: colors.card },
-        ]}
-      >
-        <View style={tw`flex-row items-center mb-4`}>
-          <View
-            style={[
-              tw`w-16 h-16 rounded-2xl items-center justify-center mr-4`,
-              { backgroundColor: colors.cardSecondary },
-            ]}
-          >
-            <Ionicons name={badge.icon as any} size={28} color={colors.textSecondary} />
-          </View>
-
-          <View style={tw`flex-1`}>
-            <View style={tw`flex-row items-center mb-1`}>
-              <Text style={[tw`font-bold text-lg mr-2`, { color: colors.text }]}>{badge.name}</Text>
-              <View
-                style={[
-                  tw`px-2 py-1 rounded`,
-                  { backgroundColor: colors.cardSecondary },
-                ]}
-              >
-                <Text
-                  style={[
-                    tw`text-xs font-bold uppercase`,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {badge.rarity}
-                </Text>
-              </View>
-            </View>
-            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{badge.description}</Text>
-          </View>
-        </View>
-
-        <View style={tw`mb-4`}>
-          <View style={tw`flex-row justify-between items-center mb-2`}>
-            <Text style={[tw`font-medium`, { color: colors.text }]}>Progress</Text>
-            <Text style={[tw`font-bold`, { color: colors.text }]}>{progressPercent}%</Text>
-          </View>
-
-          <View style={[tw`h-3 rounded-full overflow-hidden mb-2`, { backgroundColor: colors.cardSecondary }]}>
-            <View
-              style={[
-                tw`h-full rounded-full`,
-                { width: `${progressPercent}%`, backgroundColor: colors.accent },
-              ]}
-            />
-          </View>
-
-          <View style={tw`flex-row justify-between`}>
-            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}> 
-              {badge.progress}/{badge.total}
-            </Text>
-            <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Unlock at level {badge.unlockLevel}</Text>
-          </View>
-        </View>
-
-        <View style={[tw`pt-3 border-t flex-row justify-between`, { borderColor: colors.cardSecondary }]}>
-          <Text style={{ color: colors.text }}>⭐ {badge.xpReward} XP</Text>
-          <Text style={{ color: colors.text }}>💰 {badge.coinReward} Coins</Text>
-        </View>
-      </View>
+      <Screen title="Group badges">
+        <LoadingState />
+      </Screen>
     )
   }
 
-  if (loading) {
+  const earned = badges.filter((b) => b.unlocked)
+  const inProgress = badges.filter((b) => !b.unlocked)
+
+  const BadgeRow = ({ badge }: { badge: SocialBadge }) => {
+    const rarityColor = RARITY_COLOR[badge.rarity]
     return (
-      <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={currentTheme.statusBarStyle} />
-        <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading group badges...</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 }}>
+        <IconTile icon={(badge.unlocked ? badge.icon : "lock-closed-outline") as any} color={badge.unlocked ? badge.color : colors.textSecondary} size={44} />
+        <View style={{ flex: 1, gap: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ flexShrink: 1, fontSize: 15, fontWeight: "600", color: colors.text }} numberOfLines={1}>
+              {badge.name}
+            </Text>
+            <Pill label={badge.rarity.charAt(0).toUpperCase() + badge.rarity.slice(1)} color={rarityColor} />
+          </View>
+          <Text style={{ fontSize: 12, color: colors.textSecondary }} numberOfLines={2}>
+            {badge.description}
+          </Text>
+          {badge.unlocked ? (
+            <Text style={{ fontSize: 11, color: colors.textSecondary }}>Unlocked {formatDate(badge.unlockedAt)}</Text>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 }}>
+              <View style={{ flex: 1 }}>
+                <ProgressBar value={badge.progress / badge.total} color={badge.color} height={4} />
+              </View>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textSecondary }}>
+                {badge.progress}/{badge.total}
+              </Text>
+            </View>
+          )}
+          <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
+            {badge.xpReward > 0 && <Pill label={`+${badge.xpReward} XP`} color={colors.accent} />}
+            {badge.coinReward > 0 && <Pill label={`+${badge.coinReward}`} icon="ellipse" color={colors.warning} />}
+            {!badge.unlocked && badge.unlockLevel > 1 && <Pill label={`Lv ${badge.unlockLevel}+`} icon="lock-closed" />}
+          </View>
         </View>
-      </SafeAreaView>
+      </View>
     )
   }
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
-          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Group Badges</Text>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View
-            style={[
-              tw`rounded-2xl p-4 mb-4`,
-              { backgroundColor: colors.card },
-            ]}
-          >
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Your Achievement Stats</Text>
-
-            <View style={tw`flex-row justify-between`}>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{earnedBadges.length}</Text>
-                <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Earned</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{inProgressBadges.length}</Text>
-                <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>In Progress</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{socialStats.friends}</Text>
-                <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Team Mates</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>{socialStats.parties}</Text>
-                <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Groups</Text>
-              </View>
-            </View>
+    <Screen title="Group badges" subtitle="Achievements you earn with others">
+      <Card style={{ flexDirection: "row", paddingVertical: 14 }}>
+        {[
+          { label: "Earned", value: earned.length },
+          { label: "In progress", value: inProgress.length },
+          { label: "Friends", value: socialStats.friends },
+          { label: "Parties", value: socialStats.parties },
+        ].map((item, i) => (
+          <View key={item.label} style={{ flex: 1, alignItems: "center", borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: tint(colors.cardSecondary, 0.7) }}>
+            <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text }}>{item.value}</Text>
+            <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{item.label}</Text>
           </View>
+        ))}
+      </Card>
 
-          <View style={tw`mb-6`}>
-            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Earned Badges ({earnedBadges.length})</Text>
-
-            {earnedBadges.map((badge) => (
-              <EarnedBadgeCard key={badge.id} badge={badge} />
-            ))}
-
-            {earnedBadges.length === 0 && (
-              <View style={tw`items-center py-10`}>
-                <Ionicons name="medal-outline" size={48} color={colors.textSecondary} />
-                <Text style={[tw`mt-3`, { color: colors.textSecondary }]}>No group badges unlocked yet.</Text>
-              </View>
+      {badges.length === 0 ? (
+        <EmptyState icon="ribbon-outline" title="No group badges yet" message="Join a party or add friends to start earning badges together." />
+      ) : (
+        <>
+          <Section title={`Earned · ${earned.length}`}>
+            {earned.length === 0 ? (
+              <EmptyState icon="medal-outline" title="None earned yet" message="Your first group badge is waiting below." />
+            ) : (
+              <Card padded={false}>
+                {earned.map((badge, i) => (
+                  <View key={badge.id}>
+                    {i > 0 && <Divider inset={70} />}
+                    <BadgeRow badge={badge} />
+                  </View>
+                ))}
+              </Card>
             )}
-          </View>
+          </Section>
 
-          <View style={tw`mb-6`}>
-            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>In Progress ({inProgressBadges.length})</Text>
-
-            {inProgressBadges.map((badge) => (
-              <ProgressBadgeCard key={badge.id} badge={badge} />
-            ))}
-
-            {inProgressBadges.length === 0 && totalTrackedBadges > 0 && (
-              <View style={tw`items-center py-10`}>
-                <Ionicons name="checkmark-circle-outline" size={48} color={colors.success} />
-                <Text style={[tw`mt-3`, { color: colors.text }]}>All social badges are completed.</Text>
-              </View>
-            )}
-          </View>
-
-          <View
-            style={[
-              tw`rounded-2xl p-4`,
-              { backgroundColor: colors.card },
-            ]}
-          >
-            <Text style={[tw`text-lg font-bold mb-3`, { color: colors.text }]}>Badge Progress Summary</Text>
-            <Text style={{ color: colors.textSecondary }}>Total tracked social badges: {totalTrackedBadges}</Text>
-            <Text style={[tw`mt-1`, { color: colors.textSecondary }]}>Unlocked social badges: {socialStats.groupBadges}</Text>
-          </View>
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+          {inProgress.length > 0 ? (
+            <Section title={`In progress · ${inProgress.length}`}>
+              <Card padded={false}>
+                {inProgress.map((badge, i) => (
+                  <View key={badge.id}>
+                    {i > 0 && <Divider inset={70} />}
+                    <BadgeRow badge={badge} />
+                  </View>
+                ))}
+              </Card>
+            </Section>
+          ) : (
+            <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={{ fontSize: 14, color: colors.text }}>You've earned every group badge.</Text>
+            </Card>
+          )}
+        </>
+      )}
+    </Screen>
   )
 }

@@ -11,6 +11,9 @@ import { useTheme } from "../../contexts/ThemeProvider"
 
 import { dailiesAPI } from "../../lib/api"
 import CharacterPanel from "../../components/CharacterPanel"
+import { useLocalSearchParams, useRouter } from "expo-router"
+import { focusLinkParams, formatFocusMinutes, useFocusMinutes } from "../../lib/focusLinks"
+import { EmptyState, Pill, tint } from "../../components/ui"
 
 // Enhanced daily task interface
 interface DailyTask {
@@ -39,6 +42,10 @@ export default function DailiesScreen() {
   const [dailies, setDailies] = useState<DailyTask[]>([])
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
   const [editingDaily, setEditingDaily] = useState<DailyTask | null>(null)
+  const router = useRouter()
+  const { completeId } = useLocalSearchParams<{ completeId?: string }>()
+  const handledCompleteId = React.useRef<string | null>(null)
+  const focusMinutes = useFocusMinutes("daily")
 
   // Load dailies from storage
   useEffect(() => {
@@ -161,6 +168,19 @@ export default function DailiesScreen() {
       console.error("Error adding daily:", error)
     }
   }
+
+  // The Focus tab sends ?completeId=<id> when the user chose "Mark as done"
+  // after a linked session. Complete it once (never un-complete).
+  useEffect(() => {
+    if (!completeId || handledCompleteId.current === completeId) return
+    const daily = dailies.find((d) => d.id === Number(completeId))
+    if (!daily) return // wait until dailies have loaded
+    handledCompleteId.current = completeId
+    if (!daily.completed) {
+      void toggleDaily(daily.id)
+    }
+    router.setParams({ completeId: undefined })
+  }, [completeId, dailies])
 
   const toggleDaily = async (id: number) => {
     try {
@@ -418,7 +438,7 @@ export default function DailiesScreen() {
       <StatusBar barStyle={currentTheme.statusBarStyle} />
       
       <FlatList
-        style={tw`flex-1 px-2 pt-2`}
+        style={tw`flex-1 px-4 pt-1`}
         data={dailies}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
@@ -446,113 +466,87 @@ export default function DailiesScreen() {
           </View>
         )}
         ListEmptyComponent={() => (
-          <View style={tw`items-center py-8`}>
-            <Ionicons name="list-outline" size={48} color={colors.textSecondary} />
-            <Text style={[tw`text-lg mt-3`, { color: colors.textSecondary }]}>No daily tasks yet</Text>
-            <Text style={[tw`text-center mt-1`, { color: colors.textSecondary }]}>
-              Add your first task to get started
-            </Text>
-          </View>
+          <EmptyState icon="list-outline" title="No dailies yet" message="Add your first daily task to get started." />
         )}
         renderItem={({ item }) => {
           const priorityColor = getPriorityColor(item.priority)
           const difficultyInfo = getDifficultyInfo(item.difficulty)
           const reminderLabel = formatReminderTime(item.reminderTime)
-          
-          return (
-            <View style={tw`mb-2.5`}>
-              <Pressable
-                onPress={() => {
-                  setEditingDaily(item)
-                  setIsAddModalVisible(true)
-                }}
-                style={[
-                  tw`rounded-xl p-2`,
-                  { 
-                    backgroundColor: colors.card,
-                    borderLeftWidth: 4,
-                    borderLeftColor: priorityColor,
-                    shadowColor: colors.accent,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isGlowEnabled ? 0.08 : 0,
-                    shadowRadius: isGlowEnabled ? 4 : 0,
-                    elevation: isGlowEnabled ? 2 : 0,
-                  }
-                ]}
-              >
-                <View style={tw`flex-row items-center justify-between`}>
-                  <View style={tw`flex-1 mr-2`}>
-                    {/* Title with difficulty icon */}
-                    <View style={tw`flex-row items-center`}>
-                      <View
-                        style={[
-                          tw`w-7 h-7 rounded-lg items-center justify-center mr-2`,
-                          { backgroundColor: `${difficultyInfo.color}20` }
-                        ]}
-                      >
-                        <Ionicons
-                          name={difficultyInfo.icon as keyof typeof Ionicons.glyphMap}
-                          size={16}
-                          color={difficultyInfo.color}
-                        />
-                      </View>
-                      
-                      <View style={tw`flex-1`}>
-                        <Text style={[
-                          tw`text-sm font-semibold`,
-                          { 
-                            color: item.completed ? colors.textSecondary : colors.text,
-                            textDecorationLine: item.completed ? 'line-through' : 'none'
-                          }
-                        ]} numberOfLines={1}>
-                          {item.title}
-                        </Text>
-                        
-                        {/* Compact subtitle */}
-                        {item.description && (
-                          <Text style={[
-                            tw`text-xs mt-0.5`,
-                            { color: colors.textSecondary }
-                          ]} numberOfLines={1}>
-                            {item.description}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                  
-                  {/* Right side buttons */}
-                  <View style={tw`flex-row items-center`}>
-                    <TouchableOpacity
-                      onPress={(event) => {
-                        event.stopPropagation()
-                        void toggleDaily(item.id)
-                      }}
-                      style={[
-                        tw`w-6 h-6 rounded-lg items-center justify-center mr-1.5`,
-                        { 
-                          backgroundColor: item.completed ? colors.success : colors.cardSecondary,
-                          borderWidth: 1.5,
-                          borderColor: item.completed ? colors.success : colors.textSecondary,
-                        }
-                      ]}
-                    >
-                      {item.completed && (
-                        <Ionicons name="checkmark" size={12} color="white" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
+          const minutes = focusMinutes[item.id] || 0
 
-                {reminderLabel && (
-                  <View style={tw`mt-1.5 ml-9 mr-1`}> 
-                    <Text style={[tw`text-xs`, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {`Reminder ${reminderLabel}`}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
-            </View>
+          return (
+            <Pressable
+              onPress={() => {
+                setEditingDaily(item)
+                setIsAddModalVisible(true)
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 8,
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                borderRadius: 16,
+                backgroundColor: item.completed ? tint(colors.success, 0.08) : colors.card,
+                borderWidth: 1,
+                borderColor: item.completed ? tint(colors.success, 0.3) : tint(colors.cardSecondary, 0.6),
+              }}
+            >
+              <TouchableOpacity
+                onPress={(event) => {
+                  event.stopPropagation()
+                  void toggleDaily(item.id)
+                }}
+                accessibilityLabel={item.completed ? `Mark ${item.title} not done` : `Complete ${item.title}`}
+                hitSlop={8}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 8,
+                  borderWidth: 2,
+                  borderColor: item.completed ? colors.success : priorityColor,
+                  backgroundColor: item.completed ? colors.success : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {item.completed && <Ionicons name="checkmark" size={15} color="#FFFFFF" />}
+              </TouchableOpacity>
+
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '600',
+                    color: item.completed ? colors.textSecondary : colors.text,
+                    textDecorationLine: item.completed ? 'line-through' : 'none',
+                  }}
+                  numberOfLines={1}
+                >
+                  {item.title}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                  <Pill label={difficultyInfo.label || item.difficulty} icon={difficultyInfo.icon as any} color={difficultyInfo.color} />
+                  {reminderLabel && <Pill label={reminderLabel} icon="alarm-outline" />}
+                  {minutes > 0 && <Pill label={formatFocusMinutes(minutes)} icon="timer-outline" color={colors.accent} />}
+                </View>
+              </View>
+
+              {!item.completed && (
+                <TouchableOpacity
+                  onPress={(event) => {
+                    event.stopPropagation()
+                    router.navigate({ pathname: "/timer", params: focusLinkParams("daily", item.id) })
+                  }}
+                  accessibilityLabel={`Focus on ${item.title}`}
+                  hitSlop={6}
+                  style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: tint(colors.accent, 0.12) }}
+                >
+                  <Ionicons name="timer-outline" size={17} color={colors.accent} />
+                </TouchableOpacity>
+              )}
+            </Pressable>
           )
         }}
       />

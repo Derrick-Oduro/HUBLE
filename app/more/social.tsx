@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from "react-native"
+import { RefreshControl, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
+import { useRouter, type Href } from "expo-router"
 import { useTheme } from "../../contexts/ThemeProvider"
-import tw from "../../lib/tailwind"
 import { activityAPI, socialAPI } from "../../lib/api"
+import { Button, Card, Divider, EmptyState, IconName, IconTile, ListRow, Pill, Screen, Section, RADIUS, tint } from "../../components/ui"
 
 type SocialStats = {
   friends: number
@@ -20,7 +20,6 @@ type SocialStats = {
 
 type RecentActivityItem = {
   id: number
-  type: string
   message: string
   time: string
   icon: string
@@ -29,9 +28,20 @@ type RecentActivityItem = {
   hasCheered: boolean
 }
 
+const timeAgo = (dateString: string) => {
+  const diffMs = Date.now() - new Date(dateString).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 export default function Social() {
   const router = useRouter()
-  const { colors, currentTheme } = useTheme()
+  const { colors } = useTheme()
   const [socialStats, setSocialStats] = useState<SocialStats>({
     friends: 0,
     parties: 0,
@@ -41,44 +51,33 @@ export default function Social() {
     currentStreak: 0,
     pendingRequests: 0,
   })
-  const [loading, setLoading] = useState(true)
+  const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>([])
+  const [refreshing, setRefreshing] = useState(false)
 
-  // Load social stats
-  useEffect(() => {
-    loadSocialStats()
-  }, [])
-
-  const loadSocialStats = async () => {
+  const loadSocialStats = useCallback(async () => {
     try {
-      setLoading(true)
       const response = await socialAPI.getStats()
-      if (response.success && response.stats) {
-        setSocialStats(response.stats)
-      }
+      if (response.success && response.stats) setSocialStats(response.stats)
     } catch (error) {
       console.error("Failed to load social stats:", error)
-    } finally {
-      setLoading(false)
     }
-  }
-
-  // Load recent activity from friends
-  const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>([])
+  }, [])
 
   const loadRecentActivity = useCallback(async () => {
     try {
       const response = await activityAPI.getFriendsActivities(10)
       if (response.success) {
-        setRecentActivity((response.activities || []).map((activity: any) => ({
-          id: Number(activity.id),
-          type: activity.activity_type || "activity",
-          message: activity.title || "New activity",
-          time: getTimeAgo(activity.created_at),
-          icon: activity.icon || "sparkles-outline",
-          color: activity.color || colors.accent,
-          cheersCount: Number(activity.cheers_count || 0),
-          hasCheered: Boolean(activity.has_cheered),
-        })))
+        setRecentActivity(
+          (response.activities || []).map((activity: any) => ({
+            id: Number(activity.id),
+            message: activity.title || "New activity",
+            time: timeAgo(activity.created_at),
+            icon: activity.icon || "sparkles-outline",
+            color: activity.color || colors.accent,
+            cheersCount: Number(activity.cheers_count || 0),
+            hasCheered: Boolean(activity.has_cheered),
+          })),
+        )
       }
     } catch (error) {
       console.error("Failed to load recent activity:", error)
@@ -87,326 +86,140 @@ export default function Social() {
   }, [colors.accent])
 
   useEffect(() => {
+    loadSocialStats()
     loadRecentActivity()
-  }, [loadRecentActivity])
+  }, [loadSocialStats, loadRecentActivity])
 
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`
-    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`
-    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await Promise.all([loadSocialStats(), loadRecentActivity()])
+    setRefreshing(false)
   }
 
   const handleCheerToggle = async (activityId: number, currentlyCheered: boolean) => {
     const delta = currentlyCheered ? -1 : 1
+    const apply = (hasCheered: boolean, count: (prev: number) => number) =>
+      setRecentActivity((prev) => prev.map((a) => (a.id === activityId ? { ...a, hasCheered, cheersCount: Math.max(0, count(a.cheersCount)) } : a)))
 
-    setRecentActivity((prev) =>
-      prev.map((activity) =>
-        activity.id === activityId
-          ? {
-              ...activity,
-              hasCheered: !currentlyCheered,
-              cheersCount: Math.max(0, activity.cheersCount + delta),
-            }
-          : activity,
-      ),
-    )
-
+    apply(!currentlyCheered, (c) => c + delta)
     try {
-      const response = currentlyCheered
-        ? await activityAPI.uncheerActivity(activityId)
-        : await activityAPI.cheerActivity(activityId)
-
-      if (!response?.success) {
-        throw new Error("Cheer action failed")
-      }
-
-      setRecentActivity((prev) =>
-        prev.map((activity) =>
-          activity.id === activityId
-            ? {
-                ...activity,
-                hasCheered: Boolean(response.hasCheered),
-                cheersCount: Number(response.cheersCount || 0),
-              }
-            : activity,
-        ),
-      )
+      const response = currentlyCheered ? await activityAPI.uncheerActivity(activityId) : await activityAPI.cheerActivity(activityId)
+      if (!response?.success) throw new Error("Cheer action failed")
+      apply(Boolean(response.hasCheered), () => Number(response.cheersCount || 0))
     } catch (error) {
       console.error("Failed to update cheer:", error)
-      setRecentActivity((prev) =>
-        prev.map((activity) =>
-          activity.id === activityId
-            ? {
-                ...activity,
-                hasCheered: currentlyCheered,
-                cheersCount: Math.max(0, activity.cheersCount - delta),
-              }
-            : activity,
-        ),
-      )
+      apply(currentlyCheered, (c) => c - delta)
     }
   }
 
-  const socialFeatures: Array<{
-    icon: keyof typeof Ionicons.glyphMap
-    title: string
-    description: string
-    count: number
-    color: string
-    action: () => void
-  }> = [
-    {
-      icon: "people-outline",
-      title: "Friends",
-      description: "Add friends and view their progress",
-      count: socialStats.friends,
-      color: colors.accent,
-      action: () => router.push('/more/social/friends')
-    },
-    {
-      icon: "shield-outline",
-      title: "Parties",
-      description: "Join groups for shared goals",
-      count: socialStats.parties,
-      color: colors.accent,
-      action: () => router.push('/more/social/parties')
-    },
-    {
-      icon: "trophy-outline",
-      title: "Challenges",
-      description: "Compete in community challenges",
-      count: socialStats.activeChallenges,
-      color: colors.accent,
-      action: () => router.push('/more/social/challenges')
-    },
-    {
-      icon: "star-outline",
-      title: "Group Badges",
-      description: "Achievements earned with others",
-      count: socialStats.groupBadges,
-      color: colors.accent,
-      action: () => router.push('/more/social/group-badges')
-    }
+  const sections: { icon: IconName; title: string; subtitle: string; count: number; color: string; href: Href }[] = [
+    { icon: "people-outline", title: "Friends", subtitle: "See how your friends are doing", count: socialStats.friends, color: colors.accent, href: "/more/social/friends" },
+    { icon: "star-outline", title: "Parties", subtitle: "Groups working on shared goals", count: socialStats.parties, color: colors.success, href: "/more/social/parties" },
+    { icon: "flag-outline", title: "Challenges", subtitle: "Compete in community challenges", count: socialStats.activeChallenges, color: colors.warning, href: "/more/social/challenges" },
+    { icon: "ribbon-outline", title: "Group badges", subtitle: "Achievements earned together", count: socialStats.groupBadges, color: colors.error, href: "/more/social/group-badges" },
   ]
 
+  const addFriendButton = (
+    <TouchableOpacity
+      onPress={() => router.push("/more/social/add-friend")}
+      accessibilityLabel="Add friend"
+      style={{ width: 40, height: 40, borderRadius: RADIUS.inner, alignItems: "center", justifyContent: "center", backgroundColor: colors.card }}
+    >
+      <Ionicons name="person-add-outline" size={19} color={colors.text} />
+    </TouchableOpacity>
+  )
+
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
-        
-        {/* Header */}
-        <View style={tw`flex-row items-center justify-between mb-6 mt-2`}>
-          <View style={tw`flex-row items-center`}>
-            <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>Social Hub</Text>
+    <Screen
+      title="Social"
+      subtitle="Connect, compete and grow together"
+      right={addFriendButton}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} colors={[colors.accent]} />}
+    >
+      {/* Summary */}
+      <Card style={{ flexDirection: "row", paddingVertical: 14 }}>
+        {[
+          { label: "Friends", value: socialStats.friends },
+          { label: "Parties", value: socialStats.parties },
+          { label: "Challenges", value: socialStats.activeChallenges },
+          { label: "XP earned", value: socialStats.totalXpEarned },
+        ].map((item, i) => (
+          <View
+            key={item.label}
+            style={{ flex: 1, alignItems: "center", borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: tint(colors.cardSecondary, 0.7) }}
+          >
+            <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text }}>{item.value}</Text>
+            <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{item.label}</Text>
           </View>
-          <TouchableOpacity onPress={loadSocialStats} disabled={loading}>
-            <Ionicons 
-              name="refresh" 
-              size={24} 
-              color={loading ? colors.textSecondary : colors.text} 
-            />
-          </TouchableOpacity>
-        </View>
+        ))}
+      </Card>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Social Stats Overview */}
-          <View style={[
-            tw`rounded-2xl p-4 mb-4`,
-            { backgroundColor: colors.card }
-          ]}>
-            <View style={tw`flex-row items-center mb-4`}>
-              <View style={[
-                tw`w-16 h-16 rounded-2xl items-center justify-center mr-4`,
-                { backgroundColor: colors.cardSecondary }
-              ]}>
-                <Ionicons name="people" size={28} color={colors.textSecondary} />
-              </View>
-              <View style={tw`flex-1`}>
-                <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Social Profile</Text>
-                <Text style={[tw``, { color: colors.textSecondary }]}>Connect, compete & achieve together</Text>
-              </View>
-            </View>
-
-            <View style={[tw`flex-row justify-between pt-4 border-t`, { borderColor: colors.cardSecondary }]}>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.friends}</Text>
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Friends</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.parties}</Text>
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Parties</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>{socialStats.groupBadges}</Text>
-                <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>Badges</Text>
-              </View>
-              <View style={tw`items-center`}>
-                <View style={tw`flex-row items-center`}>
-                  <Ionicons name="flame" size={14} color={colors.accent} />
-                  <Text style={[tw`text-xs ml-1`, { color: colors.textSecondary }]}>Streak</Text>
-                </View>
-              </View>
-            </View>
+      {socialStats.pendingRequests > 0 && (
+        <Card onPress={() => router.push("/inbox")} highlight={colors.accent} style={{ paddingVertical: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <IconTile icon="mail-unread-outline" color={colors.accent} size={36} />
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: colors.text }}>
+              {socialStats.pendingRequests} pending friend {socialStats.pendingRequests === 1 ? "request" : "requests"}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
           </View>
+        </Card>
+      )}
 
-          {/* Social Features Grid */}
-          <View style={tw`mb-6`}>
-            <Text style={[tw`text-xl font-bold mb-4`, { color: colors.text }]}>Features</Text>
-            <View style={tw`flex-row flex-wrap justify-between`}>
-              {socialFeatures.map((feature, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    tw`w-40 rounded-2xl p-4 mb-4`,
-                    { backgroundColor: colors.card }
-                  ]}
-                  onPress={feature.action}
-                >
-                  <View style={[
-                    tw`w-12 h-12 rounded-xl items-center justify-center mb-3`,
-                    { backgroundColor: colors.cardSecondary }
-                  ]}>
-                    <Ionicons name={feature.icon} size={24} color={colors.textSecondary} />
-                  </View>
-                  
-                  <Text style={[tw`font-bold text-base mb-1`, { color: colors.text }]}>{feature.title}</Text>
-                  <Text style={[tw`text-sm mb-3`, { color: colors.textSecondary }]}>{feature.description}</Text>
-                  
-                  <View style={tw`flex-row items-center justify-between`}>
-                    <Text style={[tw`font-bold text-lg`, { color: colors.text }]}>
-                      {feature.count}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-                  </View>
-                </TouchableOpacity>
-              ))}
+      <Section title="Explore">
+        <Card padded={false}>
+          {sections.map((section, i) => (
+            <View key={section.title}>
+              {i > 0 && <Divider inset={62} />}
+              <ListRow
+                icon={section.icon}
+                iconColor={section.color}
+                title={section.title}
+                subtitle={section.subtitle}
+                right={section.count > 0 ? <Pill label={section.count} color={section.color} /> : undefined}
+                chevron
+                onPress={() => router.push(section.href)}
+              />
             </View>
-          </View>
+          ))}
+        </Card>
+      </Section>
 
-          {/* Recent Activity */}
-          <View style={[
-            tw`rounded-2xl p-4 mb-4`,
-            { backgroundColor: colors.card } // ← THEME: Use theme card color
-          ]}>
-            <View style={tw`flex-row justify-between items-center mb-4`}>
-              <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>Recent Activity</Text>
-              <TouchableOpacity>
-                <Text style={[tw`font-semibold`, { color: colors.textSecondary }]}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {recentActivity.map((activity) => (
-              <View key={activity.id} style={[tw`flex-row items-center py-3 border-b last:border-b-0`, { borderColor: colors.cardSecondary }]}>
-                <View style={[
-                  tw`w-10 h-10 rounded-lg items-center justify-center mr-3`,
-                  { backgroundColor: colors.cardSecondary }
-                ]}>
-                  <Ionicons
-                    name={activity.icon as keyof typeof Ionicons.glyphMap}
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </View>
-                
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`font-medium`, { color: colors.text }]}>{activity.message}</Text>
-                  <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{activity.time}</Text>
-                </View>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <Button label="Add friend" icon="person-add-outline" variant="secondary" onPress={() => router.push("/more/social/add-friend")} style={{ flex: 1 }} />
+        <Button label="Create party" icon="add" onPress={() => router.push("/more/social/create-party")} style={{ flex: 1 }} />
+      </View>
 
-                <TouchableOpacity
-                  style={tw`items-center px-2 py-1`}
-                  onPress={() => handleCheerToggle(activity.id, activity.hasCheered)}
-                >
-                  <Ionicons
-                    name={activity.hasCheered ? "heart" : "heart-outline"}
-                    size={18}
-                    color={activity.hasCheered ? colors.accent : colors.textSecondary}
-                  />
-                  <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>{activity.cheersCount}</Text>
-                </TouchableOpacity>
+      <Section title="Friend activity">
+        {recentActivity.length === 0 ? (
+          <EmptyState icon="pulse-outline" title="Nothing yet" message="When your friends complete tasks, it shows up here." />
+        ) : (
+          <Card padded={false}>
+            {recentActivity.map((activity, i) => (
+              <View key={activity.id}>
+                {i > 0 && <Divider inset={62} />}
+                <ListRow
+                  icon={activity.icon as IconName}
+                  iconColor={activity.color}
+                  title={activity.message}
+                  subtitle={activity.time}
+                  right={
+                    <TouchableOpacity
+                      onPress={() => handleCheerToggle(activity.id, activity.hasCheered)}
+                      accessibilityLabel={activity.hasCheered ? "Remove cheer" : "Cheer"}
+                      hitSlop={8}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: activity.hasCheered ? tint(colors.error, 0.14) : tint(colors.cardSecondary, 0.8) }}
+                    >
+                      <Ionicons name={activity.hasCheered ? "heart" : "heart-outline"} size={14} color={activity.hasCheered ? colors.error : colors.textSecondary} />
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: activity.hasCheered ? colors.error : colors.textSecondary }}>{activity.cheersCount}</Text>
+                    </TouchableOpacity>
+                  }
+                />
               </View>
             ))}
-          </View>
-
-          {/* Quick Actions */}
-          <View style={[
-            tw`rounded-2xl p-4 mb-4`,
-            { backgroundColor: colors.card } // ← THEME: Use theme card color
-          ]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Quick Actions</Text>
-            
-            <View style={tw`flex-row justify-between`}>
-              <TouchableOpacity 
-                style={[
-                  tw`flex-1 rounded-xl p-4 mr-2 items-center`,
-                  { backgroundColor: colors.cardSecondary }
-                ]}
-                onPress={() => router.push('/more/social/add-friend')}
-              >
-                <Ionicons name="person-add" size={24} color={colors.text} style={tw`mb-2`} />
-                <Text style={[tw`font-bold text-sm`, { color: colors.text }]}>Add Friend</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[
-                  tw`flex-1 rounded-xl p-4 ml-2 items-center`,
-                  { backgroundColor: colors.accent }
-                ]}
-                onPress={() => router.push('/more/social/create-party')}
-              >
-                <Ionicons name="add-circle" size={24} color="white" style={tw`mb-2`} />
-                <Text style={tw`text-white font-bold text-sm`}>Create Party</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Privacy Settings */}
-          <View style={[
-            tw`rounded-2xl p-4`,
-            { backgroundColor: colors.card } // ← THEME: Use theme card color
-          ]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Privacy & Visibility</Text>
-            
-            <TouchableOpacity 
-              style={[tw`flex-row items-center justify-between py-3 border-b`, { borderColor: colors.cardSecondary }]}
-              onPress={() => router.push('/more/security')}
-            >
-              <View style={tw`flex-row items-center`}>
-                <Ionicons name="eye-outline" size={20} color={colors.textSecondary} style={tw`mr-3`} />
-                <Text style={[tw`font-medium`, { color: colors.text }]}>Profile Visibility</Text>
-              </View>
-              <View style={tw`flex-row items-center`}>
-                <Text style={[tw`mr-2`, { color: colors.textSecondary }]}>Public</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={tw`flex-row items-center justify-between py-3`}
-              onPress={() => router.push('/more/security')}
-            >
-              <View style={tw`flex-row items-center`}>
-                <Ionicons name="ban-outline" size={20} color={colors.textSecondary} style={tw`mr-3`} />
-                <Text style={[tw`font-medium`, { color: colors.text }]}>Blocked Users</Text>
-              </View>
-              <View style={tw`flex-row items-center`}>
-                <Text style={[tw`mr-2`, { color: colors.textSecondary }]}>0</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+          </Card>
+        )}
+      </Section>
+    </Screen>
   )
 }

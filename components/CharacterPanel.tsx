@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useState } from 'react'
 import { View, Text } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import tw from '../lib/tailwind'
+import { useFocusEffect } from 'expo-router'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useStats } from '../contexts/StatsProvider'
 import { useTheme } from '../contexts/ThemeProvider'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Avatar, Card, ProgressBar } from './ui'
 
 interface CharacterPanelProps {
   completedCount: number
@@ -12,264 +13,85 @@ interface CharacterPanelProps {
   taskType: 'habits' | 'dailies' | 'routines'
 }
 
+const SINGULAR = { habits: 'habit', dailies: 'daily', routines: 'routine' } as const
+
+// Compact hero card: avatar + level + currency on one row, three slim meters below.
 export default function CharacterPanel({ completedCount, totalCount, taskType }: CharacterPanelProps) {
-  const { colors, isGlowEnabled } = useTheme()
+  const { colors } = useTheme()
   const { stats } = useStats()
-  const [avatarData, setAvatarData] = useState({
-    avatar: "🧙‍♂️",
-    color: "#8B5CF6",
-    border: "normal"
-  })
+  const [avatar, setAvatar] = useState<{ avatar: string; color: string }>({ avatar: '🧙‍♂️', color: colors.accent })
 
-  // Load avatar data
-  useEffect(() => {
-    loadAvatarData()
-    // Refresh avatar every few seconds in case it was updated
-    const interval = setInterval(loadAvatarData, 2000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadAvatarData = async () => {
-    try {
-      const savedData = await AsyncStorage.getItem('avatarData')
-      if (savedData) {
-        const parsed = JSON.parse(savedData)
-        setAvatarData({
-          avatar: parsed.avatar || "🧙‍♂️",
-          color: parsed.color || "#8B5CF6",
-          border: parsed.border || "normal"
+  // Reload the avatar whenever the screen is shown (it can change on the Avatar screen).
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('avatarData')
+        .then((saved) => {
+          if (!saved) return
+          const parsed = JSON.parse(saved)
+          setAvatar({ avatar: parsed.avatar || '🧙‍♂️', color: parsed.color || colors.accent })
         })
-      }
-    } catch (error) {
-      console.log('Error loading avatar data:', error)
-    }
-  }
+        .catch(() => {})
+    }, [colors.accent]),
+  )
 
-  // Smart color functions for progress bars
-  const getHealthColor = (current: number, max: number) => {
-    const percentage = (current / max) * 100
-    if (percentage > 70) return '#22c55e' // green-500
-    if (percentage > 40) return '#eab308' // yellow-500
-    if (percentage > 15) return '#f97316' // orange-500
-    return '#ef4444' // red-500
-  }
+  const health = stats.health || 0
+  const maxHealth = stats.maxHealth || 100
+  const healthPct = health / maxHealth
+  const xpInLevel = (stats.experience || 0) % 100
+  const todayPct = totalCount > 0 ? completedCount / totalCount : 0
+  const healthColor = healthPct > 0.5 ? colors.success : healthPct > 0.25 ? colors.warning : colors.error
 
-  const getExpColor = (progress: number) => {
-    if (progress > 80) return '#8b5cf6' // violet-500
-    if (progress > 50) return '#3b82f6' // blue-500
-    return '#eab308' // yellow-500
-  }
-
-  const getProgressColor = (percentage: number) => {
-    if (percentage === 100) return colors.success
-    if (percentage > 70) return '#22c55e' // green-500
-    if (percentage > 40) return colors.accent
-    return '#f97316' // orange-500
-  }
-
-  // Calculate completion percentage
-  const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-
-  // Get task type display text
-  const getTaskTypeText = () => {
-    switch (taskType) {
-      case 'habits':
-        return 'habits'
-      case 'dailies':
-        return 'dailies'
-      case 'routines':
-        return 'routines'
-      default:
-        return 'tasks'
-    }
-  }
-
-  const getTaskTypeAction = () => {
-    switch (taskType) {
-      case 'habits':
-        return 'completed'
-      case 'dailies':
-        return 'completed'
-      case 'routines':
-        return 'completed'
-      default:
-        return 'done'
-    }
-  }
+  const meters = [
+    { label: 'Health', value: `${health}/${maxHealth}`, pct: healthPct, color: healthColor },
+    { label: 'XP', value: `${xpInLevel}/100`, pct: xpInLevel / 100, color: colors.accent },
+    { label: 'Today', value: `${completedCount}/${totalCount}`, pct: todayPct, color: colors.success },
+  ]
 
   return (
-    <View style={[
-      tw`rounded-xl p-3 mb-3`, // Compact padding
-      { 
-        backgroundColor: colors.card,
-        shadowColor: colors.accent,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: isGlowEnabled ? 0.1 : 0,
-        shadowRadius: isGlowEnabled ? 4 : 0,
-        elevation: isGlowEnabled ? 3 : 0,
-      }
-    ]}>
-      {/* Header with Level and Title */}
-      <View style={tw`flex-row justify-between items-start mb-3`}>
-        <View style={tw`flex-1`}>
-          <Text style={[tw`text-lg font-bold`, { color: colors.text }]}>
-            Level {stats.level} Hero
-          </Text>
-          <Text style={[tw`text-xs`, { color: colors.textSecondary }]}>
-            {completedCount}/{totalCount} {getTaskTypeText()} {getTaskTypeAction()} today
+    <Card style={{ padding: 14, gap: 12, marginBottom: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Avatar emoji={avatar.avatar} color={avatar.color} size={44} />
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>Level {stats.level}</Text>
+            {stats.currentStreak > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="flame" size={13} color={colors.warning} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning, marginLeft: 2 }}>{stats.currentStreak}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>
+            {totalCount === 0
+              ? `No ${taskType} yet`
+              : completedCount === totalCount
+                ? `All ${taskType} done today`
+                : `${totalCount - completedCount} ${totalCount - completedCount === 1 ? SINGULAR[taskType] : taskType} left today`}
           </Text>
         </View>
-        
-        {/* Currency Display */}
-        <View style={tw`items-end`}>
-          <View style={tw`flex-row items-center mb-1`}>
-            <Ionicons name="diamond" size={14} color="#A78BFA" style={tw`mr-1`} />
-            <Text style={[tw`text-xs font-bold`, { color: colors.text }]}>
-              {stats.gemsEarned}
-            </Text>
+        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="ellipse" size={9} color={colors.warning} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginLeft: 4 }}>{stats.coinsEarned}</Text>
           </View>
-          <View style={tw`flex-row items-center`}>
-            <Ionicons name="logo-usd" size={14} color="#F59E0B" style={tw`mr-1`} />
-            <Text style={[tw`text-xs font-bold`, { color: colors.text }]}>
-              {stats.coinsEarned}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="diamond" size={9} color={colors.accent} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginLeft: 4 }}>{stats.gemsEarned}</Text>
           </View>
         </View>
       </View>
 
-      {/* Character Avatar and Stats Row */}
-      <View style={tw`flex-row items-center mb-3`}>
-        {/* Avatar Section */}
-        <View style={tw`mr-3`}>
-          <View style={[
-            tw`w-14 h-14 rounded-2xl items-center justify-center`,
-            { 
-              backgroundColor: avatarData.color + '20',
-              borderWidth: avatarData.border === 'glow' ? 3 : avatarData.border === 'rainbow' ? 2.5 : 2,
-              borderColor: avatarData.color,
-              shadowColor: isGlowEnabled && avatarData.border === 'glow' ? avatarData.color : 'transparent',
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: isGlowEnabled ? 0.8 : 0,
-              shadowRadius: isGlowEnabled ? 10 : 0,
-            }
-          ]}>
-            <Text style={tw`text-3xl`}>{avatarData.avatar}</Text>
-          </View>
-          
-          {/* Streak indicator under avatar */}
-          <View style={[
-            tw`mt-1.5 px-1.5 py-0.5 rounded-full items-center flex-row`,
-            { backgroundColor: avatarData.color + '20' }
-          ]}>
-            <Ionicons name="flame" size={10} color={avatarData.color} style={tw`mr-0.5`} />
-            <Text style={[tw`text-xs font-bold`, { color: avatarData.color }]}>
-              {stats.currentStreak}
-            </Text>
-          </View>
-        </View>
-
-        {/* Progress Bars Section */}
-        <View style={tw`flex-1`}>
-          {/* Health Bar */}
-          <View style={tw`mb-2`}>
-            <View style={tw`flex-row justify-between items-center mb-0.5`}>
-              <View style={tw`flex-row items-center`}>
-                <Ionicons name="heart" size={12} color="#EF4444" style={tw`mr-1`} />
-                <Text style={[tw`text-xs font-semibold`, { color: colors.text }]}>
-                  Health
-                </Text>
-              </View>
-              <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>
-                {stats.health || 100}/{stats.maxHealth || 100}
-              </Text>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        {meters.map((meter) => (
+          <View key={meter.label} style={{ flex: 1, gap: 5 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary }}>{meter.label}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>{meter.value}</Text>
             </View>
-            
-            <View style={[
-              tw`h-2 rounded-full overflow-hidden`,
-              { backgroundColor: colors.cardSecondary }
-            ]}>
-              <View
-                style={[
-                  tw`h-full rounded-full transition-all`,
-                  {
-                    width: `${Math.min(((stats.health || 100) / (stats.maxHealth || 100)) * 100, 100)}%`,
-                    backgroundColor: getHealthColor(stats.health || 100, stats.maxHealth || 100),
-                  }
-                ]}
-              />
-            </View>
+            <ProgressBar value={meter.pct} color={meter.color} height={5} />
           </View>
-
-          {/* Experience Bar */}
-          <View>
-            <View style={tw`flex-row justify-between items-center mb-0.5`}>
-              <View style={tw`flex-row items-center`}>
-                <Ionicons name="flash" size={12} color="#F59E0B" style={tw`mr-1`} />
-                <Text style={[tw`text-xs font-semibold`, { color: colors.text }]}>
-                  Experience
-                </Text>
-              </View>
-              <Text style={[tw`text-xs font-bold`, { color: colors.textSecondary }]}>
-                {(stats.experience || 0) % 100}/100
-              </Text>
-            </View>
-            
-            <View style={[
-              tw`h-2 rounded-full overflow-hidden`,
-              { backgroundColor: colors.cardSecondary }
-            ]}>
-              <View
-                style={[
-                  tw`h-full rounded-full`,
-                  {
-                    width: `${((stats.experience || 0) % 100)}%`,
-                    backgroundColor: getExpColor((stats.experience || 0) % 100),
-                  }
-                ]}
-              />
-            </View>
-          </View>
-        </View>
+        ))}
       </View>
-
-      {/* Daily Progress Summary */}
-      {totalCount > 0 && (
-        <View style={[
-          tw`p-2.5 rounded-xl`,
-          { backgroundColor: colors.cardSecondary }
-        ]}>
-          <View style={tw`flex-row justify-between items-center mb-1.5`}>
-            <Text style={[tw`text-xs font-semibold`, { color: colors.text }]}>
-              Today&apos;s Progress
-            </Text>
-            <Text style={[tw`text-xs font-bold`, { color: getProgressColor(completionPercentage) }]}>
-              {completionPercentage}%
-            </Text>
-          </View>
-          
-          <View style={[
-            tw`h-1.5 rounded-full overflow-hidden mb-1`,
-            { backgroundColor: colors.background }
-          ]}>
-            <View
-              style={[
-                tw`h-full rounded-full`,
-                {
-                  width: `${completionPercentage}%`,
-                  backgroundColor: getProgressColor(completionPercentage),
-                }
-              ]}
-            />
-          </View>
-          
-          <Text style={[tw`text-xs text-center`, { color: colors.textSecondary }]}>
-            {completedCount === totalCount && totalCount > 0
-              ? "Perfect day! All tasks completed!"
-              : `${totalCount - completedCount} ${getTaskTypeText()}${totalCount - completedCount !== 1 ? (taskType === 'dailies' ? '' : 's') : ''} remaining`
-            }
-          </Text>
-        </View>
-      )}
-    </View>
+    </Card>
   )
 }

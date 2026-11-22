@@ -1,24 +1,22 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Switch, Alert } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
-import tw from "../../lib/tailwind"
-import { useTheme } from "../../contexts/ThemeProvider"
+import { Alert, Text, View } from "react-native"
+import { useRouter, type Href } from "expo-router"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import {
-  loadAppSettings,
-  saveAppSettings,
-  syncNotificationSchedules,
-} from "../../lib/notificationService"
+import { useTheme } from "../../contexts/ThemeProvider"
+import { loadAppSettings, saveAppSettings, syncNotificationSchedules } from "../../lib/notificationService"
+import { Card, Divider, IconName, ListRow, Screen, Section, Toggle } from "../../components/ui"
 
+type Row =
+  | { kind: "link"; title: string; subtitle?: string; icon: IconName; color: string; href: Href; value?: string }
+  | { kind: "toggle"; title: string; subtitle?: string; icon: IconName; color: string; value: boolean; onChange: (v: boolean) => void }
+  | { kind: "action"; title: string; subtitle?: string; icon: IconName; color: string; onPress: () => void; destructive?: boolean }
 
 export default function Settings() {
   const router = useRouter()
   const { colors, currentTheme } = useTheme()
-  
-  // Settings state
+
   const [notifications, setNotifications] = useState(true)
   const [sound, setSound] = useState(true)
   const [vibration, setVibration] = useState(true)
@@ -26,238 +24,124 @@ export default function Settings() {
   const [analytics, setAnalytics] = useState(true)
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
 
-  // Load settings on mount
   useEffect(() => {
-    loadSettings()
+    loadAppSettings()
+      .then((settings) => {
+        setNotifications(settings.notifications)
+        setSound(settings.sound)
+        setVibration(settings.vibration)
+        setAutoBackup(settings.autoBackup)
+        setAnalytics(settings.analytics)
+      })
+      .catch((error) => console.error("Error loading settings:", error))
+      .finally(() => setHasLoadedSettings(true))
   }, [])
 
-  // Save settings whenever they change
+  // Persist whenever a setting changes (after the first load).
   useEffect(() => {
     if (!hasLoadedSettings) return
-
-    const saveSettings = async () => {
-      try {
-        const settings = {
-          notifications,
-          sound,
-          vibration,
-          autoBackup,
-          analytics
-        }
-        await saveAppSettings(settings)
-      } catch (error) {
-        console.error('Error saving settings:', error)
-      }
-    }
-
-    saveSettings()
+    saveAppSettings({ notifications, sound, vibration, autoBackup, analytics }).catch((error) => console.error("Error saving settings:", error))
   }, [hasLoadedSettings, notifications, sound, vibration, autoBackup, analytics])
 
   useEffect(() => {
     if (!hasLoadedSettings) return
-
-    const syncNotifications = async () => {
-      try {
-        await syncNotificationSchedules(notifications)
-      } catch (error) {
-        console.error("Failed to sync notification schedules:", error)
-      }
-    }
-
-    syncNotifications()
+    syncNotificationSchedules(notifications).catch((error) => console.error("Failed to sync notification schedules:", error))
   }, [hasLoadedSettings, notifications])
 
-  const loadSettings = async () => {
-    try {
-      const settings = await loadAppSettings()
-      setNotifications(settings.notifications)
-      setSound(settings.sound)
-      setVibration(settings.vibration)
-      setAutoBackup(settings.autoBackup)
-      setAnalytics(settings.analytics)
-    } catch (error) {
-      console.error('Error loading settings:', error)
-    } finally {
-      setHasLoadedSettings(true)
-    }
-  }
+  const resetAllData = () =>
+    Alert.alert(
+      "Reset all data",
+      "This permanently deletes your habits, dailies, routines and progress stored on this device. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AsyncStorage.multiRemove(["habitsData", "dailiesData", "routinesData", "statsData"])
+              Alert.alert("Done", "Your local data has been reset.")
+            } catch {
+              Alert.alert("Couldn't reset", "Please try again.")
+            }
+          },
+        },
+      ],
+    )
 
-  const settingCategories = [
+  const sections: { title: string; rows: Row[] }[] = [
+    {
+      title: "Account",
+      rows: [{ kind: "link", title: "Profile & avatar", subtitle: "Username, avatar and frame", icon: "person-circle-outline", color: colors.accent, href: "/more/avatar" }],
+    },
+    {
+      title: "Privacy & security",
+      rows: [
+        { kind: "link", title: "Privacy & security", subtitle: "Export your data, account security", icon: "shield-checkmark-outline", color: colors.success, href: "/more/security" },
+      ],
+    },
     {
       title: "Notifications",
-      icon: "notifications-outline",
-      items: [
-        {
-          title: "Push Notifications",
-          description: "Receive habit reminders and updates",
-          value: notifications,
-          setter: setNotifications,
-          icon: "notifications-outline",
-          color: colors.accent
-        },
-        {
-          title: "Sound",
-          description: "Play sounds for notifications",
-          value: sound,
-          setter: setSound,
-          icon: "volume-high-outline",
-          color: colors.success
-        },
-        {
-          title: "Vibration",
-          description: "Vibrate for notifications",
-          value: vibration,
-          setter: setVibration,
-          icon: "phone-portrait-outline",
-          color: colors.warning
-        }
-      ]
+      rows: [
+        { kind: "toggle", title: "Reminders", subtitle: "Habit and daily reminders", icon: "notifications-outline", color: colors.accent, value: notifications, onChange: setNotifications },
+        { kind: "toggle", title: "Sound", icon: "volume-high-outline", color: colors.success, value: sound, onChange: setSound },
+        { kind: "toggle", title: "Vibration", icon: "phone-portrait-outline", color: colors.warning, value: vibration, onChange: setVibration },
+      ],
     },
     {
-      title: "Data & Privacy",
-      icon: "shield-outline",
-      items: [
-        {
-          title: "Auto Backup",
-          description: "Automatically backup your data",
-          value: autoBackup,
-          setter: setAutoBackup,
-          icon: "cloud-upload-outline",
-          color: "#06B6D4"
-        },
-        {
-          title: "Analytics",
-          description: "Help improve the app with usage data",
-          value: analytics,
-          setter: setAnalytics,
-          icon: "analytics-outline",
-          color: "#8B5CF6"
-        }
-      ]
+      title: "App",
+      rows: [
+        { kind: "link", title: "Theme", icon: "color-palette-outline", color: "#EC4899", href: "/more/themes", value: currentTheme.name },
+        { kind: "link", title: "Help & support", icon: "help-circle-outline", color: "#06B6D4", href: "/more/help" },
+      ],
     },
     {
-      title: "Advanced",
-      icon: "settings-outline",
-      items: [
-        {
-          title: "Reset All Data",
-          description: "Clear all habits, dailies, and progress",
-          action: () => {
-            Alert.alert(
-              "Reset All Data",
-              "This will permanently delete all your data including habits, dailies, routines, and progress. This action cannot be undone.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Reset",
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      await AsyncStorage.multiRemove([
-                        "habitsData",
-                        "dailiesData", 
-                        "routinesData",
-                        "statsData"
-                      ])
-                      Alert.alert("Success", "All data has been reset.")
-                    } catch {
-                      Alert.alert("Error", "Failed to reset data.")
-                    }
-                  }
-                }
-              ]
-            )
-          },
-          color: colors.error
-        }
-      ]
-    }
+      title: "Data",
+      rows: [
+        { kind: "toggle", title: "Auto backup", subtitle: "Back up your data automatically", icon: "cloud-upload-outline", color: "#06B6D4", value: autoBackup, onChange: setAutoBackup },
+        { kind: "toggle", title: "Share usage analytics", subtitle: "Help improve HUBLE", icon: "analytics-outline", color: colors.accent, value: analytics, onChange: setAnalytics },
+        { kind: "action", title: "Reset all data", subtitle: "Delete everything stored on this device", icon: "trash-outline", color: colors.error, onPress: resetAllData, destructive: true },
+      ],
+    },
   ]
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
-        {/* Header */}
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
-          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[tw`text-2xl font-bold`, { color: colors.text }]}>Settings</Text>
-        </View>
+    <Screen title="Settings">
+      {sections.map((section) => (
+        <Section key={section.title} title={section.title}>
+          <Card padded={false}>
+            {section.rows.map((row, i) => (
+              <View key={row.title}>
+                {i > 0 && <Divider inset={62} />}
+                {row.kind === "link" ? (
+                  <ListRow
+                    icon={row.icon}
+                    iconColor={row.color}
+                    title={row.title}
+                    subtitle={row.subtitle}
+                    onPress={() => router.push(row.href)}
+                    chevron
+                    right={row.value ? <Text style={{ fontSize: 13, color: colors.textSecondary }}>{row.value}</Text> : undefined}
+                  />
+                ) : row.kind === "toggle" ? (
+                  <ListRow
+                    icon={row.icon}
+                    iconColor={row.color}
+                    title={row.title}
+                    subtitle={row.subtitle}
+                    onPress={() => row.onChange(!row.value)}
+                    right={<Toggle value={row.value} onChange={row.onChange} label={row.title} />}
+                  />
+                ) : (
+                  <ListRow icon={row.icon} iconColor={row.color} title={row.title} subtitle={row.subtitle} onPress={row.onPress} chevron />
+                )}
+              </View>
+            ))}
+          </Card>
+        </Section>
+      ))}
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {settingCategories.map((category, categoryIndex) => (
-            <View key={categoryIndex} style={tw`mb-6`}>
-              <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>
-                {category.title}
-              </Text>
-              
-              <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: colors.card }]}>
-                {category.items.map((item, itemIndex) => (
-                  <View key={itemIndex}>
-                    <TouchableOpacity
-                      style={[
-                        tw`p-4 flex-row items-center`,
-                        itemIndex !== category.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.cardSecondary }
-                      ]}
-                      onPress={item.action || (() => {})}
-                      disabled={!item.action}
-                    >
-                      <View style={[
-                        tw`w-10 h-10 rounded-lg items-center justify-center mr-4`,
-                        { backgroundColor: `${item.color}20` }
-                      ]}>
-                        <Ionicons name={item.icon} size={20} color={item.color} />
-                      </View>
-                      
-                      <View style={tw`flex-1 mr-3`}>
-                        <Text style={[tw`font-semibold text-base`, { color: colors.text }]}>
-                          {item.title}
-                        </Text>
-                        <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>
-                          {item.description}
-                        </Text>
-                      </View>
-                      
-                      {item.setter ? (
-                        <Switch
-                          value={item.value}
-                          onValueChange={item.setter}
-                          trackColor={{ false: colors.cardSecondary, true: item.color + '80' }}
-                          thumbColor={item.value ? item.color : colors.textSecondary}
-                        />
-                      ) : (
-                        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ))}
-
-          {/* App Info */}
-          <View style={[tw`rounded-2xl p-4 mb-6`, { backgroundColor: colors.card }]}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>About</Text>
-            <View style={tw`space-y-3`}>
-              <View style={tw`flex-row justify-between`}>
-                <Text style={[tw``, { color: colors.textSecondary }]}>Version</Text>
-                <Text style={[tw`font-semibold`, { color: colors.text }]}>1.0.0</Text>
-              </View>
-              <View style={tw`flex-row justify-between`}>
-                <Text style={[tw``, { color: colors.textSecondary }]}>Build</Text>
-                <Text style={[tw`font-semibold`, { color: colors.text }]}>2025.1.15</Text>
-              </View>
-              <View style={tw`flex-row justify-between`}>
-                <Text style={[tw``, { color: colors.textSecondary }]}>Developer</Text>
-                <Text style={[tw`font-semibold`, { color: colors.text }]}>HUBLE Team</Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+      <Text style={{ textAlign: "center", fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>HUBLE · version 1.0.0</Text>
+    </Screen>
   )
 }
-

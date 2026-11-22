@@ -1,22 +1,21 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Alert, ActivityIndicator } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
+import { Alert, RefreshControl, Text, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { useTheme } from "../../../../contexts/ThemeProvider"
-import tw from "../../../../lib/tailwind"
 import { partiesAPI } from "../../../../lib/api"
+import { Avatar, Button, Card, Divider, EmojiTile, EmptyState, ListRow, LoadingState, Pill, ProgressBar, Screen, Section } from "../../../../components/ui"
 
 export default function PartyDetails() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
-  const { colors, currentTheme } = useTheme()
+  const { colors } = useTheme()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [contributing, setContributing] = useState(false)
   const [party, setParty] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
-  const partyAccent = colors.accent
 
   const partyId = Number(Array.isArray(id) ? id[0] : id)
 
@@ -25,19 +24,13 @@ export default function PartyDetails() {
       setLoading(false)
       return
     }
-
     try {
-      setLoading(true)
-      const [partyResponse, membersResponse] = await Promise.all([
-        partiesAPI.getParty(partyId),
-        partiesAPI.getPartyMembers(partyId),
-      ])
-
+      const [partyResponse, membersResponse] = await Promise.all([partiesAPI.getParty(partyId), partiesAPI.getPartyMembers(partyId)])
       setParty(partyResponse.party || null)
       setMembers(membersResponse.members || partyResponse.party?.members || [])
     } catch (error) {
       console.error("Error loading party details:", error)
-      Alert.alert("Error", "Failed to load party details")
+      Alert.alert("Couldn't load party", "Please try again in a moment.")
     } finally {
       setLoading(false)
     }
@@ -47,244 +40,146 @@ export default function PartyDetails() {
     loadParty()
   }, [loadParty])
 
-  const weeklySummary = party?.weekly || null
-  const weeklyGoalLabel =
-    weeklySummary?.weekly_goal_label || party?.weekly_goal_label || party?.goal || "Weekly team goal"
-  const weeklyGoalTarget = Math.max(
-    1,
-    Number(weeklySummary?.weekly_goal_target ?? party?.weekly_goal_target ?? 10),
-  )
-  const weeklyPoints = Math.max(
-    0,
-    Number(weeklySummary?.total_points ?? party?.weekly_points ?? 0),
-  )
-  const weeklyProgress = Math.min(
-    100,
-    Math.max(
-      0,
-      Number(
-        weeklySummary?.progress_percent ??
-          party?.progress ??
-          Math.round((weeklyPoints / weeklyGoalTarget) * 100),
-      ) || 0,
-    ),
-  )
-  const contributors = Array.isArray(weeklySummary?.member_contributions)
-    ? weeklySummary.member_contributions
-    : []
+  const weekly = party?.weekly || null
+  const goalLabel = weekly?.weekly_goal_label || party?.weekly_goal_label || party?.goal || "Weekly team goal"
+  const goalTarget = Math.max(1, Number(weekly?.weekly_goal_target ?? party?.weekly_goal_target ?? 10))
+  const points = Math.max(0, Number(weekly?.total_points ?? party?.weekly_points ?? 0))
+  const progress = Math.min(100, Math.max(0, Number(weekly?.progress_percent ?? party?.progress ?? Math.round((points / goalTarget) * 100)) || 0))
+  const contributors: any[] = Array.isArray(weekly?.member_contributions) ? weekly.member_contributions : []
+  const color = party?.color || colors.accent
 
   const handleLeaveParty = () => {
     if (!party) return
-
-    Alert.alert(
-      "Leave Party",
-      `Are you sure you want to leave ${party.name}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Leave",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await partiesAPI.leaveParty(partyId)
-              Alert.alert("Left Party")
-              router.replace('/more/social/parties')
-            } catch (error) {
-              console.error("Error leaving party:", error)
-              Alert.alert("Error", "Failed to leave party")
-            }
-          },
+    Alert.alert("Leave party", `Leave ${party.name}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Leave",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await partiesAPI.leaveParty(partyId)
+            router.replace("/more/social/parties")
+          } catch (error) {
+            console.error("Error leaving party:", error)
+            Alert.alert("Something went wrong", "Couldn't leave the party.")
+          }
         },
-      ],
-    )
+      },
+    ])
   }
 
-  const handleContribute = async (points: number) => {
-    if (!Number.isFinite(partyId) || points < 1) {
-      return
-    }
-
+  const handleContribute = async (amount: number) => {
+    if (!Number.isFinite(partyId) || amount < 1) return
     try {
       setContributing(true)
-      await partiesAPI.contributeToParty(partyId, points)
+      await partiesAPI.contributeToParty(partyId, amount)
       await loadParty()
     } catch (error) {
       console.error("Error contributing to party:", error)
-      const message = error instanceof Error ? error.message : "Failed to add contribution"
-      Alert.alert("Error", message)
+      Alert.alert("Couldn't add points", error instanceof Error ? error.message : "Please try again.")
     } finally {
       setContributing(false)
     }
   }
 
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await loadParty()
+    setRefreshing(false)
+  }
+
   if (loading) {
     return (
-      <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={currentTheme.statusBarStyle} />
-        <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[tw`mt-4`, { color: colors.textSecondary }]}>Loading party...</Text>
-        </View>
-      </SafeAreaView>
+      <Screen title="Party">
+        <LoadingState />
+      </Screen>
+    )
+  }
+
+  if (!party) {
+    return (
+      <Screen title="Party">
+        <EmptyState icon="star-outline" title="Party not found" message="This party may no longer exist." />
+      </Screen>
     )
   }
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={currentTheme.statusBarStyle} />
-      <View style={tw`flex-1 px-2 pt-2 pb-4`}>
-        <View style={tw`flex-row items-center mb-6 mt-2`}>
-          <TouchableOpacity style={tw`mr-3`} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[tw`text-2xl font-bold flex-1`, { color: colors.text }]}>Party Details</Text>
-          <TouchableOpacity style={tw`p-2`} onPress={loadParty}>
-            <Ionicons name="refresh" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
+    <Screen
+      title={party.name}
+      subtitle={`${party.member_count || members.length || 0}/${party.max_members || 10} members`}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} colors={[colors.accent]} />}
+    >
+      {/* Overview + weekly goal */}
+      <Card style={{ gap: 16 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+          <EmojiTile emoji={party.emoji || "🎉"} color={color} size={56} />
+          <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, color: party.description ? colors.text : colors.textSecondary }}>
+            {party.description || "No description yet."}
+          </Text>
         </View>
 
-        {!party ? (
-          <View style={tw`items-center py-12`}>
-            <Ionicons name="shield-outline" size={64} color={colors.textSecondary} />
-            <Text style={[tw`text-lg mt-4`, { color: colors.textSecondary }]}>Party not found</Text>
-            <Text style={[tw`text-center mt-2`, { color: colors.textSecondary }]}>This party may no longer exist.</Text>
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
+            <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: colors.text }} numberOfLines={1}>
+              {goalLabel}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+              <Text style={{ fontWeight: "800", color: colors.text }}>{points}</Text> / {goalTarget} pts
+            </Text>
           </View>
+          <ProgressBar value={progress / 100} color={color} height={8} />
+          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{progress}% of this week's goal</Text>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Button label="+1 point" style={{ flex: 1 }} loading={contributing} onPress={() => handleContribute(1)} />
+          <Button label="+3 points" variant="secondary" style={{ flex: 1 }} disabled={contributing} onPress={() => handleContribute(3)} />
+        </View>
+      </Card>
+
+      <Section title="This week">
+        {contributors.length === 0 ? (
+          <EmptyState icon="podium-outline" title="No points yet" message="Be the first to contribute this week." />
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={[tw`rounded-2xl p-4 mb-3`, { backgroundColor: colors.card }]}> 
-              <View style={tw`flex-row items-center mb-4`}>
-                <View style={[tw`w-14 h-14 rounded-xl items-center justify-center mr-3`, { backgroundColor: colors.cardSecondary }]}>
-                  <Text style={tw`text-2xl`}>{party.emoji || '🎉'}</Text>
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`text-xl font-bold`, { color: colors.text }]}>{party.name}</Text>
-                  <Text style={[tw`text-sm mt-1`, { color: colors.textSecondary }]}>{party.description || 'No description'}</Text>
+          <Card padded={false}>
+            {contributors.slice(0, 8).map((contributor, i) => (
+              <View key={contributor.id || contributor.username}>
+                {i > 0 && <Divider inset={14} />}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 }}>
+                  <Text style={{ width: 20, fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>{i + 1}</Text>
+                  <Avatar emoji={contributor.avatar} size={32} />
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: colors.text }} numberOfLines={1}>
+                    {contributor.username}
+                  </Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>{Number(contributor.points || 0)} pts</Text>
                 </View>
               </View>
-
-              {!!weeklyGoalLabel && (
-                <View style={tw`mb-4`}>
-                  <View style={tw`flex-row justify-between items-center mb-1`}>
-                    <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>{weeklyGoalLabel}</Text>
-                    <Text style={[tw`text-sm font-bold`, { color: colors.text }]}>
-                      {weeklyPoints}/{weeklyGoalTarget} pts
-                    </Text>
-                  </View>
-                  <View style={[tw`h-2 rounded-full overflow-hidden`, { backgroundColor: colors.cardSecondary }]}>
-                    <View
-                      style={[
-                        tw`h-full rounded-full`,
-                        { width: `${weeklyProgress}%`, backgroundColor: partyAccent },
-                      ]}
-                    />
-                  </View>
-                  <Text style={[tw`text-xs mt-1`, { color: colors.textSecondary }]}>{weeklyProgress}% weekly goal complete</Text>
-                </View>
-              )}
-
-              <View style={tw`flex-row`}> 
-                <TouchableOpacity
-                  style={[
-                    tw`flex-1 py-3 rounded-xl mr-2`,
-                    {
-                      backgroundColor: partyAccent,
-                      opacity: contributing ? 0.8 : 1,
-                    },
-                  ]}
-                  onPress={() => handleContribute(1)}
-                  disabled={contributing}
-                >
-                  <Text style={tw`text-white text-center font-semibold`}>
-                    {contributing ? "Updating..." : "+1 Point"}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[tw`flex-1 py-3 rounded-xl ml-2`, { backgroundColor: colors.cardSecondary }]}
-                  onPress={() => handleContribute(3)}
-                  disabled={contributing}
-                >
-                  <Text style={[tw`text-center font-semibold`, { color: colors.text }]}>+3 Points</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={[tw`border-t pt-4`, { borderColor: colors.cardSecondary }]}>
-                <View style={tw`flex-row justify-between mb-3`}>
-                  <Text style={[tw`font-medium`, { color: colors.textSecondary }]}>Members</Text>
-                  <Text style={[tw`font-semibold`, { color: colors.text }]}>
-                    {party.member_count || members.length || 0}/{party.max_members || 10}
-                  </Text>
-                </View>
-                <View style={tw`flex-row justify-between`}>
-                  <Text style={[tw`font-medium`, { color: colors.textSecondary }]}>Created</Text>
-                  <Text style={[tw`font-semibold`, { color: colors.text }]}>
-                    {party.created_at || party.updated_at
-                      ? new Date(party.created_at || party.updated_at).toLocaleDateString()
-                      : 'Unknown'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={[tw`rounded-2xl p-4 mb-3`, { backgroundColor: colors.card }]}> 
-              <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Weekly Contributions</Text>
-
-              {contributors.length === 0 ? (
-                <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>No contributions yet this week.</Text>
-              ) : (
-                contributors.slice(0, 8).map((contributor: any) => (
-                  <View
-                    key={contributor.id || contributor.username}
-                    style={[tw`flex-row items-center justify-between py-2 border-b`, { borderColor: colors.cardSecondary }]}
-                  >
-                    <View style={tw`flex-row items-center flex-1`}> 
-                      <View style={[tw`w-8 h-8 rounded-lg items-center justify-center mr-3`, { backgroundColor: colors.cardSecondary }]}>
-                        <Text>{contributor.avatar || "🙂"}</Text>
-                      </View>
-                      <Text style={[tw`font-medium`, { color: colors.text }]}>{contributor.username}</Text>
-                    </View>
-                    <Text style={[tw`font-bold`, { color: colors.text }]}>{Number(contributor.points || 0)} pts</Text>
-                  </View>
-                ))
-              )}
-            </View>
-
-            <View style={[tw`rounded-2xl p-4 mb-3`, { backgroundColor: colors.card }]}> 
-              <Text style={[tw`text-lg font-bold mb-4`, { color: colors.text }]}>Members ({members.length})</Text>
-              {members.map((member) => (
-                <View
-                  key={member.id || member.user_id || member.username}
-                  style={[tw`flex-row items-center py-3 border-b`, { borderColor: colors.cardSecondary }]}
-                >
-                  <View style={[tw`w-10 h-10 rounded-lg items-center justify-center mr-3`, { backgroundColor: colors.cardSecondary }]}>
-                    {member.avatar ? (
-                      <Text style={tw`text-lg`}>{member.avatar}</Text>
-                    ) : (
-                      <Ionicons name="person" size={20} color={colors.textSecondary} />
-                    )}
-                  </View>
-                  <View style={tw`flex-1`}>
-                    <Text style={[tw`font-semibold`, { color: colors.text }]}>{member.username}</Text>
-                    <Text style={[tw`text-sm`, { color: colors.textSecondary }]}>Level {member.level || 1}</Text>
-                  </View>
-                  <View style={[tw`px-2 py-1 rounded`, { backgroundColor: colors.cardSecondary }]}> 
-                    <Text style={[tw`text-xs font-semibold`, { color: colors.textSecondary }]}> 
-                      {member.role || 'member'}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              style={[tw`rounded-xl p-4`, { backgroundColor: colors.error }]}
-              onPress={handleLeaveParty}
-            >
-              <Text style={tw`text-white text-center font-semibold`}>Leave Party</Text>
-            </TouchableOpacity>
-          </ScrollView>
+            ))}
+          </Card>
         )}
-      </View>
-    </SafeAreaView>
+      </Section>
+
+      <Section title={`Members · ${members.length}`}>
+        <Card padded={false}>
+          {members.map((member, i) => (
+            <View key={member.id || member.user_id || member.username}>
+              {i > 0 && <Divider inset={70} />}
+              <ListRow
+                leading={<Avatar emoji={member.avatar} color={member.avatar_color} size={42} />}
+                title={member.username}
+                subtitle={`Level ${member.level || 1}`}
+                right={member.role && member.role !== "member" ? <Pill label={member.role.charAt(0).toUpperCase() + member.role.slice(1)} color={colors.accent} /> : undefined}
+              />
+            </View>
+          ))}
+        </Card>
+      </Section>
+
+      <Text style={{ fontSize: 12, color: colors.textSecondary, textAlign: "center" }}>
+        Created {party.created_at || party.updated_at ? new Date(party.created_at || party.updated_at).toLocaleDateString() : "—"}
+      </Text>
+      <Button label="Leave party" icon="exit-outline" variant="danger" onPress={handleLeaveParty} />
+    </Screen>
   )
 }
